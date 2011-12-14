@@ -15,7 +15,7 @@ static const AP_Board::options_t options = AP_Board::opt_gps | AP_Board::opt_bar
 static const MAV_TYPE vehicle = MAV_QUADROTOR;
 //static const apo::AP_Board::mode_e boardMode = apo::AP_Board::MODE_HIL_CNTL;
 static const apo::AP_Board::mode_e boardMode = apo::AP_Board::MODE_LIVE;
-static const uint8_t heartBeatTimeout = 0;
+static const uint8_t heartBeatTimeout = 3;
 
 // algorithm selection
 #define CONTROLLER_CLASS ControllerQuad
@@ -23,15 +23,15 @@ static const uint8_t heartBeatTimeout = 0;
 #define NAVIGATOR_CLASS Navigator_Dcm
 
 //// hardware selection
-//#define BOARD_TYPE Board_APM1
+#define BOARD_TYPE Board_APM1
 //#define BOARD_TYPE Board_APM1_2560
-#define BOARD_TYPE Board_APM2
+//#define BOARD_TYPE Board_APM2
 
 // baud rates
 // optional sensors
 static const bool gpsEnabled = false;
 static const bool baroEnabled = true;
-static const bool compassEnabled = true;
+static const bool compassEnabled = false;
 static const Matrix3f compassOrientation = AP_COMPASS_COMPONENTS_UP_PINS_FORWARD;
 // compass orientation: See AP_Compass_HMC5843.h for possible values
 
