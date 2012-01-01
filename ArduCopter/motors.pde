@@ -22,7 +22,7 @@ static void arm_motors()
 		if (arming_counter == LEVEL_DELAY){
 			//Serial.printf("\nAL\n");
 			// begin auto leveling
-			auto_level_counter = 200;
+			auto_level_counter = 250;
 			arming_counter = 0;
 
 		}else if (arming_counter == ARM_DELAY){
@@ -42,7 +42,7 @@ static void arm_motors()
 			//Serial.printf("\nLEV\n");
 
 			// begin manual leveling
-			imu.init_accel(mavlink_delay);
+			imu.init_accel(mavlink_delay, flash_leds);
 			arming_counter = 0;
 
 		}else if (arming_counter == DISARM_DELAY){
@@ -81,6 +81,8 @@ static void init_arm_motors()
 	// --------------------
 	init_simple_bearing();
 
+	init_z_damper();
+
 	// Reset home position
 	// -------------------
 	if(home_is_set)
@@ -100,7 +102,7 @@ static void init_arm_motors()
 
 	// temp hack
 	motor_light = true;
-	digitalWrite(A_LED_PIN, HIGH);
+	digitalWrite(A_LED_PIN, LED_ON);
 }
 
 

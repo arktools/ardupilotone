@@ -1,4 +1,4 @@
-import util, pexpect, time, math
+import util, pexpect, time, math, mavwp
 
 # a list of pexpect objects to read while waiting for
 # messages. This keeps the output to stdout flowing
@@ -80,12 +80,24 @@ def wait_altitude(mav, alt_min, alt_max, timeout=30):
         m = mav.recv_match(type='VFR_HUD', blocking=True)
         climb_rate =  m.alt - previous_alt
         previous_alt = m.alt
-        print("Altitude %u, rate: %u" % (m.alt, climb_rate))
+        print("Wait Altitude: Cur:%u, min_alt:%u, climb_rate: %u" % (m.alt, alt_min , climb_rate))
         if abs(climb_rate) > 0:
             tstart = time.time();
         if m.alt >= alt_min and m.alt <= alt_max:
             return True
     print("Failed to attain altitude range")
+    return False
+
+def wait_groundspeed(mav, gs_min, gs_max, timeout=30):
+    '''wait for a given ground speed range'''
+    tstart = time.time()
+    print("Waiting for groundspeed between %.1f and %.1f" % (gs_min, gs_max))
+    while time.time() < tstart + timeout:
+        m = mav.recv_match(type='VFR_HUD', blocking=True)
+        print("Wait groundspeed %.1f, target:%.1f" % (m.groundspeed, gs_min))
+        if m.groundspeed >= gs_min and m.groundspeed <= gs_max:
+            return True
+    print("Failed to attain groundspeed range")
     return False
 
 
@@ -140,6 +152,8 @@ def wait_distance(mav, distance, accuracy=5, timeout=30):
         print("Distance %.2f meters" % delta)
         if math.fabs(delta - distance) <= accuracy:
             return True
+        if(delta > (distance + accuracy)):
+            return False
     print("Failed to attain distance %u" % distance)
     return False
 
@@ -162,7 +176,7 @@ def wait_location(mav, loc, accuracy=5, timeout=30, target_altitude=None, height
     print("Failed to attain location")
     return False
 
-def wait_waypoint(mav, wpnum_start, wpnum_end, allow_skip=True, timeout=400):
+def wait_waypoint(mav, wpnum_start, wpnum_end, allow_skip=True, max_dist=2, timeout=400):
     '''wait for waypoint ranges'''
     tstart = time.time()
     # this message arrives after we set the current WP
@@ -181,14 +195,18 @@ def wait_waypoint(mav, wpnum_start, wpnum_end, allow_skip=True, timeout=400):
         seq = m.seq
         m = mav.recv_match(type='NAV_CONTROLLER_OUTPUT', blocking=True)
         wp_dist = m.wp_dist
-        print("test: WP %u (wp_dist=%u)" % (seq, wp_dist))
+        print("test: WP %u (wp_dist=%u), current_wp: %u, wpnum_end: %u" % (seq, wp_dist, current_wp, wpnum_end))
         if seq == current_wp+1 or (seq > current_wp+1 and allow_skip):
             print("test: Starting new waypoint %u" % seq)
             tstart = time.time()
             current_wp = seq
             # the wp_dist check is a hack until we can sort out the right seqnum
             # for end of mission
-        if current_wp == wpnum_end or (current_wp == wpnum_end-1 and wp_dist < 2):
+        #if current_wp == wpnum_end or (current_wp == wpnum_end-1 and wp_dist < 2):
+        if (current_wp == wpnum_end and wp_dist < max_dist):
+            print("Reached final waypoint %u" % seq)
+            return True
+        if (current_wp == 255):
             print("Reached final waypoint %u" % seq)
             return True
         if seq > current_wp+1:
@@ -202,9 +220,14 @@ def save_wp(mavproxy, mav):
     mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==2000', blocking=True)
     mavproxy.send('rc 7 1000\n')
     mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==1000', blocking=True)
-    #mavproxy.send('wp list\n')
-    #mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==1000', blocking=True)
 
 def wait_mode(mav, mode):
     '''wait for a flight mode to be engaged'''
     mav.recv_match(condition='MAV.flightmode=="%s"' % mode, blocking=True)
+
+def mission_count(filename):
+    '''load a mission from a file and return number of waypoints'''
+    wploader = mavwp.MAVWPLoader()
+    wploader.load(filename)
+    num_wp = wploader.count()
+    return num_wp

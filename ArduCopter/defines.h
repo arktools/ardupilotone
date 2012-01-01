@@ -90,16 +90,11 @@
 #define GPS_PROTOCOL_MTK16	6
 #define GPS_PROTOCOL_AUTO	7
 
-// SONAR types:
-#define MAX_SONAR_UNKNOWN	0
-#define MAX_SONAR_XL		1
-
 #define CH_ROLL CH_1
 #define CH_PITCH CH_2
 #define CH_THROTTLE CH_3
 #define CH_RUDDER CH_4
 #define CH_YAW CH_4
-
 
 #define RC_CHANNEL_ANGLE 0
 #define RC_CHANNEL_RANGE 1
@@ -121,7 +116,8 @@
 #define RTL 6				// AUTO control
 #define CIRCLE 7			// AUTO control
 #define POSITION 8			// AUTO control
-#define NUM_MODES 9
+#define LAND 9				// AUTO control
+#define NUM_MODES 10
 
 #define INITIALISING 9     // in startup routines
 
@@ -156,6 +152,10 @@
 
 // altitude controller
 #define CH6_THR_HOLD_KP 14
+#define CH6_Z_GAIN 15
+#define CH6_THRUST 16
+#define CH6_DAMP 17
+
 
 // nav byte mask
 // -------------
@@ -172,6 +172,7 @@
 #define LOITER_MODE 1
 #define WP_MODE 2
 #define CIRCLE_MODE 3
+#define NO_NAV_MODE 4
 
 // Waypoint options
 #define MASK_OPTIONS_RELATIVE_ALT 		1
@@ -357,5 +358,11 @@ enum gcs_severity {
 // APM Hardware selection
 #define APM_HARDWARE_APM1 1
 #define APM_HARDWARE_APM2 2
+
+#define AP_BARO_BMP085    1
+#define AP_BARO_MS5611    2
+
+#define LOGGING_SIMPLE    1
+#define LOGGING_VERBOSE   2
 
 #endif // _DEFINES_H

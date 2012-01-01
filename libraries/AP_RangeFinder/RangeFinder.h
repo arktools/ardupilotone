@@ -18,14 +18,10 @@
 #define AP_RANGEFINDER_ORIENTATION_BACK_LEFT 	  5, -5,  0
 #define AP_RANGEFINDER_ORIENTATION_FRONT_LEFT 	  5,  5,  0
 */
-//#define AP_RANGEFINDER_PITOT_TUBE 1007
-
-//#define AP_RANGEFINDER_NUM_AVERAGES 4
 
 class RangeFinder
 {
   protected:
-	//GPS(Stream *s) : _port(s) {};
 	RangeFinder(AP_AnalogSource * source, ModeFilter *filter) :
 		_analog_source(source),
 		_mode_filter(filter)

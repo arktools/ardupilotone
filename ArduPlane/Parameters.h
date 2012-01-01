@@ -69,7 +69,8 @@ public:
         k_param_flap_2_percent,
         k_param_flap_2_speed,
         k_param_num_resets,
-        k_param_log_last_filenumber,
+        k_param_log_last_filenumber,		// *** Deprecated - remove with next eeprom number change
+        k_param_reset_switch_chan,
 
 
 		// 110: Telemetry control
@@ -84,7 +85,7 @@ public:
         //
         k_param_flybywire_airspeed_min = 120,
         k_param_flybywire_airspeed_max,
-        k_param_FBWB_min_altitude,  // -1=disabled, minimum value for altitude in cm (default 30m)
+        k_param_FBWB_min_altitude,  // 0=disabled, minimum value for altitude in cm (for first time try 30 meters = 3000 cm)
 
         //
         // 130: Sensor parameters
@@ -116,6 +117,7 @@ public:
         k_param_airspeed_cruise,
         k_param_RTL_altitude,
         k_param_inverted_flight_ch,
+        k_param_min_gndspeed,
 
         //
         // 170: Radio settings
@@ -167,6 +169,11 @@ public:
         k_param_command_index,
         k_param_waypoint_radius,
         k_param_loiter_radius,
+        k_param_fence_action,
+        k_param_fence_total,
+        k_param_fence_channel,
+        k_param_fence_minalt,
+        k_param_fence_maxalt,
 
         //
         // 240: PID Controllers
@@ -259,6 +266,13 @@ public:
     AP_Int8     command_index;
     AP_Int8     waypoint_radius;
     AP_Int8     loiter_radius;
+#if GEOFENCE_ENABLED == ENABLED
+    AP_Int8     fence_action;
+    AP_Int8     fence_total;
+    AP_Int8     fence_channel;
+    AP_Int16    fence_minalt; // meters
+    AP_Int16    fence_maxalt; // meters
+#endif
 
     // Fly-by-wire
     //
@@ -306,8 +320,10 @@ public:
     AP_Int8     reverse_ch2_elevon;
     AP_Int16    num_resets;
     AP_Int16    log_bitmask;
-    AP_Int16	log_last_filenumber;
+    AP_Int16	log_last_filenumber;		// *** Deprecated - remove with next eeprom number change
+    AP_Int8		reset_switch_chan;
     AP_Int16    airspeed_cruise;
+    AP_Int16    min_gndspeed;
     AP_Int16    pitch_trim;
     AP_Int16    RTL_altitude;
     AP_Int16    ground_temperature;
@@ -378,6 +394,14 @@ public:
         waypoint_radius         (WP_RADIUS_DEFAULT,         k_param_waypoint_radius,        PSTR("WP_RADIUS")),
         loiter_radius           (LOITER_RADIUS_DEFAULT,     k_param_loiter_radius,          PSTR("WP_LOITER_RAD")),
 
+#if GEOFENCE_ENABLED == ENABLED
+        fence_action            (0,                         k_param_fence_action,           PSTR("FENCE_ACTION")),
+        fence_total             (0,                         k_param_fence_total,            PSTR("FENCE_TOTAL")),
+        fence_channel           (0,                         k_param_fence_channel,          PSTR("FENCE_CHANNEL")),
+        fence_minalt            (0,                         k_param_fence_minalt,           PSTR("FENCE_MINALT")),
+        fence_maxalt            (0,                         k_param_fence_maxalt,           PSTR("FENCE_MAXALT")),
+#endif
+
         flybywire_airspeed_min  (AIRSPEED_FBW_MIN,          k_param_flybywire_airspeed_min, PSTR("ARSPD_FBW_MIN")),
         flybywire_airspeed_max  (AIRSPEED_FBW_MAX,          k_param_flybywire_airspeed_max, PSTR("ARSPD_FBW_MAX")),
 
@@ -413,7 +437,9 @@ public:
         num_resets              (0,                         k_param_num_resets,             PSTR("SYS_NUM_RESETS")),
         log_bitmask             (DEFAULT_LOG_BITMASK,		k_param_log_bitmask,            PSTR("LOG_BITMASK")),
         log_last_filenumber     (0,							k_param_log_last_filenumber,    PSTR("LOG_LASTFILE")),
+        reset_switch_chan		(0,							k_param_reset_switch_chan,		PSTR("RST_SWITCH_CH")),
         airspeed_cruise         (AIRSPEED_CRUISE_CM,        k_param_airspeed_cruise,        PSTR("TRIM_ARSPD_CM")),
+        min_gndspeed            (MIN_GNDSPEED_CM,        	k_param_min_gndspeed,           PSTR("MIN_GNDSPD_CM")),
         pitch_trim              (0,                         k_param_pitch_trim,             PSTR("TRIM_PITCH_CD")),
         RTL_altitude            (ALT_HOLD_HOME_CM,          k_param_RTL_altitude,           PSTR("ALT_HOLD_RTL")),
         FBWB_min_altitude       (ALT_HOLD_FBW_CM,           k_param_FBWB_min_altitude,      PSTR("ALT_HOLD_FBWCM")),

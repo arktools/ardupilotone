@@ -188,6 +188,26 @@ AP_DCM::accel_adjust(void)
 	_accel_vector -= temp;
 }
 
+/*
+  reset the DCM matrix and omega. Used on ground start, and on
+  extreme errors in the matrix
+ */
+void
+AP_DCM::matrix_reset(void)
+{
+	_dcm_matrix.a.x = 1.0f;
+	_dcm_matrix.a.y = 0.0f;
+	_dcm_matrix.a.z = 0.0f;
+	_dcm_matrix.b.x = 0.0f;
+	_dcm_matrix.b.y = 1.0f;
+	_dcm_matrix.b.z = 0.0f;
+	_dcm_matrix.c.x = 0.0f;
+	_dcm_matrix.c.y = 0.0f;
+	_dcm_matrix.c.z = 1.0f;
+	_omega_I.x = 0.0f;
+	_omega_I.y = 0.0f;
+	_omega_I.z = 0.0f;
+}
 
 /*************************************************
 Direction Cosine Matrix IMU: Theory
@@ -221,18 +241,7 @@ AP_DCM::normalize(void)
 	_dcm_matrix.c = renorm(temporary[2], problem);
 
 	if (problem == 1) {		// Our solution is blowing up and we will force back to initial condition.	Hope we are not upside down!
-		_dcm_matrix.a.x = 1.0f;
-		_dcm_matrix.a.y = 0.0f;
-		_dcm_matrix.a.z = 0.0f;
-		_dcm_matrix.b.x = 0.0f;
-		_dcm_matrix.b.y = 1.0f;
-		_dcm_matrix.b.z = 0.0f;
-		_dcm_matrix.c.x = 0.0f;
-		_dcm_matrix.c.y = 0.0f;
-		_dcm_matrix.c.z = 1.0f;
-		_omega_I.x = 0.0f;
-		_omega_I.y = 0.0f;
-		_omega_I.z = 0.0f;
+		matrix_reset();
 	}
 }
 
@@ -264,7 +273,7 @@ AP_DCM::drift_correction(void)
 	//Compensation the Roll, Pitch and Yaw drift.
 	//float mag_heading_x;
 	//float mag_heading_y;
-	float error_course;
+	float error_course = 0;
 	float accel_magnitude;
 	float accel_weight;
 	float integrator_magnitude;
@@ -300,7 +309,7 @@ AP_DCM::drift_correction(void)
 
 	//*****YAW***************
 
-	if (_compass) {
+	if (_compass && _compass->healthy) {
 		// We make the gyro YAW drift correction based on compass magnetic heading
 		error_course = (_dcm_matrix.a.x * _compass->heading_y) - (_dcm_matrix.b.x * _compass->heading_x);	// Equation 23, Calculating YAW error
 

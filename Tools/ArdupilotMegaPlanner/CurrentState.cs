@@ -20,6 +20,11 @@ namespace ArdupilotMega
         public float groundcourse { get { return _groundcourse; } set { if (value < 0) { _groundcourse = value + 360; } else { _groundcourse = value; } } }
         private float _groundcourse = 0;
 
+        /// <summary>
+        /// time over target in seconds
+        /// </summary>
+        public int tot { get { if (groundspeed <= 0) return 0; return (int)(wp_dist / groundspeed); } }
+
         // speeds
         public float airspeed { get { return _airspeed * multiplierspeed; } set { _airspeed = value; } }
         public float groundspeed { get { return _groundspeed * multiplierspeed; } set { _groundspeed = value; } }
@@ -129,7 +134,7 @@ namespace ArdupilotMega
         //battery
         public float battery_voltage { get { return _battery_voltage; } set { _battery_voltage = value / 1000; } }
         private float _battery_voltage;
-        public float battery_remaining { get { return _battery_remaining; } set { _battery_remaining = value / 1000; } }
+        public float battery_remaining { get { return _battery_remaining; } set { _battery_remaining = value / 1000; if (_battery_remaining < 0) _battery_remaining = 0; } }
         private float _battery_remaining;
 
         // HIL
@@ -456,7 +461,7 @@ namespace ArdupilotMega
                             }
                             break;
                         case (byte)ArdupilotMega.MAVLink.MAV_MODE.MAV_MODE_TEST3:
-                            mode = "FBW B";
+                            mode = "Circle";
                             break;
                         case (byte)ArdupilotMega.MAVLink.MAV_MODE.MAV_MODE_AUTO:
                             switch (sysstatus.nav_mode)

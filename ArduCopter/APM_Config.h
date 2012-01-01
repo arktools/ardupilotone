@@ -46,6 +46,7 @@
 //#define RATE_ROLL_I 	0.18
 //#define RATE_PITCH_I	0.18
 //#define MOTORS_JD880
+//#define MOTORS_JD850
 
 
 // agmatthews USERHOOKS
@@ -65,3 +66,4 @@
 
 // enable this for the new 'APM2' hardware
 // #define CONFIG_APM_HARDWARE APM_HARDWARE_APM2
+// #define APM2_BETA_HARDWARE  // for developers who received an early beta board with the older BMP085

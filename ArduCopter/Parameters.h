@@ -56,7 +56,7 @@ public:
 	// Misc
 	//
 	k_param_log_bitmask = 20,
-    k_param_log_last_filenumber,
+    k_param_log_last_filenumber,		// *** Deprecated - remove with next eeprom number change
 
 	#if FRAME_CONFIG ==	HELI_FRAME
 	//
@@ -105,6 +105,8 @@ public:
 	k_param_input_voltage,
 	k_param_low_voltage,
 	k_param_ch7_option,
+	k_param_sonar_type,  // 153
+	k_param_super_simple,
 
 	//
 	// 160: Navigation parameters
@@ -159,8 +161,9 @@ public:
 	k_param_waypoint_speed_max,
 
 	//
-	// 240: PI/D Controllers
+	// 235: PI/D Controllers
 	//
+	k_param_stablize_d = 234,
 	k_param_pi_rate_roll = 235,
 	k_param_pi_rate_pitch,
 	k_param_pi_rate_yaw,
@@ -192,12 +195,15 @@ public:
 
 	AP_Int16	RTL_altitude;
 	AP_Int8		sonar_enabled;
+	AP_Int8		sonar_type;   // 0 = XL, 1 = LV, 2 = XLL (XL with 10m range)
 	AP_Int8		battery_monitoring;	// 0=disabled, 1=3 cell lipo, 2=4 cell lipo, 3=total voltage only, 4=total voltage and current
 	AP_Int16	pack_capacity;		// Battery pack capacity less reserve
 	AP_Int8		compass_enabled;
     AP_Int8		optflow_enabled;
     AP_Float	input_voltage;
 	AP_Float	low_voltage;
+	AP_Int8		super_simple;
+
 
 	// Waypoints
 	//
@@ -232,7 +238,7 @@ public:
 	// Misc
 	//
 	AP_Int16	log_bitmask;
-    AP_Int16	log_last_filenumber;
+    AP_Int16	log_last_filenumber;		// *** Deprecated - remove with next eeprom number change
 
 	AP_Int8		esc_calibrate;
 	AP_Int8		radio_tuning;
@@ -269,6 +275,7 @@ public:
 
 	AP_Float	camera_pitch_gain;
 	AP_Float	camera_roll_gain;
+	AP_Float	stablize_d;
 
 	// PI/D controllers
 	APM_PI		pi_rate_roll;
@@ -306,12 +313,14 @@ public:
 
 	RTL_altitude			(ALT_HOLD_HOME * 100,		k_param_RTL_altitude,					PSTR("ALT_HOLD_RTL")),
 	sonar_enabled			(DISABLED,					k_param_sonar,							PSTR("SONAR_ENABLE")),
+	sonar_type				(AP_RANGEFINDER_MAXSONARXL,	k_param_sonar_type,						PSTR("SONAR_TYPE")),
 	battery_monitoring 		(DISABLED,					k_param_battery_monitoring,				PSTR("BATT_MONITOR")),
 	pack_capacity			(HIGH_DISCHARGE,			k_param_pack_capacity,					PSTR("BATT_CAPACITY")),
 	compass_enabled			(MAGNETOMETER,				k_param_compass_enabled,				PSTR("MAG_ENABLE")),
 	optflow_enabled			(OPTFLOW,					k_param_optflow_enabled,				PSTR("FLOW_ENABLE")),
 	input_voltage			(INPUT_VOLTAGE,				k_param_input_voltage,					PSTR("IN_VOLT")),
 	low_voltage				(LOW_VOLTAGE,				k_param_low_voltage,					PSTR("LOW_VOLT")),
+	super_simple			(SUPER_SIMPLE,				k_param_super_simple,					PSTR("SUPER_SIMPLE")),
 
 	waypoint_mode			(0,							k_param_waypoint_mode,					PSTR("WP_MODE")),
 	command_total			(0,							k_param_command_total,					PSTR("WP_TOTAL")),
@@ -320,7 +329,7 @@ public:
 	waypoint_radius			(WP_RADIUS_DEFAULT,			k_param_waypoint_radius,				PSTR("WP_RADIUS")),
 	loiter_radius			(LOITER_RADIUS,	    		k_param_loiter_radius,					PSTR("WP_LOITER_RAD")),
 	waypoint_speed_max		(WAYPOINT_SPEED_MAX,		k_param_waypoint_speed_max,				PSTR("WP_SPEED_MAX")),
-	crosstrack_gain			(CROSSTRACK_GAIN,			k_param_crosstrack_gain,				PSTR("XTRK_GAIN_SC")),
+	crosstrack_gain			(CROSSTRACK_GAIN * 100,		k_param_crosstrack_gain,				PSTR("XTRK_GAIN_SC")),
 
 	throttle_min			(0,							k_param_throttle_min,					PSTR("THR_MIN")),
 	throttle_max			(1000, 						k_param_throttle_max,					PSTR("THR_MAX")),
@@ -355,11 +364,11 @@ public:
 	heli_servo3_pos			(180,						k_param_heli_servo3_pos,				PSTR("SV3_POS_")),
 	heli_roll_max			(4500,						k_param_heli_roll_max,					PSTR("ROL_MAX_")),
 	heli_pitch_max			(4500,						k_param_heli_pitch_max,					PSTR("PIT_MAX_")),
-	heli_coll_min			(1000,						k_param_heli_collective_min,			PSTR("COL_MIN_")),
-	heli_coll_max			(2000,						k_param_heli_collective_max,			PSTR("COL_MAX_")),
+	heli_coll_min			(1250,						k_param_heli_collective_min,			PSTR("COL_MIN_")),
+	heli_coll_max			(1750,						k_param_heli_collective_max,			PSTR("COL_MAX_")),
 	heli_coll_mid			(1500,						k_param_heli_collective_mid,			PSTR("COL_MID_")),
 	heli_ext_gyro_enabled	(0,							k_param_heli_ext_gyro_enabled,			PSTR("GYR_ENABLE_")),
-	heli_ext_gyro_gain		(1000,						k_param_heli_ext_gyro_gain,				PSTR("GYR_GAIN_")),
+	heli_ext_gyro_gain		(1350,						k_param_heli_ext_gyro_gain,				PSTR("GYR_GAIN_")),
 	heli_servo_averaging	(0,							k_param_heli_servo_averaging,			PSTR("SV_AVG")),
 	heli_servo_manual		(0,							k_param_heli_servo_manual,				PSTR("HSV_MAN")),
 	heli_phase_angle		(0,							k_param_heli_phase_angle,				PSTR("H_PHANG")),
@@ -383,6 +392,8 @@ public:
 	//-------------------------------------------------------------------------------------------------------------------
 	camera_pitch_gain 		(CAM_PITCH_GAIN, 			k_param_camera_pitch_gain, 				PSTR("CAM_P_G")),
 	camera_roll_gain 		(CAM_ROLL_GAIN, 			k_param_camera_roll_gain,	 			PSTR("CAM_R_G")),
+
+	stablize_d 				(STABILIZE_D, 				k_param_stablize_d,	 					PSTR("STAB_D")),
 
 	// PI controller	group key						name				initial P			initial I			initial imax
 	//--------------------------------------------------------------------------------------------------------------------------------------------------------------------

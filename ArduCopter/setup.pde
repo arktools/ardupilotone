@@ -16,9 +16,7 @@ static int8_t	setup_compass			(uint8_t argc, const Menu::arg *argv);
 static int8_t	setup_tune				(uint8_t argc, const Menu::arg *argv);
 //static int8_t	setup_mag_offset		(uint8_t argc, const Menu::arg *argv);
 static int8_t	setup_declination		(uint8_t argc, const Menu::arg *argv);
-#ifdef OPTFLOW_ENABLED
 static int8_t	setup_optflow			(uint8_t argc, const Menu::arg *argv);
-#endif
 static int8_t	setup_show				(uint8_t argc, const Menu::arg *argv);
 
 #if FRAME_CONFIG == HELI_FRAME
@@ -43,9 +41,7 @@ const struct Menu::command setup_menu_commands[] PROGMEM = {
 	{"tune",			setup_tune},
 //	{"offsets",			setup_mag_offset},
 	{"declination",		setup_declination},
-#ifdef OPTFLOW_ENABLED
 	{"optflow",			setup_optflow},
-#endif
 #if FRAME_CONFIG == HELI_FRAME
 	{"heli",			setup_heli},
 	{"gyro",			setup_gyro},
@@ -99,10 +95,7 @@ setup_show(uint8_t argc, const Menu::arg *argv)
 	report_flight_modes();
 	report_imu();
 	report_compass();
-
-#ifdef OPTFLOW_ENABLED
 	report_optflow();
-#endif
 
 #if FRAME_CONFIG == HELI_FRAME
 	report_heli();
@@ -245,7 +238,8 @@ setup_motors(uint8_t argc, const Menu::arg *argv)
 static int8_t
 setup_accel(uint8_t argc, const Menu::arg *argv)
 {
-	imu.init_accel();
+    imu.init(IMU::COLD_START, delay, flash_leds, &timer_scheduler);
+	imu.init_accel(delay, flash_leds);
 	print_accel_offsets();
 	report_imu();
 	return(0);
@@ -417,8 +411,12 @@ setup_sonar(uint8_t argc, const Menu::arg *argv)
 	} else if (!strcmp_P(argv[1].str, PSTR("off"))) {
 		g.sonar_enabled.set_and_save(false);
 
+	} else if (argc > 1 && (argv[1].i >= 0 && argv[1].i <= 2)) {
+	    g.sonar_enabled.set_and_save(true);  // if you set the sonar type, surely you want it on
+		g.sonar_type.set_and_save(argv[1].i);
+
 	}else{
-		Serial.printf_P(PSTR("\nOp:[on, off]\n"));
+		Serial.printf_P(PSTR("\nOp:[on, off, 0-2]\n"));
 		report_sonar();
 		return 0;
 	}
@@ -746,10 +744,10 @@ setup_mag_offset(uint8_t argc, const Menu::arg *argv)
 }
 */
 
-#ifdef OPTFLOW_ENABLED
 static int8_t
 setup_optflow(uint8_t argc, const Menu::arg *argv)
 {
+	#ifdef OPTFLOW_ENABLED
 	if (!strcmp_P(argv[1].str, PSTR("on"))) {
 		g.optflow_enabled = true;
 		init_optflow();
@@ -765,9 +763,10 @@ setup_optflow(uint8_t argc, const Menu::arg *argv)
 
 	g.optflow_enabled.save();
 	report_optflow();
+	#endif
 	return 0;
 }
-#endif
+
 
 
 /***************************************************************************/
@@ -802,9 +801,11 @@ static void report_wp(byte index = 255)
 static void report_sonar()
 {
 	g.sonar_enabled.load();
+	g.sonar_type.load();
 	Serial.printf_P(PSTR("Sonar\n"));
 	print_divider();
 	print_enabled(g.sonar_enabled.get());
+	Serial.printf_P(PSTR("Type: %d (0=XL, 1=LV, 2=XLL)"), (int)g.sonar_type);
 	print_blanks(2);
 }
 
@@ -890,9 +891,9 @@ static void report_flight_modes()
 	print_blanks(2);
 }
 
-#ifdef OPTFLOW_ENABLED
 void report_optflow()
 {
+	#ifdef OPTFLOW_ENABLED
 	Serial.printf_P(PSTR("OptFlow\n"));
 	print_divider();
 
@@ -903,8 +904,8 @@ void report_optflow()
 	//						degrees(g.optflow_fov));
 
 	print_blanks(2);
+	#endif
 }
-#endif
 
 #if FRAME_CONFIG == HELI_FRAME
 static void report_heli()
@@ -1014,9 +1015,9 @@ static void
 print_accel_offsets(void)
 {
 	Serial.printf_P(PSTR("A_off: %4.2f, %4.2f, %4.2f\n"),
-						(float)imu.ax(),
-						(float)imu.ay(),
-						(float)imu.az());
+						(float)imu.ax(),	// Pitch
+						(float)imu.ay(),	// Roll
+						(float)imu.az());	// YAW
 }
 
 static void

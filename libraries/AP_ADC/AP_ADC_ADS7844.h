@@ -1,3 +1,4 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 #ifndef AP_ADC_ADS7844_H
 #define AP_ADC_ADS7844_H
 
@@ -24,7 +25,7 @@ class AP_ADC_ADS7844 : public AP_ADC
 	void Init( AP_PeriodicProcess * scheduler );
 
 	// Read 1 sensor value
-	uint16_t Ch(unsigned char ch_num);
+	float Ch(unsigned char ch_num);
 
 	// Read 6 sensors at once
 	uint32_t Ch6(const uint8_t *channel_numbers, uint16_t *result);
@@ -35,7 +36,7 @@ class AP_ADC_ADS7844 : public AP_ADC
 	uint16_t 		_prev_gyro[3];
 	uint16_t 		_prev_accel[3];
 	uint8_t			_filter_index_accel;
-	static void read( void );
+	static void read(uint32_t);
 
 };
 

@@ -1,9 +1,9 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduPlane V2.27 Alpha"
+#define THISFIRMWARE "ArduPlane V2.27"
 /*
-Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short
-Thanks to:  Chris Anderson, HappyKillMore, Bill Premerlani, James Cohen, JB from rotorFX, Automatik, Fefenin, Peter Meister, Remzibi
+Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short, Andrew Tridgell, Randy Mackay, Pat Hickey, John Arne Birkeland, Olivier Adler
+Thanks to:  Chris Anderson, Michael Oborne, Paul Mather, Bill Premerlani, James Cohen, JB from rotorFX, Automatik, Fefenin, Peter Meister, Remzibi, Yury Smirnov, Sandro Benigno, Max Levine, Roberto Navoni, Lorenz Meier 
 Please contribute your ideas!
 
 
@@ -29,13 +29,13 @@ version 2.1 of the License, or (at your option) any later version.
 #include <Arduino_Mega_ISR_Registry.h>
 #include <APM_RC.h>         // ArduPilot Mega RC Library
 #include <AP_GPS.h>         // ArduPilot GPS library
-#include <Wire.h>			// Arduino I2C lib
+#include <I2C.h>			// Wayne Truchsess I2C lib
 #include <SPI.h>			// Arduino SPI lib
 #include <DataFlash.h>      // ArduPilot Mega Flash Memory Library
 #include <AP_ADC.h>         // ArduPilot Mega Analog to Digital Converter Library
 #include <AP_AnalogSource.h>// ArduPilot Mega polymorphic analog getter
-#include <AP_PeriodicProcess.h> // ArduPilot Mega TimerProcess and TimerAperiodicProcess
-#include <APM_BMP085.h>     // ArduPilot Mega BMP085 Library
+#include <AP_PeriodicProcess.h> // ArduPilot Mega TimerProcess
+#include <AP_Baro.h>        // ArduPilot barometer library
 #include <AP_Compass.h>     // ArduPilot Mega Magnetometer Library
 #include <AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
 #include <AP_InertialSensor.h> // Inertial Sensor (uncalibated IMU) Library
@@ -131,13 +131,25 @@ static AP_Int8		*flight_modes = &g.flight_mode1;
 #if HIL_MODE == HIL_MODE_DISABLED
 
 // real sensors
+#if CONFIG_ADC == ENABLED
 static AP_ADC_ADS7844          adc;
+#endif
 
 #ifdef DESKTOP_BUILD
-APM_BMP085_HIL_Class    barometer;
+AP_Baro_BMP085_HIL      barometer;
 AP_Compass_HIL          compass;
 #else
-static APM_BMP085_Class        barometer;
+
+#if CONFIG_BARO == AP_BARO_BMP085
+# if CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
+static AP_Baro_BMP085          barometer(true);
+# else
+static AP_Baro_BMP085          barometer(false);
+# endif
+#elif CONFIG_BARO == AP_BARO_MS5611
+static AP_Baro_MS5611          barometer;
+#endif
+
 static AP_Compass_HMC5843      compass(Parameters::k_param_compass);
 #endif
 
@@ -174,18 +186,16 @@ AP_GPS_None     g_gps_driver(NULL);
 #endif // CONFIG_IMU_TYPE
 AP_IMU_INS imu( &ins, Parameters::k_param_IMU_calibration );
 AP_DCM  dcm(&imu, g_gps);
-AP_TimerProcess timer_scheduler;
 
 #elif HIL_MODE == HIL_MODE_SENSORS
 // sensor emulators
 AP_ADC_HIL              adc;
-APM_BMP085_HIL_Class    barometer;
+AP_Baro_BMP085_HIL      barometer;
 AP_Compass_HIL          compass;
 AP_GPS_HIL              g_gps_driver(NULL);
 AP_InertialSensor_Oilpan ins( &adc );
 AP_IMU_Shim imu;
 AP_DCM  dcm(&imu, g_gps);
-AP_TimerProcess timer_scheduler;
 
 #elif HIL_MODE == HIL_MODE_ATTITUDE
 AP_ADC_HIL              adc;
@@ -197,6 +207,9 @@ AP_IMU_Shim             imu; // never used
 #else
  #error Unrecognised HIL_MODE setting.
 #endif // HIL MODE
+
+// we always have a timer scheduler
+AP_TimerProcess timer_scheduler;
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -214,9 +227,9 @@ ModeFilter sonar_mode_filter;
 
 #if CONFIG_PITOT_SOURCE == PITOT_SOURCE_ADC
 AP_AnalogSource_ADC pitot_analog_source( &adc,
-                        CONFIG_PITOT_SOURCE_ADC_CHANNEL, 0.25);
+                        CONFIG_PITOT_SOURCE_ADC_CHANNEL, 1.0);
 #elif CONFIG_PITOT_SOURCE == PITOT_SOURCE_ANALOG_PIN
-AP_AnalogSource_Arduino pitot_analog_source(CONFIG_PITOT_SOURCE_ANALOG_PIN);
+AP_AnalogSource_Arduino pitot_analog_source(CONFIG_PITOT_SOURCE_ANALOG_PIN, 4.0);
 #endif
 
 #if SONAR_TYPE == MAX_SONAR_XL
@@ -315,7 +328,6 @@ static long	crosstrack_bearing;					// deg * 100 : 0 to 360 desired angle of pla
 static float	nav_gain_scaler 		= 1;		// Gain scaling for headwind/tailwind TODO: why does this variable need to be initialized to 1?
 static long    hold_course       	 	= -1;		// deg * 100 dir of plane
 
-static byte	command_index;						// current command memory location
 static byte	nav_command_index;					// active nav command memory location
 static byte	non_nav_command_index;				// active non-nav command memory location
 static byte	nav_command_ID		= NO_COMMAND;	// active nav command ID
@@ -325,10 +337,14 @@ static byte	non_nav_command_ID	= NO_COMMAND;	// active non-nav command ID
 // --------
 static int		airspeed;							// m/s * 100
 static int		airspeed_nudge;  					// m/s * 100 : additional airspeed based on throttle stick position in top 1/2 of range
+static long		target_airspeed;					// m/s * 100 (used for Auto-flap deployment in FBW_B mode)
 static float	airspeed_error;						// m/s * 100
-static float	airspeed_fbwB;						// m/s * 100
 static long 	energy_error;                       // energy state error (kinetic + potential) for altitude hold
-static long		airspeed_energy_error;              // kinetic portion of energy error
+static long		airspeed_energy_error;              // kinetic portion of energy error (m^2/s^2)
+
+// Ground speed
+static long		groundspeed_undershoot = 0;				// m/s * 100  (>=0, where > 0 => amount below min ground speed)
+
 
 // Location Errors
 // ---------------
@@ -350,7 +366,7 @@ static float	current_total;
 // Airspeed Sensors
 // ----------------
 static float   airspeed_raw;                       // Airspeed Sensor - is a float to better handle filtering
-static int     airspeed_pressure;					// airspeed as a pressure value
+static float   airspeed_pressure;					// airspeed as a pressure value
 
 // Barometer Sensor variables
 // --------------------------
@@ -436,7 +452,7 @@ static int		pmTest1 = 0;
 static unsigned long 	fast_loopTimer;				// Time in miliseconds of main control loop
 static unsigned long 	fast_loopTimeStamp;			// Time Stamp when fast loop was complete
 static uint8_t 		delta_ms_fast_loop; 		// Delta Time in miliseconds
-static int 			mainLoop_count;
+static uint16_t			mainLoop_count;
 
 static unsigned long 	medium_loopTimer;			// Time in miliseconds of medium loop
 static byte 			medium_loopCounter;			// Counters for branching from main control loop to slower loops
@@ -523,21 +539,21 @@ static void fast_loop()
 	read_radio();
 
     // try to send any deferred messages if the serial port now has
-    // some space available    
+    // some space available
     gcs_send_message(MSG_RETRY_DEFERRED);
 
 	// check for loss of control signal failsafe condition
 	// ------------------------------------
 	check_short_failsafe();
-	
-		// Read Airspeed
-		// -------------
+
+	// Read Airspeed
+	// -------------
 	if (g.airspeed_enabled == true) {
 #if HIL_MODE != HIL_MODE_ATTITUDE
 		read_airspeed();
-#endif
-	} else if (g.airspeed_enabled == true && HIL_MODE == HIL_MODE_ATTITUDE) {
+#else
 		calc_airspeed_errors();
+#endif
 	}
 
 	#if HIL_MODE == HIL_MODE_SENSORS
@@ -599,14 +615,16 @@ static void medium_loop()
 		//-------------------------------
 		case 0:
 			medium_loopCounter++;
-			if(GPS_enabled)		update_GPS();
+			if(GPS_enabled){
+                update_GPS();
+                calc_gndspeed_undershoot();
+            }
 
 			#if HIL_MODE != HIL_MODE_ATTITUDE
-				if(g.compass_enabled){
-					compass.read();     // Read magnetometer
-					compass.calculate(dcm.get_dcm_matrix());  // Calculate heading
-					compass.null_offsets(dcm.get_dcm_matrix());
-				}
+            if (g.compass_enabled && compass.read()) {
+                compass.calculate(dcm.get_dcm_matrix());  // Calculate heading
+                compass.null_offsets(dcm.get_dcm_matrix());
+            }
 			#endif
 /*{
 Serial.print(dcm.roll_sensor, DEC);	Serial.printf_P(PSTR("\t"));
@@ -802,6 +820,8 @@ static void update_GPS(void)
 		current_loc.lng = g_gps->longitude;    // Lon * 10**7
 		current_loc.lat = g_gps->latitude;     // Lat * 10**7
 
+        // see if we've breached the geo-fence
+        geofence_check(false);
 	}
 }
 
@@ -885,26 +905,13 @@ static void update_current_flight_mode(void)
 				nav_roll = g.channel_roll.norm_input() * g.roll_limit;
 				altitude_error = g.channel_pitch.norm_input() * g.pitch_limit_min;
 
-				if ((current_loc.alt>=home.alt+g.FBWB_min_altitude) || (g.FBWB_min_altitude == -1)) {
+				if ((current_loc.alt>=home.alt+g.FBWB_min_altitude) || (g.FBWB_min_altitude == 0)) {
 	 				altitude_error = g.channel_pitch.norm_input() * g.pitch_limit_min;
 				} else {
-					if (g.channel_pitch.norm_input()<0) 
-						altitude_error =( (home.alt + g.FBWB_min_altitude) - current_loc.alt) + g.channel_pitch.norm_input() * g.pitch_limit_min ; 
-					else altitude_error =( (home.alt + g.FBWB_min_altitude) - current_loc.alt) ;                                    
+					if (g.channel_pitch.norm_input()<0)
+						altitude_error =( (home.alt + g.FBWB_min_altitude) - current_loc.alt) + g.channel_pitch.norm_input() * g.pitch_limit_min ;
+					else altitude_error =( (home.alt + g.FBWB_min_altitude) - current_loc.alt) ;
 				}
- 
-				if (g.airspeed_enabled == true)
-									{
-					airspeed_fbwB = ((int)(g.flybywire_airspeed_max -
-							g.flybywire_airspeed_min) *
-							g.channel_throttle.servo_out) +
-							((int)g.flybywire_airspeed_min * 100);
-					airspeed_energy_error = (long)(((long)airspeed_fbwB *
-								(long)airspeed_fbwB) -
-							((long)airspeed * (long)airspeed))/20000;
-					airspeed_error = (airspeed_error - airspeed);
-									}
-
 				calc_throttle();
 				calc_nav_pitch();
 				break;
@@ -971,9 +978,15 @@ static void update_alt()
 		// this function is in place to potentially add a sonar sensor in the future
 		//altitude_sensor = BARO;
 
-		current_loc.alt = (1 - g.altitude_mix) * g_gps->altitude;			// alt_MSL centimeters (meters * 100)
-		current_loc.alt += g.altitude_mix * (read_barometer() + home.alt);
+        if (barometer.healthy) {
+            current_loc.alt = (1 - g.altitude_mix) * g_gps->altitude;			// alt_MSL centimeters (meters * 100)
+            current_loc.alt += g.altitude_mix * (read_barometer() + home.alt);
+        } else if (g_gps->fix) {
+            current_loc.alt = g_gps->altitude; // alt_MSL centimeters (meters * 100)            
+        }
 	#endif
+
+        geofence_check(true);
 
 		// Calculate new climb rate
 		//if(medium_loopCounter == 0 && slow_loopCounter == 0)

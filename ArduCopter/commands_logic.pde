@@ -230,9 +230,6 @@ static void do_takeoff()
 		//Serial.printf("abs alt: %ld",temp.alt);
 	}
 
-	takeoff_complete = false;
-	// set flag to use g_gps ground course during TO.  IMU will be doing yaw drift correction
-
 	// Set our waypoint
 	set_next_WP(&temp);
 }
@@ -301,10 +298,15 @@ static void do_loiter_turns()
 {
 	wp_control = CIRCLE_MODE;
 
-	if(command_nav_queue.lat == 0)
+	if(command_nav_queue.lat == 0){
+		// allow user to specify just the altitude
+		if(command_nav_queue.alt > 0){
+			current_loc.alt = command_nav_queue.alt;
+		}
 		set_next_WP(&current_loc);
-	else
+	}else{
 		set_next_WP(&command_nav_queue);
+	}
 
 	loiter_total = command_nav_queue.p1 * 360;
 	loiter_sum	 = 0;
@@ -336,47 +338,39 @@ static bool verify_takeoff()
 	if(g.rc_3.control_in == 0){
 		return false;
 	}
-
-	if (current_loc.alt > next_WP.alt){
-		//Serial.println("Y");
-		takeoff_complete = true;
-		return true;
-
-	}else{
-
-		//Serial.println("N");
-		return false;
-	}
+	// are we above our target altitude?
+	return (current_loc.alt > next_WP.alt);
 }
 
 static bool verify_land()
 {
-	// land at 1 meter per second
-	next_WP.alt  = original_alt - ((millis() - land_start) / 20);			// condition_value = our initial
+	// land at .62 meter per second
+	next_WP.alt  = original_alt - ((millis() - land_start) / 16);			// condition_value = our initial
 
 	velocity_land  = ((old_alt - current_loc.alt) *.2) + (velocity_land * .8);
 	old_alt = current_loc.alt;
 
+	if (current_loc.alt < 250){
+		wp_control = NO_NAV_MODE;
+		next_WP.alt = -200; // force us down
+	}
+
 	if(g.sonar_enabled){
 		// decide which sensor we're using
-		if(sonar_alt < 300){
-			next_WP = current_loc; // don't pitch or roll
-			next_WP.alt = -200; // force us down
-		}
 		if(sonar_alt < 40){
 			land_complete = true;
 			//Serial.println("Y");
-			//return true;
+			return true;
 		}
 	}
 
 	if(velocity_land <= 0){
 		land_complete = true;
+		// commented out to prevent tragedy
 		//return true;
 	}
 	//Serial.printf("N, %d\n", velocity_land);
 	//Serial.printf("N_alt, %ld\n", next_WP.alt);
-
 	return false;
 }
 

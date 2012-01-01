@@ -17,7 +17,7 @@ static void output_motors_armed()
 	int out_max = g.rc_3.radio_max;
 
 	// Throttle is 0 to 1000 only
-	g.rc_3.servo_out 	= constrain(g.rc_3.servo_out, 0, 1000);
+	g.rc_3.servo_out 	= constrain(g.rc_3.servo_out, 0, MAXIMUM_THROTTLE);
 
 	if(g.rc_3.servo_out > 0)
 		out_min = g.rc_3.radio_min + MINIMUM_THROTTLE;
@@ -69,7 +69,7 @@ static void output_motors_armed()
 	// Tridge's stability patch
     for (int i = CH_1; i<=CH_8; i++) {
     	if(i == CH_5 || i == CH_6)
-    		break;
+    		continue;
         if (motor_out[i] > out_max) {
             // note that i^1 is the opposite motor
             motor_out[i^1] -= motor_out[i] - out_max;
@@ -97,12 +97,25 @@ static void output_motors_armed()
 	}
 	#endif
 
-	APM_RC.OutputCh(CH_1, motor_out[CH_1]);
-	APM_RC.OutputCh(CH_2, motor_out[CH_2]);
-	APM_RC.OutputCh(CH_3, motor_out[CH_3]);
-	APM_RC.OutputCh(CH_4, motor_out[CH_4]);
-	APM_RC.OutputCh(CH_7, motor_out[CH_7]);
-	APM_RC.OutputCh(CH_8, motor_out[CH_8]);
+	// this filter slows the acceleration of motors vs the deceleration
+	// Idea by Denny Rowland to help with his Yaw issue
+	for(int8_t i = CH_1; i <= CH_8; i++ ) {
+    	if(i == CH_5 || i == CH_6)
+    		continue;
+		if(motor_filtered[i] < motor_out[i]){
+			motor_filtered[i] = (motor_out[i] + motor_filtered[i]) / 2;
+		}else{
+			// don't filter
+			motor_filtered[i] = motor_out[i];
+		}
+	}
+
+	APM_RC.OutputCh(CH_1, motor_filtered[CH_1]);
+	APM_RC.OutputCh(CH_2, motor_filtered[CH_2]);
+	APM_RC.OutputCh(CH_3, motor_filtered[CH_3]);
+	APM_RC.OutputCh(CH_4, motor_filtered[CH_4]);
+	APM_RC.OutputCh(CH_7, motor_filtered[CH_7]);
+	APM_RC.OutputCh(CH_8, motor_filtered[CH_8]);
 
 	#if INSTANT_PWM == 1
 	// InstantPWM

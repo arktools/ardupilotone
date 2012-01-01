@@ -167,7 +167,7 @@ namespace ArdupilotMega.GCSViews
 
             // setup language selection
             CultureInfo ci = null;
-            foreach (string name in new string[] { "en-US", "zh-Hans", "ru-RU" })
+            foreach (string name in new string[] { "en-US", "zh-Hans", "ru-RU", "Fr" })
             {
                 ci = MainV2.getcultureinfo(name);
                 if (ci != null)
@@ -349,45 +349,50 @@ namespace ArdupilotMega.GCSViews
                 {
                     try
                     {
-                        NumericUpDown thisctl = ((NumericUpDown)ctl);
-                        thisctl.Maximum = 9000;
-                        thisctl.Minimum = -9000;
-                        thisctl.Value = (decimal)(float)param[value];
-                        thisctl.Increment = (decimal)0.001;
-                        if (thisctl.Name.EndsWith("_P") || thisctl.Name.EndsWith("_I") || thisctl.Name.EndsWith("_D") || thisctl.Value == 0 || thisctl.Value.ToString("0.###", new System.Globalization.CultureInfo("en-US")).Contains("."))
+                        if (ctl.GetType() == typeof(NumericUpDown))
                         {
-                            thisctl.DecimalPlaces = 3;
-                        }
-                        else
-                        {
-                            thisctl.Increment = (decimal)1;
-                            thisctl.DecimalPlaces = 1;
-                        }
 
-                        thisctl.Enabled = true;
-
-                        thisctl.BackColor = Color.FromArgb(0x43, 0x44, 0x45);
-                        thisctl.Validated += null;
-                        if (tooltips[value] != null)
-                        {
-                            try
+                            NumericUpDown thisctl = ((NumericUpDown)ctl);
+                            thisctl.Maximum = 9000;
+                            thisctl.Minimum = -9000;
+                            thisctl.Value = (decimal)(float)param[value];
+                            thisctl.Increment = (decimal)0.001;
+                            if (thisctl.Name.EndsWith("_P") || thisctl.Name.EndsWith("_I") || thisctl.Name.EndsWith("_D") || thisctl.Value == 0 || thisctl.Value.ToString("0.###", new System.Globalization.CultureInfo("en-US")).Contains("."))
                             {
-                                toolTip1.SetToolTip(ctl, ((paramsettings)tooltips[value]).desc);
+                                thisctl.DecimalPlaces = 3;
                             }
-                            catch { }
+                            else
+                            {
+                                thisctl.Increment = (decimal)1;
+                                thisctl.DecimalPlaces = 1;
+                            }
+
+                            thisctl.Enabled = true;
+
+                            thisctl.BackColor = Color.FromArgb(0x43, 0x44, 0x45);
+                            thisctl.Validated += null;
+                            if (tooltips[value] != null)
+                            {
+                                try
+                                {
+                                    toolTip1.SetToolTip(ctl, ((paramsettings)tooltips[value]).desc);
+                                }
+                                catch { }
+                            }
+                            thisctl.Validated += new EventHandler(EEPROM_View_float_TextChanged);
+
                         }
-                        thisctl.Validated += new EventHandler(EEPROM_View_float_TextChanged);
+                        else if (ctl.GetType() == typeof(ComboBox))
+                        {
+
+                            ComboBox thisctl = ((ComboBox)ctl);
+
+                            thisctl.SelectedIndex = (int)(float)param[value];
+
+                            thisctl.Validated += new EventHandler(ComboBox_Validated);
+                        }
                     }
                     catch { }
-
-                    try
-                    {
-                        ComboBox thisctl = ((ComboBox)ctl);
-
-                        thisctl.SelectedIndex = (int)(float)param[value];
-
-                        thisctl.Validated += new EventHandler(ComboBox_Validated);
-                    } catch {}
 
                 }
                 if (text.Length == 0)
@@ -605,6 +610,20 @@ namespace ArdupilotMega.GCSViews
                         if (name == "WP_TOTAL")
                             continue;
                         if (name == "CMD_TOTAL")
+                            continue;
+                        if (name == "FENCE_TOTAL")
+                            continue;
+                        if (name == "SYS_NUM_RESETS")
+                            continue;
+                        if (name == "ARSPD_OFFSET")
+                            continue;
+                        if (name == "GND_ABS_PRESS")
+                            continue;
+                        if (name == "GND_TEMP")
+                            continue;
+                        if (name == "CMD_INDEX")
+                            continue;
+                        if (name == "LOG_LASTFILE")
                             continue;
                         if (row.Cells[0].Value.ToString() == name)
                         {

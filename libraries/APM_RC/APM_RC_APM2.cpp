@@ -87,8 +87,6 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   ICR1 = 40000; // 0.5us tick => 50hz freq
   OCR1A = 0xFFFF; // Init OCR registers to nil output signal
   OCR1B = 0xFFFF;
-  OutputCh(1, 1100);
-  OutputCh(2, 1100);
 
   // --------------- TIMER4: OUT3, OUT4, and OUT5 ---------------------
   pinMode(8,OUTPUT); // OUT3 (PH5/OC4C)
@@ -105,10 +103,6 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   OCR4C = 0xFFFF;
   ICR4 = 40000; // 0.5us tick => 50hz freq
 
-  OutputCh(3, 1100);
-  OutputCh(4, 1100);
-  OutputCh(5, 1100);
-
   //--------------- TIMER3: OUT6, OUT7, and OUT8 ----------------------
   pinMode(3,OUTPUT); // OUT6 (PE5/OC3C)
   pinMode(2,OUTPUT); // OUT7 (PE4/OC3B)
@@ -123,10 +117,6 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   OCR3B = 0xFFFF;
   OCR3C = 0xFFFF;
   ICR3 = 40000; // 0.5us tick => 50hz freq
-
-  OutputCh(6, 1100);
-  OutputCh(7, 1100);
-  OutputCh(8, 1100);
 
   //--------------- TIMER5: PPM INPUT ---------------------------------
   // Init PPM input on Timer 5
@@ -203,22 +193,26 @@ void APM_RC_APM2::Force_Out6_Out7(void) { }
 // Output rate options:
 #define OUTPUT_SPEED_50HZ 0
 #define OUTPUT_SPEED_200HZ 1
+#define OUTPUT_SPEED_400HZ 2
 
 void APM_RC_APM2::SetFastOutputChannels(uint32_t chmask)
 {
     if ((chmask & ( MSK_CH_1 | MSK_CH_2 )) != 0)
-        _set_speed_ch1_ch2(OUTPUT_SPEED_200HZ);
+        _set_speed_ch1_ch2(OUTPUT_SPEED_400HZ);
 
     if ((chmask & ( MSK_CH_3 | MSK_CH_4 | MSK_CH_5 )) != 0)
-        _set_speed_ch3_ch4_ch5(OUTPUT_SPEED_200HZ);
+        _set_speed_ch3_ch4_ch5(OUTPUT_SPEED_400HZ);
 
     if ((chmask & ( MSK_CH_6 | MSK_CH_7 | MSK_CH_8 )) != 0)
-        _set_speed_ch6_ch7_ch8(OUTPUT_SPEED_200HZ);
+        _set_speed_ch6_ch7_ch8(OUTPUT_SPEED_400HZ);
 }
 
 void APM_RC_APM2::_set_speed_ch1_ch2(uint8_t speed)
 {
   switch(speed) {
+  case OUTPUT_SPEED_400HZ:
+    ICR1 = 5000;
+    break;
   case OUTPUT_SPEED_200HZ:
     ICR1 = 10000;
     break;
@@ -232,6 +226,9 @@ void APM_RC_APM2::_set_speed_ch1_ch2(uint8_t speed)
 void APM_RC_APM2::_set_speed_ch3_ch4_ch5(uint8_t speed)
 {
   switch(speed) {
+  case OUTPUT_SPEED_400HZ:
+    ICR4 = 5000;
+    break;
   case OUTPUT_SPEED_200HZ:
     ICR4 = 10000;
     break;
@@ -246,6 +243,9 @@ void APM_RC_APM2::_set_speed_ch3_ch4_ch5(uint8_t speed)
 void APM_RC_APM2::_set_speed_ch6_ch7_ch8(uint8_t speed)
 {
   switch(speed) {
+  case OUTPUT_SPEED_400HZ:
+    ICR3 = 5000;
+    break;
   case OUTPUT_SPEED_200HZ:
     ICR3 = 10000;
     break;

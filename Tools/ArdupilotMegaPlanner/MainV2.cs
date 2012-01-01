@@ -14,7 +14,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Web;
 using System.Diagnostics;
-using System.Runtime.InteropServices; 
+using System.Runtime.InteropServices;
 using System.Speech.Synthesis;
 using System.Globalization;
 using System.Threading;
@@ -32,6 +32,11 @@ namespace ArdupilotMega
 
         const int SW_SHOWNORMAL = 1;
         const int SW_HIDE = 0;
+
+        /// <summary>
+        /// Home Location
+        /// </summary>
+        public static PointLatLngAlt HomeLocation = new PointLatLngAlt();
 
         public static MAVLink comPort = new MAVLink();
         public static string comportname = "";
@@ -81,10 +86,6 @@ namespace ArdupilotMega
 
         public MainV2()
         {
-            //new temp().ShowDialog();
-            //return;
-
-
             Form splash = new Splash();
             splash.Show();
 
@@ -96,16 +97,7 @@ namespace ArdupilotMega
 
             Application.DoEvents();
 
-            //System.Threading.Thread.CurrentThread.CurrentUICulture = new System.Globalization.CultureInfo("en-US");
-            //System.Threading.Thread.CurrentThread.CurrentCulture = new System.Globalization.CultureInfo("en-US");
-
             srtm.datadirectory = Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + "srtm";
-
-            georefimage temp = new georefimage();
-
-            //temp.dowork(244 + 60*60*24 * -1 );
-
-            //return;
 
             var t = Type.GetType("Mono.Runtime");
             MONO = (t != null);
@@ -131,7 +123,7 @@ namespace ArdupilotMega
 
             comPort.BaseStream.BaudRate = 115200;
 
-            CMB_serialport.Items.AddRange(SerialPort.GetPortNames());
+            CMB_serialport.Items.AddRange(GetPortNames());
             CMB_serialport.Items.Add("TCP");
             CMB_serialport.Items.Add("UDP");
             if (CMB_serialport.Items.Count > 0)
@@ -184,13 +176,19 @@ namespace ArdupilotMega
 
             try
             {
+                if (config["MainLocX"] != null && config["MainLocY"] != null)
+                {
+                    this.StartPosition = FormStartPosition.Manual;
+                    Point startpos = new Point(int.Parse(config["MainLocX"].ToString()), int.Parse(config["MainLocY"].ToString()));
+                    this.Location = startpos;
+                }
+
                 if (config["MainHeight"] != null)
                     this.Height = int.Parse(config["MainHeight"].ToString());
                 if (config["MainWidth"] != null)
                     this.Width = int.Parse(config["MainWidth"].ToString());
                 if (config["MainMaximised"] != null)
                     this.WindowState = (FormWindowState)Enum.Parse(typeof(FormWindowState), config["MainMaximised"].ToString());
-
 
                 if (config["CMB_rateattitude"] != null)
                     MainV2.cs.rateattitude = byte.Parse(config["CMB_rateattitude"].ToString());
@@ -203,6 +201,20 @@ namespace ArdupilotMega
 
                 if (config["speechenable"] != null)
                     MainV2.speechenable = bool.Parse(config["speechenable"].ToString());
+
+
+                try
+                {
+                    if (config["TXT_homelat"] != null)
+                        HomeLocation.Lat = double.Parse(config["TXT_homelat"].ToString());
+
+                    if (config["TXT_homelng"] != null)
+                        HomeLocation.Lng = double.Parse(config["TXT_homelng"].ToString());
+
+                    if (config["TXT_homealt"] != null)
+                        HomeLocation.Alt = double.Parse(config["TXT_homealt"].ToString());
+                }
+                catch { }
 
             }
             catch { }
@@ -236,6 +248,26 @@ namespace ArdupilotMega
             splash.Close();
         }
 
+        private string[] GetPortNames()
+        {
+            string[] devs = new string[0];
+
+            if (MONO)
+            {
+                if (Directory.Exists("/dev/"))
+                    devs = Directory.GetFiles("/dev/", "*ACM*");
+            }
+
+            string[] ports = SerialPort.GetPortNames();
+
+            string[] all = new string[devs.Length + ports.Length];
+
+            devs.CopyTo(all, 0);
+            ports.CopyTo(all, devs.Length);
+
+            return all;
+        }
+
         internal void ScreenShot()
         {
             Rectangle bounds = Screen.GetBounds(Point.Empty);
@@ -256,7 +288,7 @@ namespace ArdupilotMega
         {
             string oldport = CMB_serialport.Text;
             CMB_serialport.Items.Clear();
-            CMB_serialport.Items.AddRange(SerialPort.GetPortNames());
+            CMB_serialport.Items.AddRange(GetPortNames());
             CMB_serialport.Items.Add("TCP");
             CMB_serialport.Items.Add("UDP");
             if (CMB_serialport.Items.Contains(oldport))
@@ -653,12 +685,7 @@ namespace ArdupilotMega
                 comPort.BaseStream.DtrEnable = false;
 
                 if (config["CHK_resetapmonconnect"] == null || bool.Parse(config["CHK_resetapmonconnect"].ToString()) == true)
-                    comPort.BaseStream.DtrEnable = true;
-
-                if (DialogResult.OK != Common.MessageShowAgain("Mavlink Connect", "Make sure your APM slider switch is in Flight Mode (away from RC pins)"))
-                {
-                    return;
-                }
+                    comPort.BaseStream.toggleDTR();
 
                 try
                 {
@@ -670,7 +697,7 @@ namespace ArdupilotMega
                         comPort.logfile = new BinaryWriter(File.Open(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"logs" + Path.DirectorySeparatorChar + DateTime.Now.ToString("yyyy-MM-dd hh-mm-ss") + ".tlog", FileMode.CreateNew));
                     }
                     catch { MessageBox.Show("Failed to create log - wont log this session"); } // soft fail
-                    
+
                     comPort.BaseStream.PortName = CMB_serialport.Text;
                     comPort.Open(true);
 
@@ -740,7 +767,7 @@ namespace ArdupilotMega
                         }
                     }
                     catch { }
-                    MessageBox.Show("Is your CLI switch in Flight position?\n(this is required for MAVlink comms)\n\n" + ex.ToString());
+                    MessageBox.Show("Can not establish a connection\n\n" + ex.ToString());
                     return;
                 }
             }
@@ -847,7 +874,7 @@ namespace ArdupilotMega
                     {
                         try
                         {
-                            if (key == "")
+                            if (key == "" || key.Contains("/")) // "/dev/blah"
                                 continue;
                             xmlwriter.WriteElementString(key, config[key].ToString());
 
@@ -1020,6 +1047,8 @@ namespace ArdupilotMega
                                 {
                                     this.MenuConnect.BackgroundImage = global::ArdupilotMega.Properties.Resources.disconnect;
                                     this.MenuConnect.BackgroundImage.Tag = "Disconnect";
+                                    CMB_baudrate.Enabled = false;
+                                    CMB_serialport.Enabled = false;
                                 });
                             }
                         }
@@ -1031,6 +1060,8 @@ namespace ArdupilotMega
                                 {
                                     this.MenuConnect.BackgroundImage = global::ArdupilotMega.Properties.Resources.connect;
                                     this.MenuConnect.BackgroundImage.Tag = "Connect";
+                                    CMB_baudrate.Enabled = true;
+                                    CMB_serialport.Enabled = true;
                                 });
                             }
                         }
@@ -1092,7 +1123,7 @@ namespace ArdupilotMega
 
                     if (heatbeatsend.Second != DateTime.Now.Second)
                     {
-//                        Console.WriteLine("remote lost {0}", cs.packetdropremote);
+                        //                        Console.WriteLine("remote lost {0}", cs.packetdropremote);
 
                         MAVLink.__mavlink_heartbeat_t htb = new MAVLink.__mavlink_heartbeat_t();
 
@@ -1225,6 +1256,24 @@ namespace ArdupilotMega
             t11.Start();
         }
 
+        public static String ComputeWebSocketHandshakeSecurityHash09(String secWebSocketKey)
+        {
+            const String MagicKEY = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+            String secWebSocketAccept = String.Empty;
+
+            // 1. Combine the request Sec-WebSocket-Key with magic key.
+            String ret = secWebSocketKey + MagicKEY;
+
+            // 2. Compute the SHA1 hash
+            System.Security.Cryptography.SHA1 sha = new System.Security.Cryptography.SHA1CryptoServiceProvider();
+            byte[] sha1Hash = sha.ComputeHash(Encoding.UTF8.GetBytes(ret));
+
+            // 3. Base64 encode the hash
+            secWebSocketAccept = Convert.ToBase64String(sha1Hash);
+
+            return secWebSocketAccept;
+        }
+
         /// <summary>          
         /// little web server for sending network link kml's          
         /// </summary>          
@@ -1254,7 +1303,12 @@ namespace ArdupilotMega
                     // makesure we have valid image
                     GCSViews.FlightData.mymap.streamjpgenable = true;
                     GCSViews.FlightData.myhud.streamjpgenable = true;
-                    GCSViews.FlightData.mymap.Refresh();
+
+                    MethodInvoker m = delegate()
+                    {
+                        GCSViews.FlightData.mymap.Refresh();
+                    };
+                    this.Invoke(m);
 
                     NetworkStream stream = client.GetStream();
 
@@ -1276,33 +1330,142 @@ namespace ArdupilotMega
 
                     if (url.Contains("websocket"))
                     {
-                        using (var writer = new StreamWriter(stream))
+                        using (var writer = new StreamWriter(stream, Encoding.Default))
                         {
-                            writer.WriteLine("HTTP/1.1 101 Web Socket Protocol Handshake");
+                            writer.WriteLine("HTTP/1.1 101 WebSocket Protocol Handshake");
                             writer.WriteLine("Upgrade: WebSocket");
                             writer.WriteLine("Connection: Upgrade");
-                            writer.WriteLine("WebSocket-Origin: http://localhost:56781/");
                             writer.WriteLine("WebSocket-Location: ws://localhost:56781/websocket/server");
+
+                            int start = head.IndexOf("Sec-WebSocket-Key:") + 19;
+                            int end = head.IndexOf('\r', start);
+                            if (end == -1)
+                                end = head.IndexOf('\n', start);
+                            string accept = ComputeWebSocketHandshakeSecurityHash09(head.Substring(start, end - start));
+
+                            writer.WriteLine("Sec-WebSocket-Accept: " + accept);
+
+                            writer.WriteLine("Server: APM Planner");
+
                             writer.WriteLine("");
+
+                            writer.Flush();
 
                             while (client.Connected)
                             {
                                 System.Threading.Thread.Sleep(200);
                                 Console.WriteLine(stream.DataAvailable + " " + client.Available);
-                                stream.WriteByte(0x00);
-                                writer.WriteLine("test from planner");
-                                stream.WriteByte(0xff);
+
+                                while (client.Available > 0)
+                                {
+                                    Console.Write(stream.ReadByte());
+                                }
+
+                                byte[] packet = new byte[256];
+
+                                string sendme = cs.roll + "," + cs.pitch + "," + cs.yaw;
+
+                                packet[0] = 0x81; // fin - binary
+                                packet[1] = (byte)sendme.Length;
+
+                                int i = 2;
+                                foreach (char ch in sendme)
+                                {
+                                    packet[i++] = (byte)ch;
+                                }
+
+                                stream.Write(packet, 0, i);
 
                                 //break;
                             }
-
-                            stream.WriteByte(0x00);
-                            //message
-                            stream.WriteByte(0xff);
                         }
                     }
-                    else if (url.Contains(".html"))
+                    else if (url.Contains("network.kml"))
                     {
+                        string header = "HTTP/1.1 200 OK\r\nContent-Type: application/vnd.google-earth.kml+xml\n\n";
+                        byte[] temp = encoding.GetBytes(header);
+                        stream.Write(temp, 0, temp.Length);
+
+                        SharpKml.Dom.Document kml = new SharpKml.Dom.Document();
+
+                        SharpKml.Dom.Placemark pmplane = new SharpKml.Dom.Placemark();
+                        pmplane.Name = "P/Q ";
+
+                        pmplane.Visibility = true;
+
+                        SharpKml.Dom.Location loc = new SharpKml.Dom.Location();
+                        loc.Latitude = cs.lat;
+                        loc.Longitude = cs.lng;
+                        loc.Altitude = cs.alt;
+
+                        if (loc.Altitude < 0)
+                            loc.Altitude = 0.01;
+
+                        SharpKml.Dom.Orientation ori = new SharpKml.Dom.Orientation();
+                        ori.Heading = cs.yaw;
+                        ori.Roll = -cs.roll;
+                        ori.Tilt = -cs.pitch;
+
+                        SharpKml.Dom.Scale sca = new SharpKml.Dom.Scale();
+
+                        sca.X = 2;
+                        sca.Y = 2;
+                        sca.Z = 2;
+
+                        SharpKml.Dom.Model model = new SharpKml.Dom.Model();
+                        model.Location = loc;
+                        model.Orientation = ori;
+                        model.AltitudeMode = SharpKml.Dom.AltitudeMode.Absolute;
+                        model.Scale = sca;
+
+                        SharpKml.Dom.Link link = new SharpKml.Dom.Link();
+                        link.Href = new Uri("block_plane_0.dae", UriKind.Relative);
+
+                        model.Link = link;
+
+                        pmplane.Geometry = model;
+
+                        SharpKml.Dom.LookAt la = new SharpKml.Dom.LookAt() 
+                        { Altitude = loc.Altitude.Value, Latitude = loc.Latitude.Value, Longitude = loc.Longitude.Value, Tilt = 80,
+                            Heading = cs.yaw, AltitudeMode = SharpKml.Dom.AltitudeMode.Absolute, Range = 50};
+
+                        kml.Viewpoint = la;
+                        
+                        kml.AddFeature(pmplane);
+
+                        SharpKml.Base.Serializer serializer = new SharpKml.Base.Serializer();
+                        serializer.Serialize(kml);
+
+                        byte[] buffer = Encoding.ASCII.GetBytes(serializer.Xml);
+
+                        stream.Write(buffer, 0, buffer.Length);
+
+                        stream.Close();
+                    }
+                    else if (url.Contains("block_plane_0.dae"))
+                    {
+                        string header = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\n\n";
+                        byte[] temp = encoding.GetBytes(header);
+                        stream.Write(temp, 0, temp.Length);
+
+                        BinaryReader file = new BinaryReader(File.Open("block_plane_0.dae", FileMode.Open, FileAccess.Read, FileShare.Read));
+                        byte[] buffer = new byte[1024];
+                        while (file.PeekChar() != -1)
+                        {
+
+                            int leng = file.Read(buffer, 0, buffer.Length);
+
+                            stream.Write(buffer, 0, leng);
+                        }
+                        file.Close();
+                        stream.Close();
+                    }
+                    else if (url.Contains("hud.html"))
+                    {
+                        string header = "HTTP/1.1 200 OK\r\nContent-Type: text/html\n\n";
+                        byte[] temp = encoding.GetBytes(header);
+                        stream.Write(temp, 0, temp.Length);
+
                         BinaryReader file = new BinaryReader(File.Open("hud.html", FileMode.Open, FileAccess.Read, FileShare.Read));
                         byte[] buffer = new byte[1024];
                         while (file.PeekChar() != -1)
@@ -1450,7 +1613,7 @@ namespace ArdupilotMega
             catch (Exception ex) { MessageBox.Show("Update Failed " + ex.Message); }
         }
 
-        private static void updatelabel(Label loadinglabel,string text)
+        private static void updatelabel(Label loadinglabel, string text)
         {
             MainV2.instance.Invoke((MethodInvoker)delegate
             {
@@ -1515,7 +1678,7 @@ namespace ArdupilotMega
                 }
                 if (file.EndsWith("/"))
                 {
-                    update = updatecheck(loadinglabel, baseurl + file, file) && update;
+                    update = updatecheck(loadinglabel, baseurl + file, subdir.Replace("/", "\\") + file) && update;
                     continue;
                 }
                 if (loadinglabel != null)
@@ -1583,7 +1746,7 @@ namespace ArdupilotMega
                         }
                     }
                     if (loadinglabel != null)
-                        updatelabel(loadinglabel,"Getting " + file);
+                        updatelabel(loadinglabel, "Getting " + file);
 
                     // Create a request using a URL that can receive a post. 
                     request = WebRequest.Create(baseurl + file);
@@ -1615,7 +1778,7 @@ namespace ArdupilotMega
                             if (dt.Second != DateTime.Now.Second)
                             {
                                 if (loadinglabel != null)
-                                    updatelabel(loadinglabel,"Getting " + file + ": " + Math.Abs(bytes) + " bytes");//(((double)(contlen - bytes) / (double)contlen) * 100).ToString("0.0") + "%";
+                                    updatelabel(loadinglabel, "Getting " + file + ": " + Math.Abs(bytes) + " bytes");//(((double)(contlen - bytes) / (double)contlen) * 100).ToString("0.0") + "%";
                                 dt = DateTime.Now;
                             }
                         }
@@ -1669,18 +1832,24 @@ namespace ArdupilotMega
                 frm.Show();
                 return true;
             }
-            if (keyData == (Keys.Control | Keys.T)) // for ryan beall
+            if (keyData == (Keys.Control | Keys.T)) // for override connect
             {
-                MainV2.comPort.Open(false);
+                try
+                {
+                    MainV2.comPort.Open(false);
+                }
+                catch (Exception ex) { MessageBox.Show(ex.ToString()); }
                 return true;
             }
             if (keyData == (Keys.Control | Keys.Y)) // for ryan beall
             {
 #if MAVLINK10
-                int fixme;
-                //MainV2.comPort.doCommand(MAVLink.MAV_ACTION.MAV_ACTION_STORAGE_WRITE);
+                // write
+                MainV2.comPort.doCommand(MAVLink.MAV_CMD.PREFLIGHT_STORAGE, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+                //read
+                ///////MainV2.comPort.doCommand(MAVLink.MAV_CMD.PREFLIGHT_STORAGE, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
 #else
-				MainV2.comPort.doAction(MAVLink.MAV_ACTION.MAV_ACTION_STORAGE_WRITE);
+                MainV2.comPort.doAction(MAVLink.MAV_ACTION.MAV_ACTION_STORAGE_WRITE);
 #endif
                 MessageBox.Show("Done MAV_ACTION_STORAGE_WRITE");
                 return true;
@@ -1695,24 +1864,6 @@ namespace ArdupilotMega
             return base.ProcessCmdKey(ref msg, keyData);
         }
 
-        private void starttest()
-        {
-            MyView.Controls.Clear();
-
-            UserControl temp = new GCSViews.test();
-
-            fixtheme(temp);
-
-            temp.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top;
-
-            temp.Dock = DockStyle.Fill;
-
-            MyView.Controls.Add(temp);
-
-            temp.ForeColor = Color.White;
-
-            temp.BackColor = Color.FromArgb(0x26, 0x27, 0x28);
-        }
         public void changelanguage(CultureInfo ci)
         {
             if (ci != null && !Thread.CurrentThread.CurrentUICulture.Equals(ci))
@@ -1782,6 +1933,9 @@ namespace ArdupilotMega
             config["MainHeight"] = this.Height;
             config["MainWidth"] = this.Width;
             config["MainMaximised"] = this.WindowState.ToString();
+
+            config["MainLocX"] = this.Location.X.ToString();
+            config["MainLocY"] = this.Location.Y.ToString();
 
             try
             {

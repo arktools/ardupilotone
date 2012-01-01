@@ -104,6 +104,15 @@ static void init_ardupilot()
                     memcheck_available_memory());
 
 	//
+	// Initialize Wire and SPI libraries
+	//
+#ifndef DESKTOP_BUILD
+    I2c.begin();
+    I2c.timeOut(20);
+#endif
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
+	//
 	// Initialize the isr_registry.
 	//
     isr_registry.init();
@@ -164,33 +173,11 @@ static void init_ardupilot()
 		delay(100); // wait for serial send
 		AP_Var::erase_all();
 
-		// erase DataFlash on format version change
-		#if LOGGING_ENABLED == ENABLED
-		DataFlash.Init();
-		erase_logs(NULL, NULL);
-		#endif
-
 		// save the new format version
 		g.format_version.set_and_save(Parameters::k_format_version);
 
 		// save default radio values
 		default_dead_zones();
-
-		Serial.printf_P(PSTR("Please Run Setup...\n"));
-		while (true) {
-			delay(1000);
-			if(motor_light){
-				digitalWrite(A_LED_PIN, LED_ON);
-				digitalWrite(B_LED_PIN, LED_ON);
-				digitalWrite(C_LED_PIN, LED_ON);
-			}else{
-				digitalWrite(A_LED_PIN, LED_OFF);
-				digitalWrite(B_LED_PIN, LED_OFF);
-				digitalWrite(C_LED_PIN, LED_OFF);
-			}
-			motor_light = !motor_light;
-		}
-
 	}else{
 		// save default radio values
 		//default_dead_zones();
@@ -216,6 +203,20 @@ static void init_ardupilot()
 
     // identify ourselves correctly with the ground station
 	mavlink_system.sysid = g.sysid_this_mav;
+
+#if LOGGING_ENABLED == ENABLED
+    DataFlash.Init();
+    if (!DataFlash.CardInserted()) {
+        gcs_send_text_P(SEVERITY_LOW, PSTR("No dataflash inserted"));
+        g.log_bitmask.set(0);
+    } else if (DataFlash.NeedErase()) {
+        gcs_send_text_P(SEVERITY_LOW, PSTR("ERASING LOGS"));
+		do_erase_logs();
+    }
+	if (g.log_bitmask != 0){
+		DataFlash.start_new_log();
+	}
+#endif
 
 	#ifdef RADIO_OVERRIDE_DEFAULTS
 	{
@@ -244,11 +245,7 @@ static void init_ardupilot()
         adc.Init(&timer_scheduler);       // APM ADC library initialization
 #endif // CONFIG_ADC
 
-#if CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
-        barometer.Init(1, true);
-#else
-        barometer.Init(1, false);
-#endif // CONFIG_APM_HARDWARE
+        barometer.init(&timer_scheduler);
 
 #endif // HIL_MODE
 
@@ -260,21 +257,16 @@ static void init_ardupilot()
 	if(g.compass_enabled)
 		init_compass();
 
-	#ifdef OPTFLOW_ENABLED
 	// init the optical flow sensor
 	if(g.optflow_enabled) {
 		init_optflow();
 	}
-	#endif
+
 
 // agmatthews USERHOOKS
 #ifdef USERHOOK_INIT
    USERHOOK_INIT
 #endif
-
-	#if LOGGING_ENABLED == ENABLED
-	DataFlash.Init();
-	#endif
 
 #if CLI_ENABLED == ENABLED && CLI_SLIDER_ENABLED == ENABLED
 	// If the switch is in 'menu' mode, run the main menu.
@@ -291,14 +283,6 @@ static void init_ardupilot()
 #else
     Serial.printf_P(PSTR("\nPress ENTER 3 times for CLI\n\n"));
 #endif // CLI_ENABLED
-
-	#if LOGGING_ENABLED == ENABLED
-	if(g.log_bitmask != 0){
-		//	TODO - Here we will check  on the length of the last log
-		//  We don't want to create a bunch of little logs due to powering on and off
-		start_new_log();
-	}
-	#endif
 
     GPS_enabled = false;
 
@@ -334,6 +318,11 @@ static void init_ardupilot()
 	init_barometer();
 	#endif
 
+	// initialise sonar
+	#if HIL_MODE != HIL_MODE_ATTITUDE && CONFIG_SONAR == ENABLED
+	init_sonar();
+	#endif
+
 	// initialize commands
 	// -------------------
 	init_commands();
@@ -352,7 +341,7 @@ static void init_ardupilot()
 
 	// init the Z damopener
 	// --------------------
-	#if ACCEL_ALT_HOLD == 1
+	#if ACCEL_ALT_HOLD != 0
 	init_z_damper();
 	#endif
 
@@ -380,7 +369,7 @@ static void startup_ground(void)
 	#if HIL_MODE != HIL_MODE_ATTITUDE
 		// Warm up and read Gyro offsets
 		// -----------------------------
-		imu.init(IMU::COLD_START, mavlink_delay, &timer_scheduler);
+        imu.init(IMU::COLD_START, mavlink_delay, flash_leds, &timer_scheduler);
 		#if CLI_ENABLED == ENABLED
 			report_imu();
 		#endif
@@ -421,13 +410,19 @@ static void set_mode(byte mode)
 			mode = STABILIZE;
 	}
 
+	// nothing but Loiter for OptFlow only
+	if (g.optflow_enabled && GPS_enabled == false){
+		if (mode > ALT_HOLD && mode != LOITER)
+			mode = STABILIZE;
+	}
+
 	old_control_mode = control_mode;
 
 	control_mode = mode;
 	control_mode = constrain(control_mode, 0, NUM_MODES - 1);
 
 	// used to stop fly_aways
-	motor_auto_armed = (g.rc_3.control_in > 0);
+	motor_auto_armed = (g.rc_3.control_in > 0) || failsafe;
 
 	// clearing value used in interactive alt hold
 	manual_boost = 0;
@@ -501,6 +496,14 @@ static void set_mode(byte mode)
 			set_next_WP(&guided_WP);
 			break;
 
+		case LAND:
+			yaw_mode 		= YAW_HOLD;
+			roll_pitch_mode = ROLL_PITCH_AUTO;
+			throttle_mode 	= THROTTLE_AUTO;
+			next_WP 		= current_loc;
+			next_WP.alt 	= 0;
+			break;
+
 		case RTL:
 			yaw_mode 		= RTL_YAW;
 			roll_pitch_mode = RTL_RP;
@@ -555,29 +558,6 @@ static void set_failsafe(boolean mode)
 		}
 	}
 }
-
-
-static void
-init_compass()
-{
-	compass.set_orientation(MAG_ORIENTATION);						// set compass's orientation on aircraft
-	dcm.set_compass(&compass);
-	compass.init();
-	compass.get_offsets();					// load offsets to account for airframe magnetic interference
-}
-
-#ifdef OPTFLOW_ENABLED
-static void
-init_optflow()
-{
-	if( optflow.init() == false ) {
-	    g.optflow_enabled = false;
-	    //SendDebug("\nFailed to Init OptFlow ");
-	}
-	optflow.set_orientation(OPTFLOW_ORIENTATION);			// set optical flow sensor's orientation on aircraft
-	optflow.set_field_of_view(OPTFLOW_FOV);					// set optical flow sensor's field of view
-}
-#endif
 
 static void
 init_simple_bearing()
@@ -638,3 +618,13 @@ static void check_usb_mux(void)
     }
 }
 #endif
+
+/*
+  called by gyro/accel init to flash LEDs so user
+  has some mesmerising lights to watch while waiting
+ */
+void flash_leds(bool on)
+{
+    digitalWrite(A_LED_PIN, on?LED_OFF:LED_ON);
+    digitalWrite(C_LED_PIN, on?LED_ON:LED_OFF);
+}

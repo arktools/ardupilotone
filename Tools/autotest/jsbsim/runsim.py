@@ -2,7 +2,7 @@
 # run a jsbsim model as a child process
 
 import sys, os, pexpect, fdpexpect, socket
-import math, time, select, struct, signal
+import math, time, select, struct, signal, errno
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'pysim'))
 
@@ -69,6 +69,13 @@ def process_sitl_input(buf):
         jsb_set('fcs/throttle-cmd-norm', throttle)
         sitl_state.throttle = throttle
 
+def update_wind(wind):
+    '''update wind simulation'''
+    (speed, direction) = wind.current()
+    jsb_set('atmosphere/psiw-rad', math.radians(direction))
+    jsb_set('atmosphere/wind-mag-fps', speed/0.3048)
+    
+
 def process_jsb_input(buf):
     '''process FG FDM input from JSBSim'''
     global fdm, fg_out, sim_out
@@ -80,7 +87,7 @@ def process_jsb_input(buf):
             fdm.set('rpm', sitl_state.throttle*1000)
             fg_out.send(fdm.pack())
         except socket.error as e:
-            if e.errno not in [ 111 ]:
+            if e.errno not in [ errno.ECONNREFUSED ]:
                 raise
 
     simbuf = struct.pack('<16dI',
@@ -104,7 +111,7 @@ def process_jsb_input(buf):
     try:
         sim_out.send(simbuf)
     except socket.error as e:
-        if e.errno not in [ 111 ]:
+        if e.errno not in [ errno.ECONNREFUSED ]:
             raise
 
 
@@ -112,13 +119,14 @@ def process_jsb_input(buf):
 ##################
 # main program
 from optparse import OptionParser
-parser = OptionParser("hil_quad.py [options]")
+parser = OptionParser("runsim.py [options]")
 parser.add_option("--simin",   help="SITL input (IP:port)",          default="127.0.0.1:5502")
 parser.add_option("--simout",  help="SITL output (IP:port)",         default="127.0.0.1:5501")
-parser.add_option("--fgout",   help="FG display output (IP:port)")
+parser.add_option("--fgout",   help="FG display output (IP:port)",   default="127.0.0.1:5503")
 parser.add_option("--home",    type='string', help="home lat,lng,alt,hdg (required)")
-parser.add_option("--script",  type='string', help='jsbsim model script (required)')
+parser.add_option("--script",  type='string', help='jsbsim model script', default='jsbsim/rascal_test.xml')
 parser.add_option("--options", type='string', help='jsbsim startup options')
+parser.add_option("--wind", dest="wind", help="Simulate wind (speed,direction,turbulance)", default='0,0,0')
 
 (opts, args) = parser.parse_args()
 
@@ -186,6 +194,10 @@ if opts.fgout:
     fg_out.connect(interpret_address(opts.fgout))
 
 
+# setup wind generator
+wind = util.Wind(opts.wind)
+
+
 setup_home(opts.home)
 
 fdm = fgFDM.fgFDM()
@@ -200,8 +212,12 @@ print("Simulator ready to fly")
 
 def main_loop():
     '''run main loop'''
-    last_report = time.time()
+    tnow = time.time()
+    last_report = tnow
+    last_sim_input = tnow
+    last_wind_update = tnow
     frame_count = 0
+    paused = False
 
     while True:
         rin = [jsb_in.fileno(), sim_in.fileno(), jsb_console.fileno(), jsb.fileno()]
@@ -211,6 +227,8 @@ def main_loop():
             util.check_parent()
             continue
 
+        tnow = time.time()
+
         if jsb_in.fileno() in rin:
             buf = jsb_in.recv(fdm.packet_size())
             process_jsb_input(buf)
@@ -219,6 +237,7 @@ def main_loop():
         if sim_in.fileno() in rin:
             simbuf = sim_in.recv(22)
             process_sitl_input(simbuf)
+            last_sim_input = tnow
 
         # show any jsbsim console output
         if jsb_console.fileno() in rin:
@@ -226,7 +245,22 @@ def main_loop():
         if jsb.fileno() in rin:
             util.pexpect_drain(jsb)
 
-        if time.time() - last_report > 0.5:
+        if tnow - last_sim_input > 0.2:
+            if not paused:
+                print("PAUSING SIMULATION")
+                paused = True
+                jsb_console.send('hold\n')
+        else:
+            if paused:
+                print("RESUMING SIMULATION")
+                paused = False
+                jsb_console.send('resume\n')
+
+        if tnow - last_wind_update > 0.1:
+            update_wind(wind)
+            last_wind_update = tnow
+
+        if tnow - last_report > 0.5:
             print("FPS %u asl=%.1f agl=%.1f roll=%.1f pitch=%.1f a=(%.2f %.2f %.2f)" % (
                 frame_count / (time.time() - last_report),
                 fdm.get('altitude', units='meters'),

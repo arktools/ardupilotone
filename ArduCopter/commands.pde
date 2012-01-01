@@ -8,6 +8,9 @@ static void init_commands()
 	prev_nav_index 			= NO_COMMAND;
 	command_cond_queue.id 	= NO_COMMAND;
 	command_nav_queue.id 	= NO_COMMAND;
+
+	// default Yaw tracking
+	yaw_tracking 			= MAV_ROI_WPNEXT;
 }
 
 // Getters
@@ -167,7 +170,7 @@ static void set_next_WP(struct Location *wp)
 	target_altitude = current_loc.alt;
 
 	// this is used to offset the shrinking longitude as we go towards the poles
-	float rads 			= (abs(next_WP.lat)/t7) * 0.0174532925;
+	float rads 			= (fabs((float)next_WP.lat)/t7) * 0.0174532925;
 	scaleLongDown 		= cos(rads);
 	scaleLongUp 		= 1.0f/cos(rads);
 
@@ -176,6 +179,7 @@ static void set_next_WP(struct Location *wp)
 	wp_totalDistance 	= get_distance(&current_loc, &next_WP);
 	wp_distance 		= wp_totalDistance;
 	target_bearing 		= get_bearing(&prev_WP, &next_WP);
+	nav_bearing 		= target_bearing;
 
 	// to check if we have missed the WP
 	// ---------------------------------
@@ -192,20 +196,9 @@ static void set_next_WP(struct Location *wp)
 static void init_home()
 {
 	home_is_set = true;
-
-	// block until we get a good fix
-	// -----------------------------
-	while (!g_gps->new_data || !g_gps->fix) {
-		g_gps->update();
-        // we need GCS update while waiting for GPS, to ensure
-        // we react to HIL mavlink
-        gcs_update();
-	}
-
 	home.id 	= MAV_CMD_NAV_WAYPOINT;
 	home.lng 	= g_gps->longitude;				// Lon * 10**7
 	home.lat 	= g_gps->latitude;				// Lat * 10**7
-	//home.alt 	= max(g_gps->altitude, 0);		// we sometimes get negatives from GPS, not valid
 	home.alt 	= 0;							// Home is always 0
 
 	// to point yaw towards home until we set it with Mavlink
@@ -220,8 +213,8 @@ static void init_home()
 	// Save prev loc this makes the calcs look better before commands are loaded
 	prev_WP = home;
 
-	// this is dangerous since we can get GPS lock at any time.
-	//next_WP = home;
+	// in case we RTL
+	next_WP = home;
 
 	// Load home for a default guided_WP
 	// -------------

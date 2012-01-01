@@ -273,6 +273,20 @@ namespace ArdupilotMega.Setup
             if (tabControl1.SelectedTab == tabRadioIn)
             {
                 startup = true;
+
+                if (MainV2.cs.firmware == MainV2.Firmwares.ArduCopter2)
+                {
+                    groupBoxElevons.Visible = false;
+                }
+
+                try
+                {
+                    CHK_mixmode.Checked = MainV2.comPort.param["ELEVON_MIXING"].ToString() == "1";
+                    CHK_elevonrev.Checked = MainV2.comPort.param["ELEVON_REVERSE"].ToString() == "1";
+                    CHK_elevonch1rev.Checked = MainV2.comPort.param["ELEVON_CH1_REV"].ToString() == "1";
+                    CHK_elevonch2rev.Checked = MainV2.comPort.param["ELEVON_CH2_REV"].ToString() == "1";
+                }
+                catch {  } // this will fail on arducopter
                 try
                 {
                     CHK_revch1.Checked = MainV2.comPort.param["RC1_REV"].ToString() == "-1";
@@ -280,7 +294,7 @@ namespace ArdupilotMega.Setup
                     CHK_revch3.Checked = MainV2.comPort.param["RC3_REV"].ToString() == "-1";
                     CHK_revch4.Checked = MainV2.comPort.param["RC4_REV"].ToString() == "-1";
                 }
-                catch { MessageBox.Show("Missing RC rev Param"); }
+                catch (Exception ex) { MessageBox.Show("Missing RC rev Param "+ex.ToString()); }
                 startup = false;
             }
 
@@ -363,6 +377,7 @@ namespace ArdupilotMega.Setup
             if (tabControl1.SelectedTab == tabHardware)
             {
                 startup = true;
+
                 if (MainV2.comPort.param["ARSPD_ENABLE"] != null)
                     CHK_enableairspeed.Checked = MainV2.comPort.param["ARSPD_ENABLE"].ToString() == "1" ? true : false;
 
@@ -374,6 +389,14 @@ namespace ArdupilotMega.Setup
 
                 if (MainV2.comPort.param["COMPASS_DEC"] != null)
                     TXT_declination.Text = (float.Parse(MainV2.comPort.param["COMPASS_DEC"].ToString()) * rad2deg).ToString();
+
+                if (MainV2.comPort.param["SONAR_TYPE"] != null)
+                    CMB_sonartype.SelectedIndex = int.Parse(MainV2.comPort.param["SONAR_TYPE"].ToString());
+
+                if (MainV2.comPort.param["FLOW_ENABLE"] != null)
+                    CHK_enableoptflow.Checked = MainV2.comPort.param["FLOW_ENABLE"].ToString() == "1" ? true : false;
+                
+
                 startup = false;
             }
 
@@ -788,11 +811,11 @@ namespace ArdupilotMega.Setup
             }
             catch (Exception ex) { MainV2.givecomport = false; MessageBox.Show("Invalid Comport Settings : " + ex.Message); return; }
 
-            BUT_reset.Text = "Rebooting (60 sec)";
+            BUT_reset.Text = "Rebooting (17 sec)";
             BUT_reset.Refresh();
             Application.DoEvents();
 
-            Sleep(60000, comPortT); // wait for boot/reset
+            Sleep(17000, comPortT); // wait for boot/reset
 
             comPortT.DtrEnable = false;
 
@@ -1192,7 +1215,8 @@ namespace ArdupilotMega.Setup
                     HS4_MIN.Text = HS4.minline.ToString();
                 if (int.Parse(HS4_MAX.Text) < HS4.maxline)
                     HS4_MAX.Text = HS4.maxline.ToString();
-            } catch {}
+            }
+            catch { }
         }
 
         private void HS3_Paint(object sender, PaintEventArgs e)
@@ -1261,6 +1285,115 @@ namespace ArdupilotMega.Setup
         {
             timer.Stop();
             timer.Dispose();
+        }
+
+        private void CHK_enableoptflow_CheckedChanged(object sender, EventArgs e)
+        {
+
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["FLOW_ENABLE"] == null)
+                {
+                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("FLOW_ENABLE", ((CheckBox)sender).Checked == true ? 1 : 0);
+                }
+            }
+            catch { MessageBox.Show("Set FLOW_ENABLE Failed"); }
+        }
+
+        private void CMB_sonartype_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["SONAR_TYPE"] == null)
+                {
+                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("SONAR_TYPE", ((ComboBox)sender).SelectedIndex);
+                }
+            }
+            catch { MessageBox.Show("Set SONAR_TYPE Failed"); }
+        }
+
+        private void CHK_mixmode_CheckedChanged(object sender, EventArgs e)
+        {
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["ELEVON_MIXING"] == null)
+                {
+                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("ELEVON_MIXING", ((CheckBox)sender).Checked == true ? 1 : 0);
+                }
+            }
+            catch { MessageBox.Show("Set ELEVON_MIXING Failed"); }
+        }
+
+        private void CHK_elevonrev_CheckedChanged(object sender, EventArgs e)
+        {
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["ELEVON_REVERSE"] == null)
+                {
+                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("ELEVON_REVERSE", ((CheckBox)sender).Checked == true ? 1 : 0);
+                }
+            }
+            catch { MessageBox.Show("Set ELEVON_REVERSE Failed"); }
+        }
+
+        private void CHK_elevonch1rev_CheckedChanged(object sender, EventArgs e)
+        {
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["ELEVON_CH1_REV"] == null)
+                {
+                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("ELEVON_CH1_REV", ((CheckBox)sender).Checked == true ? 1 : 0);
+                }
+            }
+            catch { MessageBox.Show("Set ELEVON_CH1_REV Failed"); }
+        }
+
+        private void CHK_elevonch2rev_CheckedChanged(object sender, EventArgs e)
+        {
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["ELEVON_CH2_REV"] == null)
+                {
+                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("ELEVON_CH2_REV", ((CheckBox)sender).Checked == true ? 1 : 0);
+                }
+            }
+            catch { MessageBox.Show("Set ELEVON_CH2_REV Failed"); }
         }
     }
 }

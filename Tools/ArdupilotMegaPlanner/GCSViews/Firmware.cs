@@ -17,58 +17,48 @@ namespace ArdupilotMega.GCSViews
 {
     class Firmware : MyUserControl
     {
-        private System.Windows.Forms.PictureBox pictureBoxAPM;
-        private System.Windows.Forms.PictureBox pictureBoxAPMHIL;
-        private System.Windows.Forms.PictureBox pictureBoxQuad;
-        private System.Windows.Forms.PictureBox pictureBoxHexa;
-        private System.Windows.Forms.PictureBox pictureBoxTri;
-        private System.Windows.Forms.PictureBox pictureBoxY6;
+        private ImageLabel pictureBoxAPM;
+        private ImageLabel pictureBoxQuad;
+        private ImageLabel pictureBoxHexa;
+        private ImageLabel pictureBoxTri;
+        private ImageLabel pictureBoxY6;
         private System.Windows.Forms.Label lbl_status;
         private System.Windows.Forms.ProgressBar progress;
-        private System.Windows.Forms.Label lbl_AP;
         private System.Windows.Forms.Label label2;
-        private System.Windows.Forms.Label lbl_APHil;
-        private System.Windows.Forms.Label lbl_ACQuad;
-        private System.Windows.Forms.Label lbl_ACHexa;
-        private System.Windows.Forms.Label lbl_ACTri;
-        private Label lbl_Heli;
-        private PictureBox pictureBoxHeli;
+        private ImageLabel pictureBoxHeli;
         private MyButton BUT_setup;
-        private Label lbl_ACHil;
-        private PictureBox pictureBoxQuadHil;
-        private System.Windows.Forms.Label lbl_ACY6;
+        private PictureBox pictureBoxHilimage;
+        private PictureBox pictureBoxAPHil;
+        private PictureBox pictureBoxACHil;
+        private PictureBox pictureBoxACHHil;
+        private ImageLabel pictureBoxOcta;
+        private Label label1;
+        private ImageLabel pictureBoxOctav;
 
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Firmware));
-            this.pictureBoxAPM = new System.Windows.Forms.PictureBox();
-            this.pictureBoxAPMHIL = new System.Windows.Forms.PictureBox();
-            this.pictureBoxQuad = new System.Windows.Forms.PictureBox();
-            this.pictureBoxHexa = new System.Windows.Forms.PictureBox();
-            this.pictureBoxTri = new System.Windows.Forms.PictureBox();
-            this.pictureBoxY6 = new System.Windows.Forms.PictureBox();
+            this.pictureBoxAPM = new ArdupilotMega.ImageLabel();
+            this.pictureBoxQuad = new ArdupilotMega.ImageLabel();
+            this.pictureBoxHexa = new ArdupilotMega.ImageLabel();
+            this.pictureBoxTri = new ArdupilotMega.ImageLabel();
+            this.pictureBoxY6 = new ArdupilotMega.ImageLabel();
             this.lbl_status = new System.Windows.Forms.Label();
             this.progress = new System.Windows.Forms.ProgressBar();
-            this.lbl_AP = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
-            this.lbl_APHil = new System.Windows.Forms.Label();
-            this.lbl_ACQuad = new System.Windows.Forms.Label();
-            this.lbl_ACHexa = new System.Windows.Forms.Label();
-            this.lbl_ACTri = new System.Windows.Forms.Label();
-            this.lbl_ACY6 = new System.Windows.Forms.Label();
-            this.lbl_Heli = new System.Windows.Forms.Label();
-            this.pictureBoxHeli = new System.Windows.Forms.PictureBox();
-            this.lbl_ACHil = new System.Windows.Forms.Label();
-            this.pictureBoxQuadHil = new System.Windows.Forms.PictureBox();
+            this.pictureBoxHeli = new ArdupilotMega.ImageLabel();
             this.BUT_setup = new ArdupilotMega.MyButton();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAPM)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAPMHIL)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxQuad)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxHexa)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxTri)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxY6)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxHeli)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxQuadHil)).BeginInit();
+            this.pictureBoxHilimage = new System.Windows.Forms.PictureBox();
+            this.pictureBoxAPHil = new System.Windows.Forms.PictureBox();
+            this.pictureBoxACHil = new System.Windows.Forms.PictureBox();
+            this.pictureBoxACHHil = new System.Windows.Forms.PictureBox();
+            this.pictureBoxOcta = new ArdupilotMega.ImageLabel();
+            this.pictureBoxOctav = new ArdupilotMega.ImageLabel();
+            this.label1 = new System.Windows.Forms.Label();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxHilimage)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAPHil)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxACHil)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxACHHil)).BeginInit();
             this.SuspendLayout();
             // 
             // pictureBoxAPM
@@ -80,19 +70,10 @@ namespace ArdupilotMega.GCSViews
             this.pictureBoxAPM.TabStop = false;
             this.pictureBoxAPM.Click += new System.EventHandler(this.pictureBoxAPM_Click);
             // 
-            // pictureBoxAPMHIL
-            // 
-            this.pictureBoxAPMHIL.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxAPMHIL.Image = global::ArdupilotMega.Properties.Resources.APM_airframes_002;
-            resources.ApplyResources(this.pictureBoxAPMHIL, "pictureBoxAPMHIL");
-            this.pictureBoxAPMHIL.Name = "pictureBoxAPMHIL";
-            this.pictureBoxAPMHIL.TabStop = false;
-            this.pictureBoxAPMHIL.Click += new System.EventHandler(this.pictureBoxAPMHIL_Click);
-            // 
             // pictureBoxQuad
             // 
             this.pictureBoxQuad.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxQuad.Image = global::ArdupilotMega.Properties.Resources.frames_03;
+            this.pictureBoxQuad.Image = ((System.Drawing.Image)(resources.GetObject("pictureBoxQuad.Image")));
             resources.ApplyResources(this.pictureBoxQuad, "pictureBoxQuad");
             this.pictureBoxQuad.Name = "pictureBoxQuad";
             this.pictureBoxQuad.TabStop = false;
@@ -101,7 +82,7 @@ namespace ArdupilotMega.GCSViews
             // pictureBoxHexa
             // 
             this.pictureBoxHexa.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxHexa.Image = global::ArdupilotMega.Properties.Resources.frames_07;
+            this.pictureBoxHexa.Image = global::ArdupilotMega.Properties.Resources.hexa;
             resources.ApplyResources(this.pictureBoxHexa, "pictureBoxHexa");
             this.pictureBoxHexa.Name = "pictureBoxHexa";
             this.pictureBoxHexa.TabStop = false;
@@ -110,7 +91,7 @@ namespace ArdupilotMega.GCSViews
             // pictureBoxTri
             // 
             this.pictureBoxTri.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxTri.Image = global::ArdupilotMega.Properties.Resources.frames_05;
+            this.pictureBoxTri.Image = global::ArdupilotMega.Properties.Resources.tri;
             resources.ApplyResources(this.pictureBoxTri, "pictureBoxTri");
             this.pictureBoxTri.Name = "pictureBoxTri";
             this.pictureBoxTri.TabStop = false;
@@ -119,7 +100,7 @@ namespace ArdupilotMega.GCSViews
             // pictureBoxY6
             // 
             this.pictureBoxY6.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxY6.Image = global::ArdupilotMega.Properties.Resources.frames_08;
+            this.pictureBoxY6.Image = global::ArdupilotMega.Properties.Resources.y6;
             resources.ApplyResources(this.pictureBoxY6, "pictureBoxY6");
             this.pictureBoxY6.Name = "pictureBoxY6";
             this.pictureBoxY6.TabStop = false;
@@ -136,45 +117,10 @@ namespace ArdupilotMega.GCSViews
             this.progress.Name = "progress";
             this.progress.Step = 1;
             // 
-            // lbl_AP
-            // 
-            resources.ApplyResources(this.lbl_AP, "lbl_AP");
-            this.lbl_AP.Name = "lbl_AP";
-            // 
             // label2
             // 
             resources.ApplyResources(this.label2, "label2");
             this.label2.Name = "label2";
-            // 
-            // lbl_APHil
-            // 
-            resources.ApplyResources(this.lbl_APHil, "lbl_APHil");
-            this.lbl_APHil.Name = "lbl_APHil";
-            // 
-            // lbl_ACQuad
-            // 
-            resources.ApplyResources(this.lbl_ACQuad, "lbl_ACQuad");
-            this.lbl_ACQuad.Name = "lbl_ACQuad";
-            // 
-            // lbl_ACHexa
-            // 
-            resources.ApplyResources(this.lbl_ACHexa, "lbl_ACHexa");
-            this.lbl_ACHexa.Name = "lbl_ACHexa";
-            // 
-            // lbl_ACTri
-            // 
-            resources.ApplyResources(this.lbl_ACTri, "lbl_ACTri");
-            this.lbl_ACTri.Name = "lbl_ACTri";
-            // 
-            // lbl_ACY6
-            // 
-            resources.ApplyResources(this.lbl_ACY6, "lbl_ACY6");
-            this.lbl_ACY6.Name = "lbl_ACY6";
-            // 
-            // lbl_Heli
-            // 
-            resources.ApplyResources(this.lbl_Heli, "lbl_Heli");
-            this.lbl_Heli.Name = "lbl_Heli";
             // 
             // pictureBoxHeli
             // 
@@ -185,20 +131,6 @@ namespace ArdupilotMega.GCSViews
             this.pictureBoxHeli.TabStop = false;
             this.pictureBoxHeli.Click += new System.EventHandler(this.pictureBoxHeli_Click);
             // 
-            // lbl_ACHil
-            // 
-            resources.ApplyResources(this.lbl_ACHil, "lbl_ACHil");
-            this.lbl_ACHil.Name = "lbl_ACHil";
-            // 
-            // pictureBoxQuadHil
-            // 
-            this.pictureBoxQuadHil.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxQuadHil.Image = global::ArdupilotMega.Properties.Resources.new_frames_09;
-            resources.ApplyResources(this.pictureBoxQuadHil, "pictureBoxQuadHil");
-            this.pictureBoxQuadHil.Name = "pictureBoxQuadHil";
-            this.pictureBoxQuadHil.TabStop = false;
-            this.pictureBoxQuadHil.Click += new System.EventHandler(this.pictureBoxQuadHil_Click);
-            // 
             // BUT_setup
             // 
             resources.ApplyResources(this.BUT_setup, "BUT_setup");
@@ -206,41 +138,89 @@ namespace ArdupilotMega.GCSViews
             this.BUT_setup.UseVisualStyleBackColor = true;
             this.BUT_setup.Click += new System.EventHandler(this.BUT_setup_Click);
             // 
+            // pictureBoxHilimage
+            // 
+            this.pictureBoxHilimage.Image = global::ArdupilotMega.Properties.Resources.hil;
+            resources.ApplyResources(this.pictureBoxHilimage, "pictureBoxHilimage");
+            this.pictureBoxHilimage.Name = "pictureBoxHilimage";
+            this.pictureBoxHilimage.TabStop = false;
+            // 
+            // pictureBoxAPHil
+            // 
+            this.pictureBoxAPHil.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBoxAPHil.Image = global::ArdupilotMega.Properties.Resources.hilplane;
+            resources.ApplyResources(this.pictureBoxAPHil, "pictureBoxAPHil");
+            this.pictureBoxAPHil.Name = "pictureBoxAPHil";
+            this.pictureBoxAPHil.TabStop = false;
+            this.pictureBoxAPHil.Click += new System.EventHandler(this.pictureBoxAPHil_Click);
+            // 
+            // pictureBoxACHil
+            // 
+            this.pictureBoxACHil.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBoxACHil.Image = global::ArdupilotMega.Properties.Resources.hilquad;
+            resources.ApplyResources(this.pictureBoxACHil, "pictureBoxACHil");
+            this.pictureBoxACHil.Name = "pictureBoxACHil";
+            this.pictureBoxACHil.TabStop = false;
+            this.pictureBoxACHil.Click += new System.EventHandler(this.pictureBoxACHil_Click);
+            // 
+            // pictureBoxACHHil
+            // 
+            this.pictureBoxACHHil.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBoxACHHil.Image = global::ArdupilotMega.Properties.Resources.hilheli;
+            resources.ApplyResources(this.pictureBoxACHHil, "pictureBoxACHHil");
+            this.pictureBoxACHHil.Name = "pictureBoxACHHil";
+            this.pictureBoxACHHil.TabStop = false;
+            this.pictureBoxACHHil.Click += new System.EventHandler(this.pictureBoxACHHil_Click);
+            // 
+            // pictureBoxOcta
+            // 
+            this.pictureBoxOcta.Image = global::ArdupilotMega.Properties.Resources.octo;
+            resources.ApplyResources(this.pictureBoxOcta, "pictureBoxOcta");
+            this.pictureBoxOcta.Name = "pictureBoxOcta";
+            this.pictureBoxOcta.TabStop = false;
+            this.pictureBoxOcta.Click += new System.EventHandler(this.pictureBoxOcta_Click);
+            // 
+            // pictureBoxOctav
+            // 
+            this.pictureBoxOctav.Image = global::ArdupilotMega.Properties.Resources.octov;
+            resources.ApplyResources(this.pictureBoxOctav, "pictureBoxOctav");
+            this.pictureBoxOctav.Name = "pictureBoxOctav";
+            this.pictureBoxOctav.TabStop = false;
+            this.pictureBoxOctav.Click += new System.EventHandler(this.pictureBoxOctav_Click);
+            // 
+            // label1
+            // 
+            resources.ApplyResources(this.label1, "label1");
+            this.label1.Name = "label1";
+            // 
             // Firmware
             // 
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.Controls.Add(this.lbl_ACHil);
-            this.Controls.Add(this.pictureBoxQuadHil);
+            this.Controls.Add(this.label1);
+            this.Controls.Add(this.pictureBoxOctav);
+            this.Controls.Add(this.pictureBoxOcta);
+            this.Controls.Add(this.pictureBoxACHHil);
+            this.Controls.Add(this.pictureBoxACHil);
+            this.Controls.Add(this.pictureBoxAPHil);
+            this.Controls.Add(this.pictureBoxHilimage);
             this.Controls.Add(this.BUT_setup);
-            this.Controls.Add(this.lbl_Heli);
             this.Controls.Add(this.pictureBoxHeli);
-            this.Controls.Add(this.lbl_ACY6);
-            this.Controls.Add(this.lbl_ACTri);
-            this.Controls.Add(this.lbl_ACHexa);
-            this.Controls.Add(this.lbl_ACQuad);
-            this.Controls.Add(this.lbl_APHil);
             this.Controls.Add(this.label2);
-            this.Controls.Add(this.lbl_AP);
             this.Controls.Add(this.lbl_status);
             this.Controls.Add(this.progress);
             this.Controls.Add(this.pictureBoxY6);
             this.Controls.Add(this.pictureBoxTri);
             this.Controls.Add(this.pictureBoxHexa);
             this.Controls.Add(this.pictureBoxQuad);
-            this.Controls.Add(this.pictureBoxAPMHIL);
             this.Controls.Add(this.pictureBoxAPM);
             this.MinimumSize = new System.Drawing.Size(1008, 461);
             this.Name = "Firmware";
             this.Load += new System.EventHandler(this.FirmwareVisual_Load);
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAPM)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAPMHIL)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxQuad)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxHexa)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxTri)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxY6)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxHeli)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxQuadHil)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxHilimage)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxAPHil)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxACHil)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBoxACHHil)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -266,7 +246,7 @@ namespace ArdupilotMega.GCSViews
                 fd.ShowDialog();
                 if (File.Exists(fd.FileName))
                 {
-                    UploadFlash(fd.FileName, ArduinoDetect.DetectVersion(MainV2.comportname));
+                    UploadFlash(fd.FileName, ArduinoDetect.DetectBoard(MainV2.comportname));
                 }
                 return true;
             }
@@ -384,39 +364,47 @@ namespace ArdupilotMega.GCSViews
         {
             if (temp.url.ToLower().Contains("firmware/AP-1".ToLower()))
             {
-                lbl_AP.Text = temp.name;
+                pictureBoxAPM.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/APHIL-".ToLower()))
             {
-                lbl_APHil.Text = temp.name;
+                pictureBoxAPHil.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/ac2-quad-".ToLower()))
             {
-                lbl_ACQuad.Text = temp.name;
+                pictureBoxQuad.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/ac2-tri".ToLower()))
             {
-                lbl_ACTri.Text = temp.name;
+                pictureBoxTri.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/ac2-hexa".ToLower()))
             {
-                lbl_ACHexa.Text = temp.name;
+                pictureBoxHexa.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/ac2-y6".ToLower()))
             {
-                lbl_ACY6.Text = temp.name;
+                pictureBoxY6.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/ac2-heli-1".ToLower()))
             {
-                lbl_Heli.Text = temp.name;
+                pictureBoxHeli.Text = temp.name;
             }
             else if (temp.url.ToLower().Contains("firmware/ac2-quadhil".ToLower()))
             {
-                lbl_ACHil.Text = temp.name;
+                pictureBoxACHil.Text = temp.name;
+            }
+            else if (temp.url.ToLower().Contains("firmware/ac2-octav-".ToLower()))
+            {
+                pictureBoxOctav.Text = temp.name;
+            }
+            else if (temp.url.ToLower().Contains("firmware/ac2-octa-".ToLower()))
+            {
+                pictureBoxOcta.Text = temp.name;
             }
             else
             {
-                Console.WriteLine("No Home "+ temp.name + " " + temp.url);
+                Console.WriteLine("No Home " + temp.name + " " + temp.url);
             }
         }
 
@@ -498,7 +486,7 @@ namespace ArdupilotMega.GCSViews
 
                 this.Refresh();
 
-                board = ArduinoDetect.DetectVersion(MainV2.comportname);
+                board = ArduinoDetect.DetectBoard(MainV2.comportname);
 
                 if (board == "")
                 {
@@ -546,7 +534,7 @@ namespace ArdupilotMega.GCSViews
                     return;
                 }
 
-                Console.WriteLine("Using "+baseurl);
+                Console.WriteLine("Using " + baseurl);
 
                 // Create a request using a URL that can receive a post. 
                 WebRequest request = WebRequest.Create(baseurl);
@@ -705,7 +693,7 @@ namespace ArdupilotMega.GCSViews
                         }
                     }
 
-                    lbl_status.Text = "Write Done... Waiting (60 sec)";
+                    lbl_status.Text = "Write Done... Waiting (17 sec)";
                 }
                 else
                 {
@@ -718,8 +706,32 @@ namespace ArdupilotMega.GCSViews
 
                 Application.DoEvents();
 
-                System.Threading.Thread.Sleep(60000); // 10 seconds - new apvar erases eeprom on new format version, this should buy us some time.
+                try
+                {
+                    ((SerialPort)port).Open();
+                }
+                catch { }
 
+                DateTime startwait = DateTime.Now;
+
+                while ((DateTime.Now - startwait).TotalSeconds < 17)
+                {
+                    try
+                    {
+                        Console.Write(((SerialPort)port).ReadExisting().Replace("\0"," "));
+                    }
+                    catch { }
+                    System.Threading.Thread.Sleep(1000);
+                    progress.Value = (int)((DateTime.Now - startwait).TotalSeconds / 17 * 100);
+                    progress.Refresh();
+                }
+                try
+                {
+                    ((SerialPort)port).Close();
+                }
+                catch { }
+
+                progress.Value = 100;
                 lbl_status.Text = "Done";
             }
             catch (Exception ex) { lbl_status.Text = "Failed upload"; MessageBox.Show("Check port settings or Port in use? " + ex.ToString()); port.Close(); }
@@ -736,7 +748,7 @@ namespace ArdupilotMega.GCSViews
 
         byte[] readIntelHEXv2(StreamReader sr)
         {
-            byte[] FLASH = new byte[sr.BaseStream.Length / 2];
+            byte[] FLASH = new byte[1024 * 1024];
 
             int optionoffset = 0;
             int total = 0;
@@ -770,7 +782,7 @@ namespace ArdupilotMega.GCSViews
                     }
                     else if (option == 2)
                     {
-                        optionoffset += (int)Convert.ToUInt16(line.Substring(9, 4), 16) << 4;
+                        optionoffset = (int)Convert.ToUInt16(line.Substring(9, 4), 16) << 4;
                     }
                     else if (option == 1)
                     {
@@ -779,8 +791,8 @@ namespace ArdupilotMega.GCSViews
                     int checksum = Convert.ToInt32(line.Substring(line.Length - 2, 2), 16);
 
                     byte checksumact = 0;
-                    for (int z = 0; z < ((line.Length - 1 - 2) / 2) ; z++) // minus 1 for : then mins 2 for checksum itself
-                    { 
+                    for (int z = 0; z < ((line.Length - 1 - 2) / 2); z++) // minus 1 for : then mins 2 for checksum itself
+                    {
                         checksumact += Convert.ToByte(line.Substring(z * 2 + 1, 2), 16);
                     }
                     checksumact = (byte)(0x100 - checksumact);
@@ -819,6 +831,31 @@ namespace ArdupilotMega.GCSViews
             Form temp = new Setup.Setup();
             MainV2.fixtheme(temp);
             temp.ShowDialog();
+        }
+
+        private void pictureBoxOctav_Click(object sender, EventArgs e)
+        {
+            findfirmware("AC2-Octav-");
+        }
+
+        private void pictureBoxOcta_Click(object sender, EventArgs e)
+        {
+            findfirmware("AC2-Octa-");
+        }
+
+        private void pictureBoxAPHil_Click(object sender, EventArgs e)
+        {
+            findfirmware("Firmware/APHIL-");
+        }
+
+        private void pictureBoxACHil_Click(object sender, EventArgs e)
+        {
+            findfirmware("AC2-QUADHIL-");
+        }
+
+        private void pictureBoxACHHil_Click(object sender, EventArgs e)
+        {
+            findfirmware("AC2-HELHIL-");
         }
     }
 }

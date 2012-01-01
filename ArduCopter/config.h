@@ -52,6 +52,12 @@
 # define CONFIG_RELAY      DISABLED
 # define MAG_ORIENTATION   AP_COMPASS_APM2_SHIELD
 # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
+# define MAGNETOMETER ENABLED
+# ifdef APM2_BETA_HARDWARE
+#  define CONFIG_BARO     AP_BARO_BMP085
+# else // APM2 Production Hardware (default)
+#  define CONFIG_BARO     AP_BARO_MS5611
+# endif
 #endif
 
 
@@ -108,6 +114,8 @@
 # define SLIDE_SWITCH_PIN 40
 # define PUSHBUTTON_PIN   41
 # define USB_MUX_PIN      -1
+# define CLI_SLIDER_ENABLED DISABLED
+# define OPTFLOW_CS_PIN   34
 #elif CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
 # define A_LED_PIN        27
 # define B_LED_PIN        26
@@ -117,7 +125,8 @@
 # define SLIDE_SWITCH_PIN (-1)
 # define PUSHBUTTON_PIN   (-1)
 # define CLI_SLIDER_ENABLED DISABLED
-# define USB_MUX_PIN 23
+# define USB_MUX_PIN      23
+# define OPTFLOW_CS_PIN   A6
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -133,12 +142,16 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-// Sonar
+// Barometer
 //
 
-#ifndef SONAR_PORT
-# define SONAR_PORT		AP_RANGEFINDER_PITOT_TUBE
+#ifndef CONFIG_BARO
+# define CONFIG_BARO AP_BARO_BMP085
 #endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Sonar
+//
 
 #ifndef CONFIG_SONAR_SOURCE
 # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ADC
@@ -163,22 +176,6 @@
 # warning Invalid value for CONFIG_SONAR_SOURCE, disabling sonar
 # undef SONAR_ENABLED
 # define SONAR_ENABLED DISABLED
-#endif
-
-#ifndef SONAR_TYPE
-# define SONAR_TYPE		MAX_SONAR_XL
-#endif
-
-// It seems that MAX_SONAR_XL depends on an ADC. For systems without an
-// ADC, we need to disable the sonar
-#if SONAR_TYPE == MAX_SONAR_XL
-# if CONFIG_ADC == DISABLED
-#   if defined(CONFIG_SONAR)
-#      warning "MAX_SONAR_XL requires a valid ADC. This system does not have an ADC enabled."
-#      undef CONFIG_SONAR
-#   endif
-#   define CONFIG_SONAR DISABLED
-#  endif
 #endif
 
 #ifndef CONFIG_SONAR
@@ -219,6 +216,8 @@
  # undef GPS_PROTOCOL
  # define GPS_PROTOCOL GPS_PROTOCOL_NONE
 
+ #undef CONFIG_SONAR
+ #define CONFIG_SONAR DISABLED
 #endif
 
 
@@ -292,7 +291,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //  MAGNETOMETER
 #ifndef MAGNETOMETER
-# define MAGNETOMETER			DISABLED
+# define MAGNETOMETER			ENABLED
 #endif
 #ifndef MAG_ORIENTATION
 # define MAG_ORIENTATION		AP_COMPASS_COMPONENTS_DOWN_PINS_FORWARD
@@ -312,9 +311,8 @@
 //////////////////////////////////////////////////////////////////////////////
 //  OPTICAL_FLOW
 #if defined( __AVR_ATmega2560__ )  // determines if optical flow code is included
-  //#define OPTFLOW_ENABLED
+  #define OPTFLOW_ENABLED
 #endif
-
 #ifndef OPTFLOW					// sets global enabled/disabled flag for optflow (as seen in CLI)
 # define OPTFLOW				DISABLED
 #endif
@@ -372,6 +370,11 @@
 #ifndef MINIMUM_THROTTLE
 # define MINIMUM_THROTTLE	130
 #endif
+#ifndef MAXIMUM_THROTTLE
+# define MAXIMUM_THROTTLE	1000
+#endif
+
+
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -472,6 +475,10 @@
 # define RTL_THR			THROTTLE_HOLD
 #endif
 
+#ifndef SUPER_SIMPLE
+# define SUPER_SIMPLE		DISABLED
+#endif
+
 
 
 
@@ -483,11 +490,25 @@
 // and charachteristics changes.
 #ifdef MOTORS_JD880
 # define STABILIZE_ROLL_P 		3.6
-# define STABILIZE_ROLL_I 		0.08
-# define STABILIZE_ROLL_IMAX 	40.0		// degrees
+# define STABILIZE_ROLL_I 		0.0
+# define STABILIZE_ROLL_IMAX 	        40.0		// degrees
 # define STABILIZE_PITCH_P		3.6
-# define STABILIZE_PITCH_I		0.08
-# define STABILIZE_PITCH_IMAX	40.0		// degrees
+# define STABILIZE_PITCH_I		0.0
+# define STABILIZE_PITCH_IMAX	        40.0		// degrees
+#endif
+
+#ifdef MOTORS_JD850
+# define STABILIZE_ROLL_P 		4.0
+# define STABILIZE_ROLL_I 		0.0
+# define STABILIZE_ROLL_IMAX 	        40.0		// degrees
+# define STABILIZE_PITCH_P		4.0
+# define STABILIZE_PITCH_I		0.0
+# define STABILIZE_PITCH_IMAX	        40.0		// degrees
+#endif
+
+
+#ifndef STABILIZE_D
+# define STABILIZE_D 		.2
 #endif
 
 // Jasons default values that are good for smaller payload motors.
@@ -495,7 +516,7 @@
 # define STABILIZE_ROLL_P 		4.6
 #endif
 #ifndef STABILIZE_ROLL_I
-# define STABILIZE_ROLL_I 		0.08
+# define STABILIZE_ROLL_I 		0.02
 #endif
 #ifndef STABILIZE_ROLL_IMAX
 # define STABILIZE_ROLL_IMAX 	40		// degrees
@@ -505,7 +526,7 @@
 # define STABILIZE_PITCH_P		4.6
 #endif
 #ifndef STABILIZE_PITCH_I
-# define STABILIZE_PITCH_I		0.08
+# define STABILIZE_PITCH_I		0.02
 #endif
 #ifndef STABILIZE_PITCH_IMAX
 # define STABILIZE_PITCH_IMAX	40		// degrees
@@ -515,7 +536,7 @@
 // Acro Rate Control
 //
 #ifndef ACRO_ROLL_P
-# define ACRO_ROLL_P         0.145
+# define ACRO_ROLL_P         0.155
 #endif
 #ifndef ACRO_ROLL_I
 # define ACRO_ROLL_I         0.0
@@ -525,7 +546,7 @@
 #endif
 
 #ifndef ACRO_PITCH_P
-# define ACRO_PITCH_P       0.145
+# define ACRO_PITCH_P       0.155
 #endif
 #ifndef ACRO_PITCH_I
 # define ACRO_PITCH_I		0 //0.18
@@ -538,7 +559,7 @@
 // Stabilize Rate Control
 //
 #ifndef RATE_ROLL_P
-# define RATE_ROLL_P         0.145
+# define RATE_ROLL_P         0.155
 #endif
 #ifndef RATE_ROLL_I
 # define RATE_ROLL_I         0.0
@@ -548,7 +569,7 @@
 #endif
 
 #ifndef RATE_PITCH_P
-# define RATE_PITCH_P       0.145
+# define RATE_PITCH_P       0.155
 #endif
 #ifndef RATE_PITCH_I
 # define RATE_PITCH_I		0 //0.18
@@ -561,7 +582,7 @@
 // YAW Control
 //
 #ifndef  STABILIZE_YAW_P
-# define STABILIZE_YAW_P		7			// increase for more aggressive Yaw Hold, decrease if it's bouncy
+# define STABILIZE_YAW_P		7.5			// increase for more aggressive Yaw Hold, decrease if it's bouncy
 #endif
 #ifndef  STABILIZE_YAW_I
 # define STABILIZE_YAW_I		0.01		// set to .0001 to try and get over user's steady state error caused by poor balance
@@ -585,27 +606,27 @@
 // Navigation control gains
 //
 #ifndef LOITER_P
-# define LOITER_P			.3		//
+# define LOITER_P			.25		//
 #endif
 #ifndef LOITER_I
-# define LOITER_I			0.0	//
+# define LOITER_I			0.1	// Wind control
 #endif
 #ifndef LOITER_IMAX
-# define LOITER_IMAX		12		// degrees°
+# define LOITER_IMAX		30		// degrees°
 #endif
 
 #ifndef NAV_P
-# define NAV_P				3.0			//
+# define NAV_P				2.2			// 3 was causing rapid oscillations in Loiter
 #endif
 #ifndef NAV_I
-# define NAV_I				0.05		// Lowerd from .25 - saw lots of overshoot.
+# define NAV_I				0.15		// used in traverals
 #endif
 #ifndef NAV_IMAX
-# define NAV_IMAX			20			// degrees
+# define NAV_IMAX			30			// degrees
 #endif
 
 #ifndef WAYPOINT_SPEED_MAX
-# define WAYPOINT_SPEED_MAX			400			// for 6m/s error = 13mph
+# define WAYPOINT_SPEED_MAX			600			// for 6m/s error = 13mph
 #endif
 
 
@@ -620,7 +641,7 @@
 # define THR_HOLD_P		0.4			//
 #endif
 #ifndef THR_HOLD_I
-# define THR_HOLD_I		0.02		// with 4m error, 12.5s windup
+# define THR_HOLD_I		0.01		// with 4m error, 12.5s windup
 #endif
 #ifndef THR_HOLD_IMAX
 # define THR_HOLD_IMAX	300
@@ -628,13 +649,13 @@
 
 // RATE control
 #ifndef THROTTLE_P
-# define THROTTLE_P		0.4			//
+# define THROTTLE_P		0.5			//
 #endif
 #ifndef THROTTLE_I
 # define THROTTLE_I		0.0			//
 #endif
 #ifndef THROTTLE_IMAX
-# define THROTTLE_IMAX	50
+# define THROTTLE_IMAX	300
 #endif
 
 
@@ -642,7 +663,7 @@
 // Crosstrack compensation
 //
 #ifndef CROSSTRACK_GAIN
-# define CROSSTRACK_GAIN		4
+# define CROSSTRACK_GAIN		1
 #endif
 
 
@@ -662,14 +683,19 @@
 //////////////////////////////////////////////////////////////////////////////
 // Dataflash logging control
 //
-#ifdef LOGGING_ENABLED
-	#undef LOGGING_ENABLED
-#endif
-
-#if defined( __AVR_ATmega2560__ )  // determines if optical flow code is included
-	#define LOGGING_ENABLED		ENABLED
-#else
-	#define LOGGING_ENABLED     DISABLED
+// Logging must be disabled for 1280 build.
+#if defined( __AVR_ATmega1280__ )
+# if LOGGING_ENABLED == ENABLED
+// If logging was enabled in APM_Config or command line, warn the user.
+#  warning "Logging is not supported on ATmega1280"
+#  undef LOGGING_ENABLED
+# endif
+# ifndef LOGGING_ENABLED
+#  define LOGGING_ENABLED    DISABLED
+# endif
+#elif !defined(LOGGING_ENABLED)
+// Logging is enabled by default for all other builds.
+# define LOGGING_ENABLED		ENABLED
 #endif
 
 
@@ -766,7 +792,7 @@
 // Navigation defaults
 //
 #ifndef WP_RADIUS_DEFAULT
-# define WP_RADIUS_DEFAULT		3
+# define WP_RADIUS_DEFAULT	1
 #endif
 
 #ifndef LOITER_RADIUS

@@ -31,9 +31,12 @@
             this.components = new System.ComponentModel.Container();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Setup));
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.tabReset = new System.Windows.Forms.TabPage();
-            this.BUT_reset = new ArdupilotMega.MyButton();
             this.tabRadioIn = new System.Windows.Forms.TabPage();
+            this.groupBoxElevons = new System.Windows.Forms.GroupBox();
+            this.CHK_mixmode = new System.Windows.Forms.CheckBox();
+            this.CHK_elevonch2rev = new System.Windows.Forms.CheckBox();
+            this.CHK_elevonrev = new System.Windows.Forms.CheckBox();
+            this.CHK_elevonch1rev = new System.Windows.Forms.CheckBox();
             this.CHK_revch3 = new System.Windows.Forms.CheckBox();
             this.CHK_revch4 = new System.Windows.Forms.CheckBox();
             this.CHK_revch2 = new System.Windows.Forms.CheckBox();
@@ -79,6 +82,9 @@
             this.CMB_fmode1 = new System.Windows.Forms.ComboBox();
             this.BUT_SaveModes = new ArdupilotMega.MyButton();
             this.tabHardware = new System.Windows.Forms.TabPage();
+            this.CMB_sonartype = new System.Windows.Forms.ComboBox();
+            this.CHK_enableoptflow = new System.Windows.Forms.CheckBox();
+            this.pictureBox2 = new System.Windows.Forms.PictureBox();
             this.linkLabelmagdec = new System.Windows.Forms.LinkLabel();
             this.label100 = new System.Windows.Forms.Label();
             this.TXT_declination = new System.Windows.Forms.TextBox();
@@ -109,9 +115,9 @@
             this.label28 = new System.Windows.Forms.Label();
             this.label16 = new System.Windows.Forms.Label();
             this.label15 = new System.Windows.Forms.Label();
+            this.BUT_levelac2 = new ArdupilotMega.MyButton();
             this.pictureBoxQuadX = new System.Windows.Forms.PictureBox();
             this.pictureBoxQuad = new System.Windows.Forms.PictureBox();
-            this.BUT_levelac2 = new ArdupilotMega.MyButton();
             this.tabHeli = new System.Windows.Forms.TabPage();
             this.groupBox3 = new System.Windows.Forms.GroupBox();
             this.label46 = new System.Windows.Forms.Label();
@@ -163,13 +169,17 @@
             this.HS4 = new ArdupilotMega.HorizontalProgressBar2();
             this.HS3 = new ArdupilotMega.VerticalProgressBar2();
             this.Gservoloc = new AGaugeApp.AGauge();
+            this.tabReset = new System.Windows.Forms.TabPage();
+            this.BUT_reset = new ArdupilotMega.MyButton();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
+            this.label27 = new System.Windows.Forms.Label();
             this.tabControl1.SuspendLayout();
-            this.tabReset.SuspendLayout();
             this.tabRadioIn.SuspendLayout();
+            this.groupBoxElevons.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.currentStateBindingSource)).BeginInit();
             this.tabModes.SuspendLayout();
             this.tabHardware.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
@@ -186,11 +196,11 @@
             ((System.ComponentModel.ISupportInitialize)(this.HS3_TRIM)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.HS2_TRIM)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.HS1_TRIM)).BeginInit();
+            this.tabReset.SuspendLayout();
             this.SuspendLayout();
             // 
             // tabControl1
             // 
-            this.tabControl1.Controls.Add(this.tabReset);
             this.tabControl1.Controls.Add(this.tabRadioIn);
             this.tabControl1.Controls.Add(this.tabModes);
             this.tabControl1.Controls.Add(this.tabHardware);
@@ -202,23 +212,9 @@
             this.tabControl1.SelectedIndex = 0;
             this.tabControl1.SelectedIndexChanged += new System.EventHandler(this.tabControl1_SelectedIndexChanged);
             // 
-            // tabReset
-            // 
-            this.tabReset.Controls.Add(this.BUT_reset);
-            resources.ApplyResources(this.tabReset, "tabReset");
-            this.tabReset.Name = "tabReset";
-            this.tabReset.UseVisualStyleBackColor = true;
-            // 
-            // BUT_reset
-            // 
-            resources.ApplyResources(this.BUT_reset, "BUT_reset");
-            this.BUT_reset.Name = "BUT_reset";
-            this.BUT_reset.Tag = "";
-            this.BUT_reset.UseVisualStyleBackColor = true;
-            this.BUT_reset.Click += new System.EventHandler(this.BUT_reset_Click);
-            // 
             // tabRadioIn
             // 
+            this.tabRadioIn.Controls.Add(this.groupBoxElevons);
             this.tabRadioIn.Controls.Add(this.CHK_revch3);
             this.tabRadioIn.Controls.Add(this.CHK_revch4);
             this.tabRadioIn.Controls.Add(this.CHK_revch2);
@@ -235,6 +231,48 @@
             resources.ApplyResources(this.tabRadioIn, "tabRadioIn");
             this.tabRadioIn.Name = "tabRadioIn";
             this.tabRadioIn.UseVisualStyleBackColor = true;
+            // 
+            // groupBoxElevons
+            // 
+            this.groupBoxElevons.Controls.Add(this.CHK_mixmode);
+            this.groupBoxElevons.Controls.Add(this.CHK_elevonch2rev);
+            this.groupBoxElevons.Controls.Add(this.CHK_elevonrev);
+            this.groupBoxElevons.Controls.Add(this.CHK_elevonch1rev);
+            resources.ApplyResources(this.groupBoxElevons, "groupBoxElevons");
+            this.groupBoxElevons.Name = "groupBoxElevons";
+            this.groupBoxElevons.TabStop = false;
+            // 
+            // CHK_mixmode
+            // 
+            resources.ApplyResources(this.CHK_mixmode, "CHK_mixmode");
+            this.CHK_mixmode.Name = "CHK_mixmode";
+            this.toolTip1.SetToolTip(this.CHK_mixmode, resources.GetString("CHK_mixmode.ToolTip"));
+            this.CHK_mixmode.UseVisualStyleBackColor = true;
+            this.CHK_mixmode.CheckedChanged += new System.EventHandler(this.CHK_mixmode_CheckedChanged);
+            // 
+            // CHK_elevonch2rev
+            // 
+            resources.ApplyResources(this.CHK_elevonch2rev, "CHK_elevonch2rev");
+            this.CHK_elevonch2rev.Name = "CHK_elevonch2rev";
+            this.toolTip1.SetToolTip(this.CHK_elevonch2rev, resources.GetString("CHK_elevonch2rev.ToolTip"));
+            this.CHK_elevonch2rev.UseVisualStyleBackColor = true;
+            this.CHK_elevonch2rev.CheckedChanged += new System.EventHandler(this.CHK_elevonch2rev_CheckedChanged);
+            // 
+            // CHK_elevonrev
+            // 
+            resources.ApplyResources(this.CHK_elevonrev, "CHK_elevonrev");
+            this.CHK_elevonrev.Name = "CHK_elevonrev";
+            this.toolTip1.SetToolTip(this.CHK_elevonrev, resources.GetString("CHK_elevonrev.ToolTip"));
+            this.CHK_elevonrev.UseVisualStyleBackColor = true;
+            this.CHK_elevonrev.CheckedChanged += new System.EventHandler(this.CHK_elevonrev_CheckedChanged);
+            // 
+            // CHK_elevonch1rev
+            // 
+            resources.ApplyResources(this.CHK_elevonch1rev, "CHK_elevonch1rev");
+            this.CHK_elevonch1rev.Name = "CHK_elevonch1rev";
+            this.toolTip1.SetToolTip(this.CHK_elevonch1rev, resources.GetString("CHK_elevonch1rev.ToolTip"));
+            this.CHK_elevonch1rev.UseVisualStyleBackColor = true;
+            this.CHK_elevonch1rev.CheckedChanged += new System.EventHandler(this.CHK_elevonch1rev_CheckedChanged);
             // 
             // CHK_revch3
             // 
@@ -611,6 +649,10 @@
             // tabHardware
             // 
             this.tabHardware.BackColor = System.Drawing.Color.DarkRed;
+            this.tabHardware.Controls.Add(this.label27);
+            this.tabHardware.Controls.Add(this.CMB_sonartype);
+            this.tabHardware.Controls.Add(this.CHK_enableoptflow);
+            this.tabHardware.Controls.Add(this.pictureBox2);
             this.tabHardware.Controls.Add(this.linkLabelmagdec);
             this.tabHardware.Controls.Add(this.label100);
             this.tabHardware.Controls.Add(this.TXT_declination);
@@ -622,6 +664,33 @@
             this.tabHardware.Controls.Add(this.pictureBox1);
             resources.ApplyResources(this.tabHardware, "tabHardware");
             this.tabHardware.Name = "tabHardware";
+            // 
+            // CMB_sonartype
+            // 
+            this.CMB_sonartype.FormattingEnabled = true;
+            this.CMB_sonartype.Items.AddRange(new object[] {
+            resources.GetString("CMB_sonartype.Items"),
+            resources.GetString("CMB_sonartype.Items1"),
+            resources.GetString("CMB_sonartype.Items2")});
+            resources.ApplyResources(this.CMB_sonartype, "CMB_sonartype");
+            this.CMB_sonartype.Name = "CMB_sonartype";
+            this.CMB_sonartype.SelectedIndexChanged += new System.EventHandler(this.CMB_sonartype_SelectedIndexChanged);
+            // 
+            // CHK_enableoptflow
+            // 
+            resources.ApplyResources(this.CHK_enableoptflow, "CHK_enableoptflow");
+            this.CHK_enableoptflow.Name = "CHK_enableoptflow";
+            this.CHK_enableoptflow.UseVisualStyleBackColor = true;
+            this.CHK_enableoptflow.CheckedChanged += new System.EventHandler(this.CHK_enableoptflow_CheckedChanged);
+            // 
+            // pictureBox2
+            // 
+            this.pictureBox2.BackColor = System.Drawing.Color.White;
+            this.pictureBox2.BackgroundImage = global::ArdupilotMega.Properties.Resources.opticalflow;
+            resources.ApplyResources(this.pictureBox2, "pictureBox2");
+            this.pictureBox2.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pictureBox2.Name = "pictureBox2";
+            this.pictureBox2.TabStop = false;
             // 
             // linkLabelmagdec
             // 
@@ -821,9 +890,9 @@
             this.tabArducopter.Controls.Add(this.label28);
             this.tabArducopter.Controls.Add(this.label16);
             this.tabArducopter.Controls.Add(this.label15);
+            this.tabArducopter.Controls.Add(this.BUT_levelac2);
             this.tabArducopter.Controls.Add(this.pictureBoxQuadX);
             this.tabArducopter.Controls.Add(this.pictureBoxQuad);
-            this.tabArducopter.Controls.Add(this.BUT_levelac2);
             resources.ApplyResources(this.tabArducopter, "tabArducopter");
             this.tabArducopter.Name = "tabArducopter";
             this.tabArducopter.UseVisualStyleBackColor = true;
@@ -843,10 +912,17 @@
             resources.ApplyResources(this.label15, "label15");
             this.label15.Name = "label15";
             // 
+            // BUT_levelac2
+            // 
+            resources.ApplyResources(this.BUT_levelac2, "BUT_levelac2");
+            this.BUT_levelac2.Name = "BUT_levelac2";
+            this.BUT_levelac2.UseVisualStyleBackColor = true;
+            this.BUT_levelac2.Click += new System.EventHandler(this.BUT_levelac2_Click);
+            // 
             // pictureBoxQuadX
             // 
             this.pictureBoxQuadX.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxQuadX.Image = global::ArdupilotMega.Properties.Resources.frames_04;
+            this.pictureBoxQuadX.Image = global::ArdupilotMega.Properties.Resources.quadx;
             resources.ApplyResources(this.pictureBoxQuadX, "pictureBoxQuadX");
             this.pictureBoxQuadX.Name = "pictureBoxQuadX";
             this.pictureBoxQuadX.TabStop = false;
@@ -855,18 +931,11 @@
             // pictureBoxQuad
             // 
             this.pictureBoxQuad.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBoxQuad.Image = global::ArdupilotMega.Properties.Resources.frames_03;
+            this.pictureBoxQuad.Image = global::ArdupilotMega.Properties.Resources.quad;
             resources.ApplyResources(this.pictureBoxQuad, "pictureBoxQuad");
             this.pictureBoxQuad.Name = "pictureBoxQuad";
             this.pictureBoxQuad.TabStop = false;
             this.pictureBoxQuad.Click += new System.EventHandler(this.pictureBoxQuad_Click);
-            // 
-            // BUT_levelac2
-            // 
-            resources.ApplyResources(this.BUT_levelac2, "BUT_levelac2");
-            this.BUT_levelac2.Name = "BUT_levelac2";
-            this.BUT_levelac2.UseVisualStyleBackColor = true;
-            this.BUT_levelac2.Click += new System.EventHandler(this.BUT_levelac2_Click);
             // 
             // tabHeli
             // 
@@ -1437,6 +1506,26 @@
             this.Gservoloc.Value2 = 180F;
             this.Gservoloc.Value3 = 0F;
             // 
+            // tabReset
+            // 
+            this.tabReset.Controls.Add(this.BUT_reset);
+            resources.ApplyResources(this.tabReset, "tabReset");
+            this.tabReset.Name = "tabReset";
+            this.tabReset.UseVisualStyleBackColor = true;
+            // 
+            // BUT_reset
+            // 
+            resources.ApplyResources(this.BUT_reset, "BUT_reset");
+            this.BUT_reset.Name = "BUT_reset";
+            this.BUT_reset.Tag = "";
+            this.BUT_reset.UseVisualStyleBackColor = true;
+            this.BUT_reset.Click += new System.EventHandler(this.BUT_reset_Click);
+            // 
+            // label27
+            // 
+            resources.ApplyResources(this.label27, "label27");
+            this.label27.Name = "label27";
+            // 
             // Setup
             // 
             resources.ApplyResources(this, "$this");
@@ -1447,14 +1536,16 @@
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.Setup_FormClosing);
             this.Load += new System.EventHandler(this.Setup_Load);
             this.tabControl1.ResumeLayout(false);
-            this.tabReset.ResumeLayout(false);
             this.tabRadioIn.ResumeLayout(false);
             this.tabRadioIn.PerformLayout();
+            this.groupBoxElevons.ResumeLayout(false);
+            this.groupBoxElevons.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.currentStateBindingSource)).EndInit();
             this.tabModes.ResumeLayout(false);
             this.tabModes.PerformLayout();
             this.tabHardware.ResumeLayout(false);
             this.tabHardware.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
@@ -1477,6 +1568,7 @@
             ((System.ComponentModel.ISupportInitialize)(this.HS3_TRIM)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.HS2_TRIM)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.HS1_TRIM)).EndInit();
+            this.tabReset.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -1617,6 +1709,15 @@
         private System.Windows.Forms.GroupBox groupBox3;
         private System.Windows.Forms.Label label46;
         private System.Windows.Forms.Label label45;
+        private System.Windows.Forms.CheckBox CHK_enableoptflow;
+        private System.Windows.Forms.PictureBox pictureBox2;
+        private System.Windows.Forms.ComboBox CMB_sonartype;
+        private System.Windows.Forms.CheckBox CHK_mixmode;
+        private System.Windows.Forms.CheckBox CHK_elevonch2rev;
+        private System.Windows.Forms.CheckBox CHK_elevonch1rev;
+        private System.Windows.Forms.CheckBox CHK_elevonrev;
+        private System.Windows.Forms.GroupBox groupBoxElevons;
+        private System.Windows.Forms.Label label27;
 
     }
 }

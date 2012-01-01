@@ -122,6 +122,7 @@ enum ap_message {
     MSG_NEXT_WAYPOINT,
     MSG_NEXT_PARAM,
     MSG_STATUSTEXT,
+    MSG_FENCE_STATUS,
     MSG_RETRY_DEFERRED // this must be last
 };
 
@@ -213,8 +214,14 @@ enum gcs_severity {
 #define WP_START_BYTE 0x400 // where in memory home WP is stored + all other WP
 #define WP_SIZE 15
 
+// fence points are stored at the end of the EEPROM
+#define MAX_FENCEPOINTS 20
+#define FENCE_WP_SIZE sizeof(Vector2l)
+#define FENCE_START_BYTE (EEPROM_MAX_ADDR-(MAX_FENCEPOINTS*FENCE_WP_SIZE))
+
+#define MAX_WAYPOINTS  ((FENCE_START_BYTE - WP_START_BYTE) / WP_SIZE) - 1 // - 1 to be safe
+
 #define ONBOARD_PARAM_NAME_LENGTH 15
-#define MAX_WAYPOINTS  ((EEPROM_MAX_ADDR - WP_START_BYTE) / WP_SIZE) - 1 // - 1 to be safe
 
 // convert a boolean (0 or 1) to a sign for multiplying (0 maps to 1, 1 maps to -1)
 #define BOOL_TO_SIGN(bvalue) ((bvalue)?-1:1)
@@ -227,5 +234,8 @@ enum gcs_severity {
 
 #define APM_HARDWARE_APM1  1
 #define APM_HARDWARE_APM2 2
+
+#define AP_BARO_BMP085   1
+#define AP_BARO_MS5611   2
 
 #endif // _DEFINES_H
