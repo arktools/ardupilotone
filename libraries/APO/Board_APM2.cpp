@@ -16,7 +16,7 @@
 #include <AP_Compass.h>
 #include <AP_GPS.h>
 #include <AP_IMU.h>
-#include <APM_BMP085.h>
+#include <AP_Baro.h>
 #include <ModeFilter.h>
 #include <APO.h>
 #include <AP_AnalogSource.h>
@@ -27,6 +27,13 @@
 #include "Board_APM2.h"
 
 namespace apo {
+
+
+void mavlink_delay(long delay) {
+}
+
+void flash_leds(bool param) {
+}
 
 Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Board(mode,vehicle,options) {
 
@@ -103,8 +110,8 @@ Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
 
         if (_options & opt_baro) {
             debug->println_P(PSTR("initializing baro"));
-            baro = new APM_BMP085_Class;
-            baro->Init(0,true);
+            baro = new AP_Baro_BMP085(true);
+            baro->init(scheduler);
         }
 
         if (_options & opt_compass) {

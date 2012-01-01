@@ -14,7 +14,7 @@
 class AP_ADC;
 class IMU;
 class GPS;
-class APM_BMP085_Class;
+class AP_Baro;
 class Compass;
 class BetterStream;
 class RangeFinder;
@@ -70,7 +70,7 @@ public:
      */
     AP_ADC * adc;
     GPS * gps;
-    APM_BMP085_Class * baro;
+    AP_Baro * baro;
     Compass * compass;
     Vector<RangeFinder *> rangeFinders;
     AP_BatteryMonitor * batteryMonitor;

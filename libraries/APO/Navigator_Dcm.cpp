@@ -17,8 +17,7 @@
 #include "../AP_RangeFinder/RangeFinder.h"
 #include "../AP_IMU/AP_IMU.h"
 #include "../AP_InertialSensor/AP_InertialSensor.h"
-#include "../APM_BMP085/APM_BMP085_hil.h"
-#include "../APM_BMP085/APM_BMP085.h"
+#include "../AP_Baro/AP_Baro.h"
 
 namespace apo {
 
@@ -63,7 +62,7 @@ void Navigator_Dcm::calibrate() {
 
     // TODO: handle cold/warm restart
     if (_board->imu) {
-        _board->imu->init(IMU::COLD_START,delay,_board->scheduler);
+        _board->imu->init(IMU::COLD_START,mavlink_delay,flash_leds,_board->scheduler);
     }
 
     if (_board->baro) {

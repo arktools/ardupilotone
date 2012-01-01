@@ -16,7 +16,7 @@
 #include <AP_Compass.h>
 #include <AP_GPS.h>
 #include <AP_IMU.h>
-#include <APM_BMP085.h>
+#include <AP_Baro.h>
 #include <ModeFilter.h>
 #include <APO.h>
 #include <AP_AnalogSource.h>
@@ -101,8 +101,8 @@ Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
 
         if (_options & opt_baro) {
             debug->println_P(PSTR("initializing baro"));
-            baro = new APM_BMP085_Class;
-            baro->Init(0,false);
+            baro = new APM_Baro_BMP085(false);
+            baro->init(scheduler);
         }
 
         if (_options & opt_compass) {
