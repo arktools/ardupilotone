@@ -476,9 +476,6 @@ test_dipswitches(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_adc(uint8_t argc, const Menu::arg *argv)
 {
-	print_hit_enter();
-	adc.Init(&timer_scheduler);
-	delay(1000);
 	Serial.printf_P(PSTR("ADC\n"));
 	delay(1000);
 
@@ -527,7 +524,7 @@ static int8_t
 test_imu(uint8_t argc, const Menu::arg *argv)
 {
 	//Serial.printf_P(PSTR("Calibrating."));
-	imu.init(IMU::COLD_START, delay, flash_leds, &timer_scheduler);
+    imu.coldStart();
     dcm.matrix_reset();
 
 	print_hit_enter();
@@ -590,7 +587,7 @@ test_mag(uint8_t argc, const Menu::arg *argv)
     report_compass();
 
     // we need the DCM initialised for this test
-	imu.init(IMU::COLD_START, delay, flash_leds, &timer_scheduler);
+    imu.coldStart();
     dcm.matrix_reset();
 
 	int counter = 0;

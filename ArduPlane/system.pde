@@ -112,16 +112,6 @@ static void init_ardupilot()
 #endif
     SPI.begin();
     SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
-	//
-	// Initialize the ISR registry.
-	//
-    isr_registry.init();
-
-    //
-	// Initialize the timer scheduler to use the ISR registry.
-	//
-
-    timer_scheduler.init( & isr_registry );
 
 	//
 	// Check the EEPROM format version before loading any parameters from EEPROM.
@@ -185,10 +175,6 @@ static void init_ardupilot()
 #endif
 
 #if HIL_MODE != HIL_MODE_ATTITUDE
-
-#if CONFIG_ADC == ENABLED
-    adc.Init(&timer_scheduler);      // APM ADC library initialization
-#endif
 
 	barometer.init(&timer_scheduler);
 
@@ -277,7 +263,7 @@ static void init_ardupilot()
 		//----------------
 		//read_EEPROM_airstart_critical();
 #if HIL_MODE != HIL_MODE_ATTITUDE
-		imu.init(IMU::WARM_START, mavlink_delay, flash_leds, &timer_scheduler);
+        imu.warmStart();
 		dcm.set_centripetal(1);
 #endif
 
@@ -468,8 +454,8 @@ static void startup_IMU_ground(void)
     gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning IMU calibration; do not move plane"));
 	mavlink_delay(1000);
 
-	imu.init(IMU::COLD_START, mavlink_delay, flash_leds, &timer_scheduler);
-	imu.init_accel(mavlink_delay, flash_leds);
+    imu.coldStart();
+	imu.init_accel();
 	dcm.set_centripetal(1);
     dcm.matrix_reset();
 

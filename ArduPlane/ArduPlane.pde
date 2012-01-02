@@ -122,6 +122,9 @@ static void update_events(void);
 //   supply data from the simulation.
 //
 
+// we always have a timer scheduler
+AP_TimerProcess timer_scheduler(&isr_registry);
+
 // All GPS access should be through this pointer.
 static GPS         *g_gps;
 
@@ -132,7 +135,7 @@ static AP_Int8		*flight_modes = &g.flight_mode1;
 
 // real sensors
 #if CONFIG_ADC == ENABLED
-static AP_ADC_ADS7844          adc;
+static AP_ADC_ADS7844          adc(&timer_scheduler);
 #endif
 
 #ifdef DESKTOP_BUILD
@@ -180,20 +183,20 @@ AP_GPS_None     g_gps_driver(NULL);
 #endif // GPS PROTOCOL
 
 # if CONFIG_IMU_TYPE == CONFIG_IMU_MPU6000
-  AP_InertialSensor_MPU6000 ins( CONFIG_MPU6000_CHIP_SELECT_PIN );
+  AP_InertialSensor_MPU6000 ins( CONFIG_MPU6000_CHIP_SELECT_PIN, &timer_scheduler );
 # else
-  AP_InertialSensor_Oilpan ins( &adc );
+  AP_InertialSensor_Oilpan ins( &adc, &timer_scheduler );
 #endif // CONFIG_IMU_TYPE
-AP_IMU_INS imu( &ins, Parameters::k_param_IMU_calibration );
+AP_IMU_INS imu( &ins, Parameters::k_param_IMU_calibration , &timer_scheduler);
 AP_DCM  dcm(&imu, g_gps);
 
 #elif HIL_MODE == HIL_MODE_SENSORS
 // sensor emulators
-AP_ADC_HIL              adc;
+AP_ADC_HIL              adc(&timer_scheduler);
 AP_Baro_BMP085_HIL      barometer;
 AP_Compass_HIL          compass;
 AP_GPS_HIL              g_gps_driver(NULL);
-AP_InertialSensor_Oilpan ins( &adc );
+AP_InertialSensor_Oilpan ins( &adc, &timer_scheduler);
 AP_IMU_Shim imu;
 AP_DCM  dcm(&imu, g_gps);
 
@@ -207,9 +210,6 @@ AP_IMU_Shim             imu; // never used
 #else
  #error Unrecognised HIL_MODE setting.
 #endif // HIL MODE
-
-// we always have a timer scheduler
-AP_TimerProcess timer_scheduler;
 
 
 ////////////////////////////////////////////////////////////////////////////////
