@@ -1,5 +1,8 @@
 // Libraries
 #include <FastSerial.h>
+#include <DataFlash.h>
+#include <SPI.h>
+#include <AP_Math.h>
 #include <I2C.h>
 #include <AP_Common.h>
 #include <APM_RC.h>
@@ -15,6 +18,8 @@
 #include <APO.h>
 #include <AP_AnalogSource.h>
 #include <AP_InertialSensor.h>
+#include <Arduino_Mega_ISR_Registry.h>
+#include <AP_PeriodicProcess.h>
 
 // Vehicle Configuration
 #include "CarStampede.h"
