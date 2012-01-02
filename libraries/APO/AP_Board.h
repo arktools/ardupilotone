@@ -31,6 +31,7 @@ namespace apo {
 class AP_RcChannel;
 class AP_CommLink;
 class AP_BatteryMonitor;
+class AP_Autopilot;
 
 class AP_Board {
 
@@ -101,6 +102,7 @@ public:
     FastSerial * debug;
     FastSerial * gcsPort;
     FastSerial * hilPort;
+    AP_Autopilot * autopilot;
 
     /**
      * data

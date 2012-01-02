@@ -67,6 +67,12 @@ public:
      */
     uint32_t callbackCalls;
 
+    /**
+     * Misc Callback Functions
+     */
+    void cycleLeds() {}
+    void mavlinkDelay(uint32_t millis) {}
+
 private:
 
     /**

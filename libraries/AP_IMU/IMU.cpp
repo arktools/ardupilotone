@@ -10,8 +10,7 @@
 IMU::IMU () {}
 
 
-void IMU::init( Start_style style,
-		void (*delay_cb)(unsigned long t),
+void IMU::init( void (*delay_cb)(unsigned long t),
 		void (*flash_leds_cb)(bool on),
 		AP_PeriodicProcess * scheduler )
 { }

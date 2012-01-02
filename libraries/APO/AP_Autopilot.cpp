@@ -28,6 +28,9 @@ AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
     _controller(controller), _board(board),
     callbackCalls(0) {
 
+    // allow hardware to call autopilot public routines
+    board->autopilot = this;
+
     board->debug->printf_P(PSTR("initializing autopilot\n"));
     board->debug->printf_P(PSTR("free ram: %d bytes\n"),freeMemory());
 

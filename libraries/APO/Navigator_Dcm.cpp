@@ -62,7 +62,7 @@ void Navigator_Dcm::calibrate() {
 
     // TODO: handle cold/warm restart
     if (_board->imu) {
-        _board->imu->init(IMU::COLD_START,mavlink_delay,flash_leds,_board->scheduler);
+        _board->imu->warmStart();
     }
 
     if (_board->baro) {
@@ -70,17 +70,17 @@ void Navigator_Dcm::calibrate() {
         int flashcount = 0;
 
         while(_groundPressure == 0){
-            _board->baro->Read(); 					// Get initial data from absolute pressure sensor
-            _groundPressure = _board->baro->Press;
-            _groundTemperature = _board->baro->Temp/10.0;
+            _board->baro->read(); 					// Get initial data from absolute pressure sensor
+            _groundPressure = _board->baro->get_pressure();
+            _groundTemperature = _board->baro->get_temperature()/10.0;
             delay(20);
         }
 
         for(int i = 0; i < 30; i++){		// We take some readings...
 
             // set using low pass filters
-            _groundPressure = _groundPressure * 0.9   + _board->baro->Press * 0.1;
-            _groundTemperature = _groundTemperature * 0.9   + (_board->baro->Temp/10.0) * 0.1;
+            _groundPressure = _groundPressure * 0.9   + _board->baro->get_pressure() * 0.1;
+            _groundTemperature = _groundTemperature * 0.9   + (_board->baro->get_temperature()/10.0) * 0.1;
 
             //mavlink_delay(20);
             delay(20);
@@ -131,9 +131,9 @@ void Navigator_Dcm::updateFast(float dt) {
          * pressure input is in pascals
          * temp input is in deg C *10
          */
-        _board->baro->Read();		// Get new data from absolute pressure sensor
+        _board->baro->read();		// Get new data from absolute pressure sensor
         float reference = 44330 * (1.0 - (pow(_groundPressure.get()/101325.0,0.190295)));
-        setAlt(_baroLowPass.update((44330 * (1.0 - (pow((_board->baro->Press/101325.0),0.190295)))) - reference,dt));
+        setAlt(_baroLowPass.update((44330 * (1.0 - (pow((_board->baro->get_pressure()/101325.0),0.190295)))) - reference,dt));
         //_board->debug->printf_P(PSTR("Ground Pressure %f\tAltitude = %f\tGround Temperature = %f\tPress = %ld\tTemp = %d\n"),_groundPressure.get(),getAlt(),_groundTemperature.get(),_board->baro->Press,_board->baro->Temp);
         
     // last resort, use gps altitude

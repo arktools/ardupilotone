@@ -8,7 +8,7 @@
 #ifndef CONTROLLERCAR_H_
 #define CONTROLLERCAR_H_
 
-#include "../APO/AP_Controller.h"
+#include "AP_Controller.h"
 
 namespace apo {
 

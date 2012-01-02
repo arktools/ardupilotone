@@ -15,13 +15,10 @@ ap_procedure AP_TimerProcess::_failsafe;
 bool AP_TimerProcess::_in_timer_call;
 uint8_t AP_TimerProcess::_pidx = 0;
 
-AP_TimerProcess::AP_TimerProcess(uint8_t period)
+AP_TimerProcess::AP_TimerProcess(Arduino_Mega_ISR_Registry * isr_reg, uint8_t period)
 {
     _period = period;
-}
 
-void AP_TimerProcess::init( Arduino_Mega_ISR_Registry * isr_reg )
-{
 	// Enable Timer2 Overflow interrupt to trigger process.
 	TIMSK2 = 0;                 // Disable interrupts
 	TCCR2A = 0;                 // normal counting mode

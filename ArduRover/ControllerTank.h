@@ -8,35 +8,43 @@
 #ifndef CONTROLLERTANK_H_
 #define CONTROLLERTANK_H_
 
-#include "../APO/AP_Controller.h"
+#include "AP_Var_keys.h"
+#include "AP_Controller.h"
+#include "AP_ControllerBlock.h"
+#include "AP_ArmingMechanism.h"
 
 namespace apo {
+
+struct ControllerTankParams {
+    float steeringP, steeringI, steeringD, steeringIMax, steeringYMax;
+    float throttleP, throttleI, throttleD, throttleIMax, throttleYMax, throttleDFCut;
+};
 
 class ControllerTank: public AP_Controller {
 public:
     ControllerTank(AP_Navigator * nav, AP_Guide * guide,
-                   AP_HardwareAbstractionLayer * hal) :
-        AP_Controller(nav, guide, hal, new AP_ArmingMechanism(hal,ch_thrust,ch_str,0.1,-0.9,0.9),ch_mode,k_cntrl),
+                   AP_Board * board, ControllerTankParams params) :
+        AP_Controller(nav, guide, board, new AP_ArmingMechanism(board,this,ch_thrust,ch_str,0.1,-0.9,0.9),ch_mode,k_cntrl),
         pidStr(new AP_Var_group(k_pidStr, PSTR("STR_")), 1, steeringP,
                steeringI, steeringD, steeringIMax, steeringYMax),
         pidThr(new AP_Var_group(k_pidThr, PSTR("THR_")), 1, throttleP,
                throttleI, throttleD, throttleIMax, throttleYMax,
                throttleDFCut), _headingOutput(0), _throttleOutput(0) {
-        _hal->debug->println_P(PSTR("initializing tank controller"));
+        _board->debug->println_P(PSTR("initializing tank controller"));
 
-        _hal->rc.push_back(
+        _board->rc.push_back(
             new AP_RcChannel(k_chMode, PSTR("MODE_"), APM_RC, 5, 1100,
                              1500, 1900, RC_MODE_IN, false));
-        _hal->rc.push_back(
+        _board->rc.push_back(
             new AP_RcChannel(k_chLeft, PSTR("LEFT_"), APM_RC, 0, 1100, 1500,
                              1900, RC_MODE_OUT, false));
-        _hal->rc.push_back(
+        _board->rc.push_back(
             new AP_RcChannel(k_chRight, PSTR("RIGHT_"), APM_RC, 1, 1100, 1500,
                              1900, RC_MODE_OUT, false));
-        _hal->rc.push_back(
+        _board->rc.push_back(
             new AP_RcChannel(k_chStr, PSTR("STR_"), APM_RC, 0, 1100, 1500,
                              1900, RC_MODE_IN, false));
-        _hal->rc.push_back(
+        _board->rc.push_back(
             new AP_RcChannel(k_chThr, PSTR("THR_"), APM_RC, 1, 1100, 1500,
                              1900, RC_MODE_IN, false));
     }
@@ -45,8 +53,8 @@ private:
     // methods
     void manualLoop(const float dt) {
         setAllRadioChannelsManually();
-        _headingOutput = _hal->rc[ch_str]->getPosition();
-        _throttleOutput = _hal->rc[ch_thrust]->getPosition();
+        _headingOutput = _board->rc[ch_str]->getPosition();
+        _throttleOutput = _board->rc[ch_thrust]->getPosition();
     }
     void autoLoop(const float dt) {
         float headingError = _guide->getHeadingCommand()
@@ -61,11 +69,11 @@ private:
     }
     void setMotorsActive() {
         // turn all motors off if below 0.1 throttle
-        if (fabs(_hal->rc[ch_thrust]->getRadioPosition()) < 0.1) {
+        if (fabs(_board->rc[ch_thrust]->getRadioPosition()) < 0.1) {
             setAllRadioChannelsToNeutral();
         } else {
-            _hal->rc[ch_left]->setPosition(_throttleOutput + _headingOutput);
-            _hal->rc[ch_right]->setPosition(_throttleOutput - _headingOutput);
+            _board->rc[ch_left]->setPosition(_throttleOutput + _headingOutput);
+            _board->rc[ch_right]->setPosition(_throttleOutput - _headingOutput);
         }
     }
 

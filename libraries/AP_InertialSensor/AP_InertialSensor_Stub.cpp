@@ -2,8 +2,6 @@
 
 #include "AP_InertialSensor_Stub.h"
 
-void AP_InertialSensor_Stub::init( AP_PeriodicProcess * scheduler ) {}
-
 /*================ AP_INERTIALSENSOR PUBLIC INTERFACE ==================== */
 
 bool AP_InertialSensor_Stub::update( void ) { return true; }

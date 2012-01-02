@@ -5,8 +5,8 @@
  *
  */
 
-#include <Wire.h>
 #include <FastSerial.h>
+#include <I2C.h>
 #include <AP_Common.h>
 #include <APM_RC.h>
 #include <AP_RangeFinder.h>
@@ -28,6 +28,12 @@
 
 namespace apo {
 
+void mavlink_delay(unsigned long delay) {
+}
+
+void flash_leds(bool param) {
+}
+
 Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Board(mode,vehicle,options) {
 
     const uint32_t debugBaud = 57600;
@@ -42,7 +48,7 @@ Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
 
     AP_Var::load_all();
 
-    Wire.begin();
+    I2c.begin();
 
     // debug
     Serial.begin(debugBaud, 128, 128);
@@ -76,10 +82,8 @@ Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
     radio = new APM_RC_APM1;
     radio->Init(isr_registry);
     dataFlash = new DataFlash_APM1;
-    scheduler = new AP_TimerProcess;
-    scheduler->init(isr_registry);
-    adc = new AP_ADC_ADS7844;
-    adc->Init(scheduler);
+    scheduler = new AP_TimerProcess(isr_registry);
+    adc = new AP_ADC_ADS7844(scheduler);
 
    /*
      * Sensor initialization
@@ -101,7 +105,7 @@ Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
 
         if (_options & opt_baro) {
             debug->println_P(PSTR("initializing baro"));
-            baro = new APM_Baro_BMP085(false);
+            baro = new AP_Baro_BMP085(false);
             baro->init(scheduler);
         }
 
@@ -172,12 +176,10 @@ Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
      * navigation sensors
      */
     debug->println_P(PSTR("initializing imu"));
-    ins = new AP_InertialSensor_Oilpan(adc);
-    ins->init(scheduler);
+    ins = new AP_InertialSensor_Oilpan(adc,scheduler);
     //ins = new AP_InertialSensor_MPU6000(mpu6000SelectPin)
     debug->println_P(PSTR("initializing ins"));
-    imu = new AP_IMU_INS(ins, k_sensorCalib); 
-    imu->init(IMU::WARM_START,delay,scheduler);
+    imu = new AP_IMU_INS(ins, k_sensorCalib,scheduler);
     debug->println_P(PSTR("setup completed"));
 }
 

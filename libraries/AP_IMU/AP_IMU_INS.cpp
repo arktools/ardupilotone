@@ -21,40 +21,39 @@
 
 #include "AP_IMU_INS.h"
 
-void
-AP_IMU_INS::init( Start_style style,
-                  void (*delay_cb)(unsigned long t),
-                  void (*flash_leds_cb)(bool on),
-                  AP_PeriodicProcess * scheduler )
+AP_IMU_INS::AP_IMU_INS(AP_InertialSensor *ins, AP_Var::Key key, AP_PeriodicProcess *scheduler) : 
+    _ins(ins),
+    _sensor_cal(key, PSTR("IMU_SENSOR_CAL"))
 {
-    _ins->init(scheduler);
-    // if we are warm-starting, load the calibration data from EEPROM and go
-    //
-    if (WARM_START == style) {
-        _sensor_cal.load();
-    } else {
+}
 
-        // do cold-start calibration for both accel and gyro
-        _init_gyro(delay_cb, flash_leds_cb);
+void AP_IMU_INS::warmStart() {
+    _sensor_cal.load();
+}
 
-        // save calibration
-        _sensor_cal.save();
-    }
+void AP_IMU_INS::coldStart() {
+    // do cold-start calibration for both accel and gyro
+    _init_gyro();
+
+    // save calibration
+    _sensor_cal.save();
+
 }
 
 /**************************************************/
 
 void
-AP_IMU_INS::init_gyro(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(bool on))
+AP_IMU_INS::init_gyro()
 {
-    _init_gyro(delay_cb, flash_leds_cb);
+    _init_gyro();
     _sensor_cal.save();
 }
 
-#define FLASH_LEDS(on) do { if (flash_leds_cb != NULL) flash_leds_cb(on); } while (0)
+//#define FLASH_LEDS(on) do { if (flash_leds_cb != NULL) flash_leds_cb(on); } while (0)
+#define FLASH_LEDS(on) do { } while (0)
 
 void
-AP_IMU_INS::_init_gyro(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(bool on))
+AP_IMU_INS::_init_gyro()
 {
 	int flashcount = 0;
 	float adc_in;
@@ -64,20 +63,20 @@ AP_IMU_INS::_init_gyro(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(
     float ins_gyro[6];
 
 	// cold start
-	delay_cb(500);
+	//delay_cb(500);
 	Serial.printf_P(PSTR("Init Gyro"));
 
 	for(int c = 0; c < 25; c++){
     // Mostly we are just flashing the LED's here
     // to tell the user to keep the IMU still
         FLASH_LEDS(true);
-		delay_cb(20);
+		//delay_cb(20);
 
         _ins->update();
         _ins->get_gyros(ins_gyro);
 
         FLASH_LEDS(false);
-		delay_cb(20);
+		//delay_cb(20);
 	}
 
 	for (int j = 0; j <= 2; j++)
@@ -105,7 +104,7 @@ AP_IMU_INS::_init_gyro(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(
 				_sensor_cal[j] = _sensor_cal[j] * 0.9 + adc_in * 0.1;
 			}
 
-			delay_cb(20);
+			//delay_cb(20);
 			if(flashcount == 5) {
 				Serial.printf_P(PSTR("*"));
                 FLASH_LEDS(true);
@@ -121,7 +120,7 @@ AP_IMU_INS::_init_gyro(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(
 		total_change    = fabs(prev[0] - _sensor_cal[0]) + fabs(prev[1] - _sensor_cal[1]) +fabs(prev[2] - _sensor_cal[2]);
 		max_offset      = (_sensor_cal[0] > _sensor_cal[1]) ? _sensor_cal[0] : _sensor_cal[1];
 		max_offset      = (max_offset > _sensor_cal[2]) ? max_offset : _sensor_cal[2];
-		delay_cb(500);
+		//delay_cb(500);
 	} while (  total_change > _gyro_total_cal_change || max_offset > _gyro_max_cal_offset);
 }
 
@@ -132,14 +131,14 @@ AP_IMU_INS::save()
 }
 
 void
-AP_IMU_INS::init_accel(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(bool on))
+AP_IMU_INS::init_accel()
 {
-    _init_accel(delay_cb, flash_leds_cb);
+    _init_accel();
     _sensor_cal.save();
 }
 
 void
-AP_IMU_INS::_init_accel(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)(bool on))
+AP_IMU_INS::_init_accel()
 {
 	int flashcount = 0;
 	float adc_in;
@@ -150,7 +149,7 @@ AP_IMU_INS::_init_accel(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)
 
 
 	// cold start
-	delay_cb(500);
+	//delay_cb(500);
 
 	Serial.printf_P(PSTR("Init Accel"));
 
@@ -168,7 +167,7 @@ AP_IMU_INS::_init_accel(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)
 
 		for(int i = 0; i < 50; i++){		// We take some readings...
 
-			delay_cb(20);
+			//delay_cb(20);
       _ins->update();
       _ins->get_accels(ins_accel);
 
@@ -196,7 +195,7 @@ AP_IMU_INS::_init_accel(void (*delay_cb)(unsigned long t), void (*flash_leds_cb)
 		max_offset = (_sensor_cal[3] > _sensor_cal[4]) ? _sensor_cal[3] : _sensor_cal[4];
 		max_offset = (max_offset > _sensor_cal[5]) ? max_offset : _sensor_cal[5];
 
-		delay_cb(500);
+		//delay_cb(500);
 	} while (  total_change > _accel_total_cal_change || max_offset > _accel_max_cal_offset);
 
 	Serial.printf_P(PSTR(" "));
