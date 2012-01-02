@@ -22,7 +22,7 @@
 #include <AP_AnalogSource.h>
 #include <AP_InertialSensor.h>
 #include <DataFlash.h>
-
+#include <SPI.h>
 
 #include "Board_APM2.h"
 
@@ -42,7 +42,13 @@ Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
 
     AP_Var::load_all();
 
+    // start I2C
     I2c.begin();
+    I2c.timeOut(20);
+
+    //start SPI
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
 
     // debug
     Serial.begin(debugBaud, 128, 128);
