@@ -28,12 +28,6 @@
 
 namespace apo {
 
-void mavlink_delay(unsigned long delay) {
-}
-
-void flash_leds(bool param) {
-}
-
 Board_APM1::Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Board(mode,vehicle,options) {
 
     const uint32_t debugBaud = 57600;
