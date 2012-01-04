@@ -5,12 +5,12 @@
  *      Author: jgoppert
  */
 
-#include "../FastSerial/FastSerial.h"
+#include <FastSerial.h>
+#include <GCS_MAVLink.h>
 #include "AP_ArmingMechanism.h"
 #include "AP_BatteryMonitor.h"
 #include "AP_Board.h"
 #include "AP_RcChannel.h"
-#include "../GCS_MAVLink/include/mavlink_types.h"
 #include "constants.h"
 #include "AP_CommLink.h"
 #include "AP_Controller.h"

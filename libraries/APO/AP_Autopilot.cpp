@@ -41,8 +41,6 @@ AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
     if (board->getMode() != AP_Board::MODE_LIVE) {
         board->hil = new MavlinkComm(board->hilPort, navigator, guide, controller, board, 3);
     }
-    board->gcsPort->printf_P(PSTR("gcs hello\n"));
-
     board->gcs->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
     board->gcs->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
 
@@ -100,12 +98,12 @@ AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
     AP_MavlinkCommand::home.setLon(_navigator->getLon());
     AP_MavlinkCommand::home.setCommand(MAV_CMD_NAV_WAYPOINT);
     AP_MavlinkCommand::home.save();
-    _board->debug->printf_P(PSTR("\nhome before load lat: %f deg, lon: %f deg, cmd: %d\n"),
+    board->debug->printf_P(PSTR("\nhome before load lat: %f deg, lon: %f deg, cmd: %d\n"),
                           AP_MavlinkCommand::home.getLat()*rad2Deg,
                           AP_MavlinkCommand::home.getLon()*rad2Deg,
                           AP_MavlinkCommand::home.getCommand());
     AP_MavlinkCommand::home.load();
-    _board->debug->printf_P(PSTR("\nhome after load lat: %f deg, lon: %f deg, cmd: %d\n"),
+    board->debug->printf_P(PSTR("\nhome after load lat: %f deg, lon: %f deg, cmd: %d\n"),
                           AP_MavlinkCommand::home.getLat()*rad2Deg,
                           AP_MavlinkCommand::home.getLon()*rad2Deg,
                           AP_MavlinkCommand::home.getCommand());
@@ -124,7 +122,7 @@ AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
     subLoops().push_back(new Loop(loop3Rate, callback3, this));
 
     board->debug->println_P(PSTR("running"));
-    board->gcs->sendText(SEVERITY_LOW, PSTR("running"));
+    //board->gcs->sendText(SEVERITY_LOW, PSTR("running"));
 }
 
 void AP_Autopilot::callback(void * data) {

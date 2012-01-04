@@ -20,9 +20,9 @@
 #define AP_CommLink_H
 
 #include <inttypes.h>
-#include "../AP_Common/AP_Common.h"
+#include <AP_Common.h>
 #include "../AP_Common/AP_Vector.h"
-#include "../GCS_MAVLink/GCS_MAVLink.h"
+#include <GCS_MAVLink.h>
 
 class FastSerial;
 

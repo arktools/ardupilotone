@@ -1,0 +1,4 @@
+*~
+doc/html
+doc/*.log
+build

@@ -80,12 +80,12 @@ Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
     pinMode(slideSwitchPin, INPUT);
     pinMode(pushButtonPin, INPUT);
     DDRL |= B00000100; // set port L, pint 2 to output for the relay
+
     isr_registry = new Arduino_Mega_ISR_Registry;
     radio = new APM_RC_APM2;
     radio->Init(isr_registry);
     dataFlash = new DataFlash_APM2;
     scheduler = new AP_TimerProcess(isr_registry);
-    adc = new AP_ADC_ADS7844(scheduler);
 
    /*
      * Sensor initialization

@@ -13,11 +13,12 @@
 #include "AP_MavlinkCommand.h"
 #include "AP_Board.h"
 #include "AP_RcChannel.h"
-#include "../AP_GPS/AP_GPS.h"
-#include "../AP_Math/AP_Math.h"
-#include "../AP_IMU/AP_IMU.h"
-#include "../AP_Compass/AP_Compass.h"
 #include "AP_BatteryMonitor.h"
+#include <AP_GPS.h>
+#include <AP_Math.h>
+#include <AP_IMU.h>
+#include <AP_Compass.h>
+#include <GCS_MAVLink.h>
 
 namespace apo {
 

@@ -23,9 +23,9 @@ static const uint8_t heartBeatTimeout = 3;
 #define NAVIGATOR_CLASS Navigator_Dcm
 
 //// hardware selection
-#define BOARD_TYPE Board_APM1
+//#define BOARD_TYPE Board_APM1
 //#define BOARD_TYPE Board_APM1_2560
-//#define BOARD_TYPE Board_APM2
+#define BOARD_TYPE Board_APM2
 
 // baud rates
 // optional sensors
