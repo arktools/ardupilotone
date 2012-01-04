@@ -46,7 +46,11 @@ version 2.1 of the License, or (at your option) any later version.
 #include <AP_RangeFinder.h>	// Range finder library
 #include <ModeFilter.h>
 #include <AP_Relay.h>       // APM relay
+
+#if MOUNT==ENABLED
 #include <AP_Mount.h>		// Camera/Antenna mount
+#endif
+
 #include <GCS_MAVLink.h>    // MAVLink GCS definitions
 #include <memcheck.h>
 
