@@ -12,9 +12,9 @@ BetterStream	*mavlink_comm_1_port;
 mavlink_system_t mavlink_system = {7,1,0,0};
 
 #ifdef MAVLINK10
-# include "v1.0/include/mavlink_helpers.h"
+# include "include/v1.0/mavlink_helpers.h"
 #else
-//# include "v0.9/include/mavlink_helpers.h"
+# include "include/v0.9/mavlink_helpers.h"
 #endif
 
 uint8_t mavlink_check_target(uint8_t sysid, uint8_t compid)

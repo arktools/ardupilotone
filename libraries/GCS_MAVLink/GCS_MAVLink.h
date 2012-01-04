@@ -11,9 +11,9 @@
 #define MAVLINK_SEPARATE_HELPERS
 
 #ifdef MAVLINK10
-# include "v1.0/include/ardupilotmega/version.h"
+# include "include/v1.0/ardupilotmega/version.h"
 #else
-//# include "v0.9/include/ardupilotmega/version.h"
+# include "include/v0.9/ardupilotmega/version.h"
 #endif
 
 // this allows us to make mavlink_message_t much smaller
@@ -22,9 +22,9 @@
 #define MAVLINK_COMM_NUM_BUFFERS 2
 
 #ifdef MAVLINK10
-# include "v1.0/include/mavlink_types.h"
+# include "include/v1.0/mavlink_types.h"
 #else
-# include "v0.9/include/mavlink_types.h"
+# include "include/v0.9/mavlink_types.h"
 #endif
 
 /// MAVLink stream used for HIL interaction
@@ -119,9 +119,9 @@ static inline int comm_get_txspace(mavlink_channel_t chan)
 
 #define MAVLINK_USE_CONVENIENCE_FUNCTIONS
 #ifdef MAVLINK10
-# include "v1.0/include/ardupilotmega/mavlink.h"
+# include "include/v1.0/ardupilotmega/mavlink.h"
 #else
-# include "v0.9/include/ardupilotmega/mavlink.h"
+# include "include/v0.9/ardupilotmega/mavlink.h"
 #endif
 
 uint8_t mavlink_check_target(uint8_t sysid, uint8_t compid);
