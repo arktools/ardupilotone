@@ -114,7 +114,7 @@ public:
     AP_TimerProcess * getScheduler() { return _scheduler; }
     Arduino_Mega_ISR_Registry * getIsrRegistry() { return _isr_registry; }
     APM_RC_Class * getRadio() { return _radio; } 
-    Vector<AP_RcChannel *> getRadioChannels() { return _radioChannels; };
+    Vector<AP_RcChannel *> & getRadioChannels() { return _radioChannels; };
     FastSerial * getDebug() { return _debug; }
     FastSerial * getGcsPort() { return _gcsPort; }
     FastSerial * getHilPort() { return _hilPort; }

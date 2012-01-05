@@ -265,8 +265,8 @@ void AP_Autopilot::callback2(void * data) {
 }
 
 void AP_Autopilot::callback3(void * data) {
-    //AP_Autopilot * apo = (AP_Autopilot *) data;
-    //apo->getBoard()->debug->println_P(PSTR("callback 3"));
+    AP_Autopilot * apo = (AP_Autopilot *) data;
+    //apo->getBoard()->getDebug()->println_P(PSTR("callback 3"));
 }
 
 } // apo

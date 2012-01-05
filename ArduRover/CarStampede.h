@@ -55,7 +55,7 @@ static const struct AP_Board::parameters_t parameters =
     AP_COMPASS_COMPONENTS_UP_PINS_FORWARD, // compass orientation
 
     // loop rates
-    250,    // attitude nav
+    150,    // attitude nav
     50,     // controller
     10,     // pos nav/ gcs fast
     1,      // gcs slow

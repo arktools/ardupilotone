@@ -31,13 +31,13 @@ static const struct AP_Board::parameters_t parameters =
 
     // options
     AP_Board::opt_gps | 
-    AP_Board::opt_baro | 
-    AP_Board::opt_compass |
-    AP_Board::opt_batteryMonitor |
+    //AP_Board::opt_baro | 
+    //AP_Board::opt_compass |
+    //AP_Board::opt_batteryMonitor |
     //AP_Board::opt_rangeFinderFront |
     //AP_Board::opt_rangeFinderBack |
     //AP_Board::opt_rangeFinderLeft |
-    AP_Board::opt_rangeFinderRight |
+    //AP_Board::opt_rangeFinderRight |
     0, // note: 0 here to allow | on last option
 
     // baud rates
@@ -54,7 +54,7 @@ static const struct AP_Board::parameters_t parameters =
     AP_COMPASS_COMPONENTS_UP_PINS_FORWARD, // compass orientation
 
     // loop rates
-    250,    // attitude nav
+    150,    // attitude nav
     50,     // controller
     10,     // pos nav/ gcs fast
     1,      // gcs slow
