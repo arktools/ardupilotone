@@ -10,6 +10,8 @@
 
 using namespace apo;
 
+
+
 // vehicle options
 static const AP_Board::options_t options = AP_Board::opt_gps | AP_Board::opt_baro | AP_Board::opt_compass;
 static const MAV_TYPE vehicle = MAV_TYPE_FIXED_WING;

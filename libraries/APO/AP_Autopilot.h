@@ -25,6 +25,7 @@ class AP_Navigator;
 class AP_Guide;
 class AP_Controller;
 class AP_Board;
+class AP_CommLink;
 
 /**
  * This class encapsulates the entire autopilot system
@@ -43,8 +44,7 @@ public:
      * Default constructor
      */
     AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
-                 AP_Controller * controller, AP_Board * board,
-                 float loopRate, float loop0Rate, float loop1Rate, float loop2Rate, float loop3Rate);
+                 AP_Controller * controller, AP_Board * board);
 
     /**
      * Accessors
@@ -60,6 +60,14 @@ public:
     }
     AP_Board * getBoard() {
         return _board;
+    }
+
+    AP_CommLink * getGcs() { 
+        return _gcs; 
+    }
+    
+    AP_CommLink * getHil() {
+        return _hil;
     }
 
     /**
@@ -121,6 +129,10 @@ private:
     AP_Guide * _guide;
     AP_Controller * _controller;
     AP_Board * _board;
+
+    // communications
+    AP_CommLink * _gcs;
+    AP_CommLink * _hil;
 };
 
 } // namespace apo

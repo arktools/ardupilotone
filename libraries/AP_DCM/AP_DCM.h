@@ -21,7 +21,7 @@ class AP_DCM
 {
 public:
 	// Constructors
-	AP_DCM(IMU *imu, GPS *&gps, Compass *withCompass = NULL) :
+	AP_DCM(IMU *imu, GPS *gps, Compass *withCompass = NULL) :
 		_compass(withCompass),
 		_gps(gps),
 		_imu(imu),

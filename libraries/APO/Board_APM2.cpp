@@ -28,17 +28,8 @@
 
 namespace apo {
 
-Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Board(mode,vehicle,options) {
-
-    const uint32_t debugBaud = 57600;
-    const uint32_t telemBaud = 57600;
-    const uint32_t gpsBaud = 38400;
-    const uint32_t hilBaud = 115200;
-    const uint8_t batteryPin = 0;
-    const float batteryVoltageDivRatio = 6;
-    const float batteryMinVolt = 10.0;
-    const float batteryMaxVolt = 12.4;
-    Matrix3f compassOrientation = AP_COMPASS_COMPONENTS_UP_PINS_FORWARD;
+Board_APM2::Board_APM2(const parameters_t & parameters) : 
+    AP_Board(parameters) {
 
     AP_Var::load_all();
 
@@ -51,73 +42,80 @@ Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
     SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
 
     // debug
-    Serial.begin(debugBaud, 128, 128);
-    debug = &Serial;
-    debug->println_P(PSTR("initialized debug port"));
+    Serial.begin(_parameters.debugBaud, 128, 128);
+    _debug = &Serial;
+    _debug->println_P(PSTR("initialized debug port"));
 
     // gcs
-    Serial2.begin(telemBaud, 128, 128);
-    gcsPort = &Serial2;
-    gcsPort->println_P(PSTR("initialized gcs port"));
+    Serial2.begin(_parameters.telemBaud, 128, 128);
+    _gcsPort = &Serial2;
+    _gcsPort->println_P(PSTR("initialized gcs port"));
     delay(1000);
 
     // hil
-    Serial1.begin(hilBaud, 128, 128);
-    hilPort = &Serial1;
-    hilPort->println_P(PSTR("initialized hil port"));
+    Serial1.begin(_parameters.hilBaud, 128, 128);
+    _hilPort = &Serial1;
+    _hilPort->println_P(PSTR("initialized hil port"));
     delay(1000);
 
-    slideSwitchPin = 40;
-    pushButtonPin = 41;
-    aLedPin = 37;
-    bLedPin = 36;
-    cLedPin = 35;
+    // button and switch locations
+    _slideSwitchPin = 40;
+    _pushButtonPin = 41;
+    _aLedPin = 37;
+    _bLedPin = 36;
+    _cLedPin = 35;
 
-    eepromMaxAddr = 1024;
-    pinMode(aLedPin, OUTPUT); //  extra led
-    pinMode(bLedPin, OUTPUT); //  imu ledclass AP_CommLink;
-    pinMode(cLedPin, OUTPUT); //  gps led
-    pinMode(slideSwitchPin, INPUT);
-    pinMode(pushButtonPin, INPUT);
+    // eeprom memory
+    _eepromMaxAddr = 2048;
+
+    // pin modes
+    pinMode(_aLedPin, OUTPUT); //  extra led
+    pinMode(_bLedPin, OUTPUT); //  imu ledclass AP_CommLink;
+    pinMode(_cLedPin, OUTPUT); //  gps led
+    pinMode(_slideSwitchPin, INPUT);
+    pinMode(_pushButtonPin, INPUT);
     DDRL |= B00000100; // set port L, pint 2 to output for the relay
 
-    isr_registry = new Arduino_Mega_ISR_Registry;
-    radio = new APM_RC_APM2;
-    radio->Init(isr_registry);
-    dataFlash = new DataFlash_APM2;
-    scheduler = new AP_TimerProcess(isr_registry);
+    // components
+    _isr_registry = new Arduino_Mega_ISR_Registry;
+    _radio = new APM_RC_APM2;
+    _radio->Init(_isr_registry);
+    _dataFlash = new DataFlash_APM2;
+    _scheduler = new AP_TimerProcess(_isr_registry);
 
-   /*
-     * Sensor initialization
-     */
-    if (getMode() == MODE_LIVE) {
+    // live mode devices
+    if (_parameters.mode == MODE_LIVE) {
 
-        if (_options & opt_batteryMonitor) {
-            batteryMonitor = new AP_BatteryMonitor(batteryPin,batteryVoltageDivRatio,batteryMinVolt,batteryMaxVolt);
+        if (_parameters.options & opt_batteryMonitor) {
+            _batteryMonitor = new AP_BatteryMonitor(
+                    _parameters.batteryPin,
+                    _parameters.batteryVoltageDivRatio,
+                    _parameters.batteryMinVolt,
+                    _parameters.batteryMaxVolt);
         }
 
-        if (_options & opt_gps) {
-            Serial1.begin(gpsBaud, 128, 16); // gps
-            debug->println_P(PSTR("initializing gps"));
-            AP_GPS_Auto gpsDriver(&Serial1, &(gps));
-            gps = &gpsDriver;
-            gps->callback = delay;
-            gps->init();
+        if (_parameters.options & opt_gps) {
+            Serial1.begin(_parameters.gpsBaud, 128, 16); // gps
+            _debug->println_P(PSTR("initializing gps"));
+            AP_GPS_Auto gpsDriver(&Serial1, &(_gps));
+            _gps = &gpsDriver;
+            _gps->callback = delay;
+            _gps->init();
         }
 
-        if (_options & opt_baro) {
-            debug->println_P(PSTR("initializing baro"));
-            baro = new AP_Baro_BMP085(true);
-            baro->init(scheduler);
+        if (_parameters.options & opt_baro) {
+            _debug->println_P(PSTR("initializing baro"));
+            _baro = new AP_Baro_BMP085(true);
+            _baro->init(_scheduler);
         }
 
-        if (_options & opt_compass) {
-            debug->println_P(PSTR("initializing compass"));
-            compass = new AP_Compass_HMC5843;
-            compass->set_orientation(compassOrientation);
-            compass->set_offsets(0,0,0);
-            compass->set_declination(0.0);
-            compass->init();
+        if (_parameters.options & opt_compass) {
+            _debug->println_P(PSTR("initializing compass"));
+            _compass = new AP_Compass_HMC5843;
+            _compass->set_orientation(_parameters.compassOrientation);
+            _compass->set_offsets(0,0,0);
+            _compass->set_declination(0.0);
+            _compass->init();
         }
     }
 
@@ -132,56 +130,62 @@ Board_APM2::Board_APM2(mode_e mode, MAV_TYPE vehicle, options_t options) : AP_Bo
 
     // XXX this isn't really that general, should be a better way
 
-    if (_options & opt_rangeFinderFront) {
-        debug->println_P(PSTR("initializing front range finder"));
-        RangeFinder * rangeFinder = new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(1),new ModeFilter);
+    if (_parameters.options & opt_rangeFinderFront) {
+        _debug->println_P(PSTR("initializing front range finder"));
+        RangeFinder * rangeFinder = 
+            new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(1),new ModeFilter);
         rangeFinder->set_orientation(1, 0, 0);
-        rangeFinders.push_back(rangeFinder);
+        _rangeFinders.push_back(rangeFinder);
     }
 
-    if (_options & opt_rangeFinderBack) {
-        debug->println_P(PSTR("initializing back range finder"));
-        RangeFinder * rangeFinder = new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(2),new ModeFilter);
+    if (_parameters.options & opt_rangeFinderBack) {
+        _debug->println_P(PSTR("initializing back range finder"));
+        RangeFinder * rangeFinder = 
+            new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(2),new ModeFilter);
         rangeFinder->set_orientation(-1, 0, 0);
-        rangeFinders.push_back(rangeFinder);
+        _rangeFinders.push_back(rangeFinder);
     }
 
-    if (_options & opt_rangeFinderLeft) {
-        debug->println_P(PSTR("initializing left range finder"));
-        RangeFinder * rangeFinder = new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(3),new ModeFilter);
+    if (_parameters.options & opt_rangeFinderLeft) {
+        _debug->println_P(PSTR("initializing left range finder"));
+        RangeFinder * rangeFinder = 
+            new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(3),new ModeFilter);
         rangeFinder->set_orientation(0, -1, 0);
-        rangeFinders.push_back(rangeFinder);
+        _rangeFinders.push_back(rangeFinder);
     }
 
-    if (_options & opt_rangeFinderRight) {
-        debug->println_P(PSTR("initializing right range finder"));
-        RangeFinder * rangeFinder = new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(4),new ModeFilter);
+    if (_parameters.options & opt_rangeFinderRight) {
+        _debug->println_P(PSTR("initializing right range finder"));
+        RangeFinder * rangeFinder = 
+            new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(4),new ModeFilter);
         rangeFinder->set_orientation(0, 1, 0);
-        rangeFinders.push_back(rangeFinder);
+        _rangeFinders.push_back(rangeFinder);
     }
 
-    if (_options & opt_rangeFinderUp) {
-        debug->println_P(PSTR("initializing up range finder"));
-        RangeFinder * rangeFinder = new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(5),new ModeFilter);
+    if (_parameters.options & opt_rangeFinderUp) {
+        _debug->println_P(PSTR("initializing up range finder"));
+        RangeFinder * rangeFinder = 
+            new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(5),new ModeFilter);
         rangeFinder->set_orientation(0, 0, -1);
-        rangeFinders.push_back(rangeFinder);
+        _rangeFinders.push_back(rangeFinder);
     }
 
-    if (_options & opt_rangeFinderDown) {
-        debug->println_P(PSTR("initializing down range finder"));
-        RangeFinder * rangeFinder = new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(6),new ModeFilter);
+    if (_parameters.options & opt_rangeFinderDown) {
+        _debug->println_P(PSTR("initializing down range finder"));
+        RangeFinder * rangeFinder = 
+            new AP_RangeFinder_MaxsonarXL(new AP_AnalogSource_Arduino(6),new ModeFilter);
         rangeFinder->set_orientation(0, 0, 1);
-        rangeFinders.push_back(rangeFinder);
+        _rangeFinders.push_back(rangeFinder);
     }
 
     /*
      * navigation sensors
      */
-    debug->println_P(PSTR("initializing imu"));
-    ins = new AP_InertialSensor_MPU6000(53,scheduler);
-    debug->println_P(PSTR("initializing ins"));
-    imu = new AP_IMU_INS(ins, k_sensorCalib,scheduler);
-    debug->println_P(PSTR("setup completed"));
+    _debug->println_P(PSTR("initializing imu"));
+    _ins = new AP_InertialSensor_MPU6000(53,_scheduler);
+    _debug->println_P(PSTR("initializing ins"));
+    _imu = new AP_IMU_INS(_ins, k_sensorCalib,_scheduler);
+    _debug->println_P(PSTR("setup completed"));
 }
 
 } // namespace apo

@@ -23,7 +23,7 @@ namespace apo {
 
 Navigator_Dcm::Navigator_Dcm(AP_Board * board, const uint16_t key, const prog_char_t * name) :
     AP_Navigator(board), _imuOffsetAddress(0),
-    _dcm(_board->imu, _board->gps, _board->compass),
+    _dcm(_board->getImu(), _board->getGps(), _board->getCompass()),
     _rangeFinderDown(),
     _group(key, name ? : PSTR("NAV_")),
     _baroLowPass(&_group,1,10,PSTR("BAROLP")),
@@ -35,13 +35,13 @@ Navigator_Dcm::Navigator_Dcm(AP_Board * board, const uint16_t key, const prog_ch
      * rangeFinder<direction> is assigned values based on orientation which
      * is specified in ArduPilotOne.pde.
      */
-    for (uint8_t i = 0; i < _board-> rangeFinders.getSize(); i++) {
-        if (_board->rangeFinders[i] == NULL)
+    for (uint8_t i = 0; i < _board->getRangeFinders().getSize(); i++) {
+        if (_board->getRangeFinders()[i] == NULL)
             continue;
-        if (_board->rangeFinders[i]->orientation_x == 0
-                && _board->rangeFinders[i]->orientation_y == 0
-                && _board->rangeFinders[i]->orientation_z == 1)
-            _rangeFinderDown = _board->rangeFinders[i];
+        if (_board->getRangeFinders()[i]->orientation_x == 0
+                && _board->getRangeFinders()[i]->orientation_y == 0
+                && _board->getRangeFinders()[i]->orientation_z == 1)
+            _rangeFinderDown = _board->getRangeFinders()[i];
     }
 
     // tune down dcm
@@ -52,8 +52,8 @@ Navigator_Dcm::Navigator_Dcm(AP_Board * board, const uint16_t key, const prog_ch
     _dcm.kp_yaw(0.08);
     _dcm.ki_yaw(0);
 
-    if (_board->compass) {
-        _dcm.set_compass(_board->compass);
+    if (_board->getCompass()) {
+        _dcm.set_compass(_board->getCompass());
     }
 }
 void Navigator_Dcm::calibrate() {
@@ -61,40 +61,40 @@ void Navigator_Dcm::calibrate() {
     AP_Navigator::calibrate();
 
     // TODO: handle cold/warm restart
-    if (_board->imu) {
-        _board->imu->warmStart();
+    if (_board->getImu()) {
+        _board->getImu()->warmStart();
     }
 
-    if (_board->baro) {
+    if (_board->getBaro()) {
 
         int flashcount = 0;
 
         while(_groundPressure == 0){
-            _board->baro->read(); 					// Get initial data from absolute pressure sensor
-            _groundPressure = _board->baro->get_pressure();
-            _groundTemperature = _board->baro->get_temperature()/10.0;
+            _board->getBaro()->read(); 					// Get initial data from absolute pressure sensor
+            _groundPressure = _board->getBaro()->get_pressure();
+            _groundTemperature = _board->getBaro()->get_temperature()/10.0;
             delay(20);
         }
 
         for(int i = 0; i < 30; i++){		// We take some readings...
 
             // set using low pass filters
-            _groundPressure = _groundPressure * 0.9   + _board->baro->get_pressure() * 0.1;
-            _groundTemperature = _groundTemperature * 0.9   + (_board->baro->get_temperature()/10.0) * 0.1;
+            _groundPressure = _groundPressure * 0.9   + _board->getBaro()->get_pressure() * 0.1;
+            _groundTemperature = _groundTemperature * 0.9   + (_board->getBaro()->get_temperature()/10.0) * 0.1;
 
             //mavlink_delay(20);
             delay(20);
             if(flashcount == 5) {
-                digitalWrite(_board->cLedPin, LOW);
-                digitalWrite(_board->aLedPin, HIGH);
-                digitalWrite(_board->bLedPin, LOW);
+                digitalWrite(_board->getCLedPin(), LOW);
+                digitalWrite(_board->getALedPin(), HIGH);
+                digitalWrite(_board->getBLedPin(), LOW);
             }
 
             if(flashcount >= 10) {
                 flashcount = 0;
-                digitalWrite(_board->cLedPin, LOW);
-                digitalWrite(_board->aLedPin, HIGH);
-                digitalWrite(_board->bLedPin, LOW);
+                digitalWrite(_board->getCLedPin(), LOW);
+                digitalWrite(_board->getALedPin(), HIGH);
+                digitalWrite(_board->getBLedPin(), LOW);
             }
             flashcount++;
         }
@@ -102,14 +102,14 @@ void Navigator_Dcm::calibrate() {
         _groundPressure.save();
         _groundTemperature.save();
 
-        _board->debug->printf_P(PSTR("ground pressure: %ld ground temperature: %d\n"),_groundPressure.get(), _groundTemperature.get());
-        _board->gcs->sendText(SEVERITY_LOW, PSTR("barometer calibration complete\n"));
+        _board->getDebug()->printf_P(PSTR("ground pressure: %ld ground temperature: %d\n"),_groundPressure.get(), _groundTemperature.get());
+        _board->getGcs()->sendText(SEVERITY_LOW, PSTR("barometer calibration complete\n"));
     }
 }
 
 void Navigator_Dcm::updateFast(float dt) {
 
-    if (_board->getMode() != AP_Board::MODE_LIVE)
+    if (_board->getParameters().mode != AP_Board::MODE_LIVE)
         return;
 
     setTimeStamp(micros()); // if running in live mode, record new time stamp
@@ -119,7 +119,7 @@ void Navigator_Dcm::updateFast(float dt) {
         setAlt(_rangeFinderDown->distance);
 
     // otherwise if you have a baro attached, use it
-    } else if (_board->baro) {
+    } else if (_board->getBaro()) {
         /**
          * The altitued is read off the barometer by implementing the following formula:
          * altitude (in m) = 44330*(1-(p/po)^(1/5.255)),
@@ -131,14 +131,14 @@ void Navigator_Dcm::updateFast(float dt) {
          * pressure input is in pascals
          * temp input is in deg C *10
          */
-        _board->baro->read();		// Get new data from absolute pressure sensor
+        _board->getBaro()->read();		// Get new data from absolute pressure sensor
         float reference = 44330 * (1.0 - (pow(_groundPressure.get()/101325.0,0.190295)));
-        setAlt(_baroLowPass.update((44330 * (1.0 - (pow((_board->baro->get_pressure()/101325.0),0.190295)))) - reference,dt));
-        //_board->debug->printf_P(PSTR("Ground Pressure %f\tAltitude = %f\tGround Temperature = %f\tPress = %ld\tTemp = %d\n"),_groundPressure.get(),getAlt(),_groundTemperature.get(),_board->baro->Press,_board->baro->Temp);
+        setAlt(_baroLowPass.update((44330 * (1.0 - (pow((_board->getBaro()->get_pressure()/101325.0),0.190295)))) - reference,dt));
+        //_board->getDebug->printf_P(PSTR("Ground Pressure %f\tAltitude = %f\tGround Temperature = %f\tPress = %ld\tTemp = %d\n"),_groundPressure.get(),getAlt(),_groundTemperature.get(),_board->baro->Press,_board->baro->Temp);
         
     // last resort, use gps altitude
-    } else if (_board->gps && _board->gps->fix) {
-        setAlt_intM(_board->gps->altitude * 10); // gps in cm, intM in mm
+    } else if (_board->getGps() && _board->getGps()->fix) {
+        setAlt_intM(_board->getGps()->altitude * 10); // gps in cm, intM in mm
     }
 
     // update dcm calculations and navigator data
@@ -158,59 +158,59 @@ void Navigator_Dcm::updateFast(float dt) {
      * accel/gyro debug
      */
     /*
-     Vector3f accel = _board->imu->get_accel();
-     Vector3f gyro = _board->imu->get_gyro();
+     Vector3f accel = _board->getImu()->get_accel();
+     Vector3f gyro = _board->getImu()->get_gyro();
      Serial.printf_P(PSTR("accel: %f %f %f gyro: %f %f %f\n"),
      accel.x,accel.y,accel.z,gyro.x,gyro.y,gyro.z);
      */
 }
 
 void Navigator_Dcm::updateSlow(float dt) {
-    if (_board->getMode() != AP_Board::MODE_LIVE)
+    if (_board->getParameters().mode != AP_Board::MODE_LIVE)
         return;
 
     setTimeStamp(micros()); // if running in live mode, record new time stamp
 
-    if (_board->gps) {
-        _board->gps->update();
+    if (_board->getGps()) {
+        _board->getGps()->update();
         updateGpsLight();
-        if (_board->gps->fix && _board->gps->new_data) {
-            setLat_degInt(_board->gps->latitude);
-            setLon_degInt(_board->gps->longitude);
-            setGroundSpeed(_board->gps->ground_speed / 100.0); // gps is in cm/s
+        if (_board->getGps()->fix && _board->getGps()->new_data) {
+            setLat_degInt(_board->getGps()->latitude);
+            setLon_degInt(_board->getGps()->longitude);
+            setGroundSpeed(_board->getGps()->ground_speed / 100.0); // gps is in cm/s
         }
     }
 
-    if (_board->compass) {
-        _board->compass->read();
-        _board->compass->calculate(_dcm.get_dcm_matrix());
-        _board->compass->null_offsets(_dcm.get_dcm_matrix());
-        //_board->debug->printf_P(PSTR("heading: %f"), _board->compass->heading);
+    if (_board->getCompass()) {
+        _board->getCompass()->read();
+        _board->getCompass()->calculate(_dcm.get_dcm_matrix());
+        _board->getCompass()->null_offsets(_dcm.get_dcm_matrix());
+        //_board->getDebug()->printf_P(PSTR("heading: %f"), _board->getCompass()->heading);
     }
 }
 void Navigator_Dcm::updateGpsLight(void) {
     // GPS LED on if we have a fix or Blink GPS LED if we are receiving data
     // ---------------------------------------------------------------------
     static bool GPS_light = false;
-    switch (_board->gps->status()) {
+    switch (_board->getGps()->status()) {
     case (2):
         //digitalWrite(C_LED_PIN, HIGH); //Turn LED C on when gps has valid fix.
         break;
 
     case (1):
-        if (_board->gps->valid_read == true) {
+        if (_board->getGps()->valid_read == true) {
             GPS_light = !GPS_light; // Toggle light on and off to indicate gps messages being received, but no GPS fix lock
             if (GPS_light) {
-                digitalWrite(_board->cLedPin, LOW);
+                digitalWrite(_board->getCLedPin(), LOW);
             } else {
-                digitalWrite(_board->cLedPin, HIGH);
+                digitalWrite(_board->getCLedPin(), HIGH);
             }
-            _board->gps->valid_read = false;
+            _board->getGps()->valid_read = false;
         }
         break;
 
     default:
-        digitalWrite(_board->cLedPin, LOW);
+        digitalWrite(_board->getCLedPin(), LOW);
         break;
     }
 }

@@ -17,13 +17,13 @@ void setup() {
     using namespace apo;
 
     // hardware abstraction layer
-    AP_Board * board = new BOARD_TYPE(boardMode, vehicle, options);
+    AP_Board * board = new BOARD_TYPE(parameters);
 
     /*
      * Select guidance, navigation, control algorithms
      */
     AP_Navigator * navigator = NULL;
-    if (board->getMode() == AP_Board::MODE_LIVE) {
+    if (board->getParameters().mode == AP_Board::MODE_LIVE) {
         navigator = new NAVIGATOR_CLASS(board,k_nav);
     } else {
         navigator = new AP_Navigator(board);
@@ -32,10 +32,9 @@ void setup() {
     AP_Controller * controller = new CONTROLLER_CLASS(navigator,guide,board);
 
     /*
-     * Start the autopil/ot
+     * Start the autopilot
      */
-    autoPilot = new apo::AP_Autopilot(navigator, guide, controller, board,
-                                      loopRate, loop0Rate, loop1Rate, loop2Rate, loop3Rate);
+    autoPilot = new apo::AP_Autopilot(navigator, guide, controller, board);
 }
 
 void loop() {
