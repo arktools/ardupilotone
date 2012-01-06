@@ -108,7 +108,9 @@ static void init_ardupilot()
 	//
 #ifndef DESKTOP_BUILD
     I2c.begin();
-    I2c.timeOut(20);
+    I2c.timeOut(5);
+    // initially set a fast I2c speed, and drop it on first failures
+    I2c.setSpeed(true);
 #endif
     SPI.begin();
     SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
@@ -359,6 +361,28 @@ static void init_ardupilot()
 	SendDebug("\nReady to FLY ");
 }
 
+/*
+  reset all I integrators
+ */
+static void reset_I_all(void)
+{
+	g.pi_rate_roll.reset_I();
+	g.pi_rate_pitch.reset_I();
+	g.pi_rate_yaw.reset_I();
+	g.pi_stabilize_roll.reset_I();
+	g.pi_stabilize_pitch.reset_I();
+	g.pi_stabilize_yaw.reset_I();
+	g.pi_loiter_lat.reset_I();
+	g.pi_loiter_lon.reset_I();
+	g.pi_nav_lat.reset_I();
+	g.pi_nav_lon.reset_I();
+	g.pi_alt_hold.reset_I();
+	g.pi_throttle.reset_I();
+	g.pi_acro_roll.reset_I();
+	g.pi_acro_pitch.reset_I();
+}
+
+
 //********************************************************************************
 //This function does all the calibrations, etc. that we need during a ground start
 //********************************************************************************
@@ -378,6 +402,10 @@ static void startup_ground(void)
 	// reset the leds
 	// ---------------------------
 	clear_leds();
+
+    // when we re-calibrate the gyros, all previous I values now
+    // make no sense
+    reset_I_all();
 }
 
 /*
@@ -422,11 +450,15 @@ static void set_mode(byte mode)
 	control_mode = constrain(control_mode, 0, NUM_MODES - 1);
 
 	// used to stop fly_aways
-	motor_auto_armed = (g.rc_3.control_in > 0) || failsafe;
+	motor_auto_armed = (g.rc_3.control_in > 0);
 
 	// clearing value used in interactive alt hold
 	manual_boost = 0;
 
+	// do not auto_land if we are leaving RTL
+	auto_land_timer = 0;
+
+	// debug to Serial terminal
 	Serial.println(flight_mode_strings[control_mode]);
 
 	// report the GPS and Motor arming status
@@ -438,6 +470,7 @@ static void set_mode(byte mode)
 			yaw_mode 		= YAW_ACRO;
 			roll_pitch_mode = ROLL_PITCH_ACRO;
 			throttle_mode 	= THROTTLE_MANUAL;
+			reset_rate_I();
 			break;
 
 		case STABILIZE:
@@ -452,6 +485,8 @@ static void set_mode(byte mode)
 			throttle_mode 	= ALT_HOLD_THR;
 
 			next_WP = current_loc;
+			// 1m is the alt hold limit
+			next_WP.alt = max(next_WP.alt, 100);
 			break;
 
 		case AUTO:
@@ -467,15 +502,16 @@ static void set_mode(byte mode)
 			yaw_mode 		= CIRCLE_YAW;
 			roll_pitch_mode = CIRCLE_RP;
 			throttle_mode 	= CIRCLE_THR;
-
 			next_WP 		= current_loc;
+
+			// reset the desired circle angle
+			circle_angle 	= 0;
 			break;
 
 		case LOITER:
 			yaw_mode 		= LOITER_YAW;
 			roll_pitch_mode = LOITER_RP;
 			throttle_mode 	= LOITER_THR;
-
 			next_WP 		= current_loc;
 			break;
 
@@ -483,7 +519,6 @@ static void set_mode(byte mode)
 			yaw_mode 		= YAW_HOLD;
 			roll_pitch_mode = ROLL_PITCH_AUTO;
 			throttle_mode 	= THROTTLE_MANUAL;
-
 			next_WP 		= current_loc;
 			break;
 
@@ -491,12 +526,12 @@ static void set_mode(byte mode)
 			yaw_mode 		= YAW_AUTO;
 			roll_pitch_mode = ROLL_PITCH_AUTO;
 			throttle_mode 	= THROTTLE_AUTO;
-
-			next_WP = current_loc;
+			next_WP 		= current_loc;
 			set_next_WP(&guided_WP);
 			break;
 
 		case LAND:
+			land_complete 	= false;
 			yaw_mode 		= YAW_HOLD;
 			roll_pitch_mode = ROLL_PITCH_AUTO;
 			throttle_mode 	= THROTTLE_AUTO;
@@ -516,20 +551,35 @@ static void set_mode(byte mode)
 			break;
 	}
 
+	if(failsafe){
+		// this is to allow us to fly home without interactive throttle control
+		throttle_mode = THROTTLE_AUTO;
+		// does not wait for us to be in high throttle, since the
+		// Receiver will be outputting low throttle
+		motor_auto_armed = true;
+	}
+
 	if(throttle_mode == THROTTLE_MANUAL){
 		// reset all of the throttle iterms
 		g.pi_alt_hold.reset_I();
 		g.pi_throttle.reset_I();
-	}else { // an automatic throttle
 
+	}else {
+		// an automatic throttle
 		// todo: replace with a throttle cruise estimator
 		init_throttle_cruise();
 	}
 
 	if(roll_pitch_mode <= ROLL_PITCH_ACRO){
 		// We are under manual attitude control
-		// reset out nav parameters
+		// removes the navigation from roll and pitch commands, but leaves the wind compensation
 		reset_nav();
+
+		// removes the navigation from roll and pitch commands, but leaves the wind compensation
+		if(GPS_enabled)
+			wp_control = NO_NAV_MODE;
+			update_nav_wp();
+
 	}
 
 	Log_Write_Mode(control_mode);
@@ -554,7 +604,6 @@ static void set_failsafe(boolean mode)
 			// We've lost radio contact
 			// ------------------------
 			failsafe_on_event();
-
 		}
 	}
 }

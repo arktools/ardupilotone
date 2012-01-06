@@ -77,14 +77,14 @@ namespace ArdupilotMega.GCSViews
             if (MainV2.APMFirmware == MainV2.Firmwares.ArduPlane)
             {
                 ConfigTabs.SelectedIndex = 0;
-                TabAPM2.Enabled = true;
-                TabAC2.Enabled = false;
+                TabAP.Enabled = true;
+                TabAC.Enabled = false;
             }
             else
             {
                 ConfigTabs.SelectedIndex = 1;
-                TabAPM2.Enabled = false;
-                TabAC2.Enabled = true;
+                TabAP.Enabled = false;
+                TabAC.Enabled = true;
             }
 
             // read tooltips
@@ -167,7 +167,7 @@ namespace ArdupilotMega.GCSViews
 
             // setup language selection
             CultureInfo ci = null;
-            foreach (string name in new string[] { "en-US", "zh-Hans", "ru-RU", "Fr", "Pl" })
+            foreach (string name in new string[] { "en-US", "zh-Hans", "zh-TW", "ru-RU", "Fr", "Pl" })
             {
                 ci = MainV2.getcultureinfo(name);
                 if (ci != null)
@@ -314,8 +314,8 @@ namespace ArdupilotMega.GCSViews
             toolTip1.RemoveAll();
             Params.Rows.Clear();
 
-            disableNumericUpDownControls(TabAC2);
-            disableNumericUpDownControls(TabAPM2);
+            disableNumericUpDownControls(TabAC);
+            disableNumericUpDownControls(TabAP);
 
             // process hashdefines and update display
             foreach (string value in param.Keys)
