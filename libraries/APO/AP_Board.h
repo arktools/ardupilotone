@@ -130,7 +130,6 @@ public:
     AP_CommLink * getGcs() { return _gcs; }
     AP_CommLink * getHil() { return _hil; }
 
-    AP_Autopilot * getAutopilot() { return _autopilot; }
     DataFlash_Class * getDataFlash() { return _dataFlash; }
     uint8_t getLoad() { return _load; }
     uint8_t getSlideSwitchPin() { return _slideSwitchPin; }
@@ -142,7 +141,6 @@ public:
     const parameters_t & getParameters() { return _parameters; }
 
     // set routines
-    void setAutopilot(AP_Autopilot * autopilot) { _autopilot = autopilot; }
     void setGcs(AP_CommLink * gcs) { _gcs = gcs; }
     void setHil(AP_CommLink * hil) { _hil = hil; }
     void setLoad(uint8_t load) { _load = load; }
@@ -193,9 +191,6 @@ protected:
     FastSerial * _ports[4];
     AP_CommLink * _gcs;
     AP_CommLink * _hil;
-
-    // link to autopilot
-    AP_Autopilot * _autopilot;
 
     // data flash
     DataFlash_Class * _dataFlash;

@@ -32,17 +32,16 @@ void setup() {
 
     AP_Guide * guide = new GUIDE_CLASS(navigator, board, velCmd, xt, xtLim);
     AP_Controller * controller = new CONTROLLER_CLASS(navigator,guide,board);
-    AP_CommLink * gcs = new MavlinkComm(AP_Board::PORT_GCS,navigator,guide,controller,board); 
-    AP_CommLink * hil = NULL;
 
+    board->setGcs(new MavlinkComm(AP_Board::PORT_GCS,navigator,guide,controller,board)); 
     if (board->getParameters().mode != AP_Board::MODE_LIVE) {
-        hil = new MavlinkComm(AP_Board::PORT_HIL,navigator,guide,controller,board); 
+        board->setHil(new MavlinkComm(AP_Board::PORT_HIL,navigator,guide,controller,board)); 
     }
 
     /*
      * Start the autopilot
      */
-    autopilot = new apo::AP_Autopilot(navigator, guide, controller, board, gcs, hil);
+    autopilot = new apo::AP_Autopilot(navigator, guide, controller, board);
 }
 
 void loop() {

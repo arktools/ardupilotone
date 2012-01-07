@@ -48,6 +48,7 @@ MavlinkComm::MavlinkComm(AP_Board::port_e port, AP_Navigator * nav, AP_Guide * g
     // parameters
     _parameterCount(0), _queuedParameter(NULL),
     _queuedParameterIndex(0) {
+    initialize();
 }
 
 void MavlinkComm::send() {

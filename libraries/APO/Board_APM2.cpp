@@ -49,13 +49,10 @@ Board_APM2::Board_APM2(const parameters_t & parameters) :
 
     setPort(PORT_DEBUG,0);
     setPort(PORT_HIL,1);
-    setPort(PORT_GPS,1);
     setPort(PORT_GCS,2);
 
     // start debug
-    startPort(PORT_DEBUG);
     getDebug()->println_P(PSTR("initialized debug port"));
-    delay(1000);
 
     // button and switch locations
     _slideSwitchPin = 40;
@@ -94,7 +91,7 @@ Board_APM2::Board_APM2(const parameters_t & parameters) :
         }
 
         if (_parameters.options & opt_gps) {
-            startPort(PORT_GPS);
+            setPort(PORT_GPS,1);
             getDebug()->println_P(PSTR("initializing gps"));
             AP_GPS_Auto gpsDriver(getPort(PORT_GPS), &(_gps));
             _gps = &gpsDriver;
