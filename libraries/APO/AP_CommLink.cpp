@@ -25,17 +25,16 @@ namespace apo {
 uint8_t MavlinkComm::_nChannels = 0;
 uint8_t MavlinkComm::_paramNameLengthMax = 13;
 
-AP_CommLink::AP_CommLink(FastSerial * link, AP_Navigator * navigator, AP_Guide * guide,
-                         AP_Controller * controller, AP_Board * board,
-                         const uint16_t heartBeatTimeout) :
-    _link(link), _navigator(navigator), _guide(guide),
-    _controller(controller), _board(board), _heartBeatTimeout(heartBeatTimeout), _lastHeartBeat(0) {
+AP_CommLink::AP_CommLink(AP_Board::port_e port, AP_Navigator * navigator, AP_Guide * guide,
+                         AP_Controller * controller, AP_Board * board) :
+    _port(port), _navigator(navigator), _guide(guide),
+    _controller(controller), _board(board), _lastHeartBeat(0) {
+    initialize();
 }
 
-MavlinkComm::MavlinkComm(FastSerial * link, AP_Navigator * nav, AP_Guide * guide,
-                         AP_Controller * controller, AP_Board * board,
-                         const uint16_t heartBeatTimeout) :
-    AP_CommLink(link, nav, guide, controller, board,heartBeatTimeout),
+MavlinkComm::MavlinkComm(AP_Board::port_e port, AP_Navigator * nav, AP_Guide * guide,
+                         AP_Controller * controller, AP_Board * board) :
+    AP_CommLink(port, nav, guide, controller, board),
 
     // options
     _useRelativeAlt(true),
@@ -49,7 +48,6 @@ MavlinkComm::MavlinkComm(FastSerial * link, AP_Navigator * nav, AP_Guide * guide
     // parameters
     _parameterCount(0), _queuedParameter(NULL),
     _queuedParameterIndex(0) {
-    setLink(link);
 }
 
 void MavlinkComm::send() {
@@ -245,16 +243,16 @@ void MavlinkComm::sendText(uint8_t severity, const prog_char_t *str) {
 void MavlinkComm::acknowledge(uint8_t id, uint8_t sum1, uint8_t sum2) {
 }
 
-void MavlinkComm::setLink(FastSerial * link) {
-    AP_CommLink::setLink(link);
+void MavlinkComm::initialize() {
+    AP_CommLink::initialize();
     switch (_nChannels) {
     case 0:
-        mavlink_comm_0_port = link;
+        mavlink_comm_0_port = _board->getPort(_port);
         _channel = MAVLINK_COMM_0;
         _nChannels++;
         break;
     case 1:
-        mavlink_comm_1_port = link;
+        mavlink_comm_1_port = _board->getPort(_port);
         _channel = MAVLINK_COMM_1;
         _nChannels++;
         break;

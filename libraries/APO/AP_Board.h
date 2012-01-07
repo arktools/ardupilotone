@@ -40,8 +40,16 @@ public:
 
     // enumerations
     enum mode_e {
-        MODE_LIVE, MODE_HIL_CNTL,
+        MODE_LIVE, 
+        MODE_HIL_CNTL,
         /*MODE_HIL_NAV*/
+    };
+
+    enum port_e {
+        PORT_DEBUG,
+        PORT_GCS,
+        PORT_HIL,
+        PORT_GPS,
     };
 
     // parameters
@@ -71,7 +79,7 @@ public:
 
         // baud rates
         uint32_t debugBaud;
-        uint32_t telemBaud;
+        uint32_t gcsBaud;
         uint32_t gpsBaud;
         uint32_t hilBaud;
 
@@ -115,11 +123,10 @@ public:
     Arduino_Mega_ISR_Registry * getIsrRegistry() { return _isr_registry; }
     APM_RC_Class * getRadio() { return _radio; } 
     Vector<AP_RcChannel *> & getRadioChannels() { return _radioChannels; };
-    FastSerial * getDebug() { return _debug; }
-    FastSerial * getGcsPort() { return _gcsPort; }
-    FastSerial * getHilPort() { return _hilPort; }
+    FastSerial * getPort(port_e port);
 
     // TODO move these to AP_Autopilot?
+    FastSerial * getDebug() { return getPort(PORT_DEBUG); }
     AP_CommLink * getGcs() { return _gcs; }
     AP_CommLink * getHil() { return _hil; }
 
@@ -156,6 +163,11 @@ public:
      */
     void checkUsbConnection();
 
+    void startPort(port_e port);
+    void setPort(port_e port, uint8_t portNumber);
+    uint8_t getPortNumber(port_e port);
+
+
 protected:
 
     // sensors
@@ -177,9 +189,8 @@ protected:
     Vector<AP_RcChannel *> _radioChannels;
 
     // communications
-    FastSerial * _debug;
-    FastSerial * _gcsPort;
-    FastSerial * _hilPort;
+    uint8_t _portNumber[4];
+    FastSerial * _ports[4];
     AP_CommLink * _gcs;
     AP_CommLink * _hil;
 

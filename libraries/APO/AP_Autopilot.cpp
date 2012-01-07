@@ -22,9 +22,9 @@ namespace apo {
 class AP_Board;
 
 AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
-                           AP_Controller * controller, AP_Board * board) :
+                           AP_Controller * controller, AP_Board * board, AP_CommLink * gcs, AP_CommLink * hil) :
     Loop(board->getParameters().loopRate, callback, this), _navigator(navigator), _guide(guide),
-    _controller(controller), _board(board),
+    _controller(controller), _board(board), _gcs(gcs), _hil(hil),
     callbackCalls(0) {
 
     // allow hardware to call autopilot public routines
@@ -36,9 +36,9 @@ AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
     /*
      * Comm links
      */
-    board->setGcs(new MavlinkComm(board->getGcsPort(), navigator, guide, controller, board, 3));
+    board->setGcs(gcs);
     if (board->getParameters().mode != AP_Board::MODE_LIVE) {
-        board->setHil(new MavlinkComm(board->getHilPort(), navigator, guide, controller, board, 3));
+        board->setHil(hil);
     }
     board->getGcs()->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
     board->getGcs()->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
@@ -265,7 +265,7 @@ void AP_Autopilot::callback2(void * data) {
 }
 
 void AP_Autopilot::callback3(void * data) {
-    AP_Autopilot * apo = (AP_Autopilot *) data;
+    //AP_Autopilot * apo = (AP_Autopilot *) data;
     //apo->getBoard()->getDebug()->println_P(PSTR("callback 3"));
 }
 

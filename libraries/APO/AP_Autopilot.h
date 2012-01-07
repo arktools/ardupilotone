@@ -44,7 +44,8 @@ public:
      * Default constructor
      */
     AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
-                 AP_Controller * controller, AP_Board * board);
+                 AP_Controller * controller, AP_Board * board,
+                 AP_CommLink * gcs, AP_CommLink * hil);
 
     /**
      * Accessors
