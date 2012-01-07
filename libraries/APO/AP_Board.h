@@ -140,6 +140,22 @@ public:
     void setHil(AP_CommLink * hil) { _hil = hil; }
     void setLoad(uint8_t load) { _load = load; }
 
+    /**
+     * delay while updating comms
+     */
+    void delayWithCommUpdate(uint32_t t);
+
+    /**
+     * called by gyro/accel init to flash LEDs so user
+     * has some mesmerising lights to watch while waiting
+     */
+    void flashLeds(bool on);
+
+    /**
+     * check if usb is connected
+     */
+    void checkUsbConnection();
+
 protected:
 
     // sensors
@@ -181,9 +197,13 @@ protected:
     uint8_t _bLedPin;
     uint8_t _cLedPin;
     uint16_t _eepromMaxAddr;
+    uint8_t _usbMuxPin;
 
     // parameters structure
     const parameters_t _parameters;
+
+    bool _inDelayWithCommUpdate;
+    bool _usbConnected;
 };
 
 } // namespace apo

@@ -49,23 +49,7 @@ MavlinkComm::MavlinkComm(FastSerial * link, AP_Navigator * nav, AP_Guide * guide
     // parameters
     _parameterCount(0), _queuedParameter(NULL),
     _queuedParameterIndex(0) {
-
-    switch (_nChannels) {
-    case 0:
-        mavlink_comm_0_port = link;
-        _channel = MAVLINK_COMM_0;
-        _nChannels++;
-        break;
-    case 1:
-        mavlink_comm_1_port = link;
-        _channel = MAVLINK_COMM_1;
-        _nChannels++;
-        break;
-    default:
-        // signal that number of channels exceeded
-        _channel = MAVLINK_COMM_3;
-        break;
-    }
+    setLink(link);
 }
 
 void MavlinkComm::send() {
@@ -259,6 +243,26 @@ void MavlinkComm::sendText(uint8_t severity, const prog_char_t *str) {
 }
 
 void MavlinkComm::acknowledge(uint8_t id, uint8_t sum1, uint8_t sum2) {
+}
+
+void MavlinkComm::setLink(FastSerial * link) {
+    AP_CommLink::setLink(link);
+    switch (_nChannels) {
+    case 0:
+        mavlink_comm_0_port = link;
+        _channel = MAVLINK_COMM_0;
+        _nChannels++;
+        break;
+    case 1:
+        mavlink_comm_1_port = link;
+        _channel = MAVLINK_COMM_1;
+        _nChannels++;
+        break;
+    default:
+        // signal that number of channels exceeded
+        _channel = MAVLINK_COMM_3;
+        break;
+    }
 }
 
 /**
