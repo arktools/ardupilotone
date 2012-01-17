@@ -5,7 +5,6 @@
  *
  */
 
-#include <FastSerial.h>
 #include <GCS_MAVLink.h>
 #include "AP_CommLink.h"
 #include "AP_Board.h"
@@ -52,28 +51,20 @@ void AP_Board::delayWithCommUpdate(uint32_t t)
 
 void AP_Board::checkUsbConnection()
 {
-    // XXX this needs to be tested
-    static uint8_t portNumberDebug = 0;
-    static uint8_t portNumberGcs = 0;
-
     if (_usbMuxPin == 0) return;
     bool _usbCheck = !digitalRead(_usbMuxPin);
-    if (_usbConnected == _usbCheck) {
+    if (_usbCheck == _usbConnected) {
         return;
-    } else{
-        _usbConnected = _usbCheck;
-        if (_usbConnected) {
-            portNumberDebug = getPortNumber(PORT_DEBUG);
-            portNumberGcs = getPortNumber(PORT_GCS);
-            setPort(PORT_DEBUG,portNumberGcs);
-            setPort(PORT_GCS,portNumberDebug);
-            getGcs()->initialize();
-        } else {
-            setPort(PORT_DEBUG,portNumberDebug);
-            setPort(PORT_GCS,portNumberGcs);
-            getGcs()->initialize();
-        }
     }
+
+    // the user has switched to/from the telemetry port
+    _usbConnected = _usbCheck;
+    // TODO get this working
+    //if (_usbConnected) {
+        //Serial.begin(_parameters.serial0Baud, 128, 128);
+    //} else {
+        //Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+    //}
 }
 
 
@@ -81,38 +72,6 @@ void AP_Board::flashLeds(bool on)
 {
     digitalWrite(_aLedPin, on?LED_OFF:LED_ON);
     digitalWrite(_cLedPin, on?LED_ON:LED_OFF);
-}
-
-FastSerial * AP_Board::getPort(port_e port) {
-    return _ports[_portNumber[port]];
-}
-
-void AP_Board::startPort(port_e port) {
-    switch(port) {
-        case PORT_DEBUG:
-            getPort(PORT_DEBUG)->begin(_parameters.debugBaud, 128, 128);
-            break;
-        case PORT_GCS:
-            getPort(PORT_GCS)->begin(_parameters.gcsBaud, 128, 128);
-            break;
-        case PORT_HIL:
-            getPort(PORT_HIL)->begin(_parameters.hilBaud, 128, 128);
-            break;
-        case PORT_GPS:
-            getPort(PORT_GPS)->begin(_parameters.gpsBaud, 128, 16);
-            break;
-        default: 
-            break;
-    }
-}
-
-void AP_Board::setPort(port_e port, uint8_t portNumber) {
-    _portNumber[port] = portNumber;
-    startPort(port);
-}
-
-uint8_t AP_Board::getPortNumber(port_e port) {
-    return _portNumber[port];
 }
 
 } // namespace apo

@@ -23,7 +23,6 @@
 #include <AP_Common.h>
 #include "../AP_Common/AP_Vector.h"
 #include <GCS_MAVLink.h>
-#include <AP_Board.h>
 
 class FastSerial;
 
@@ -46,8 +45,8 @@ enum {
 class AP_CommLink {
 public:
 
-    AP_CommLink(AP_Board::port_e port, AP_Navigator * navigator, AP_Guide * guide,
-                AP_Controller * controller, AP_Board * board);
+    AP_CommLink(FastSerial * link, AP_Navigator * navigator, AP_Guide * guide,
+                AP_Controller * controller, AP_Board * board, const uint16_t heartBeatTimeout);
     virtual void send() = 0;
     virtual void receive() = 0;
     virtual void sendMessage(uint8_t id, uint32_t param = 0) = 0;
@@ -56,29 +55,30 @@ public:
     virtual void acknowledge(uint8_t id, uint8_t sum1, uint8_t sum2) = 0;
     virtual void sendParameters() = 0;
     virtual void requestCmds() = 0;
-    virtual void initialize() {};
+    virtual void setLink(FastSerial * link) { _link = link; }
 
     /// check if heartbeat is lost
     bool heartBeatLost() {
-        if (_board->getParameters().heartBeatTimeout == 0)
+        if (_heartBeatTimeout == 0)
             return false;
         else
-            return ((micros() - _lastHeartBeat) / 1e6) > _board->getParameters().heartBeatTimeout;
+            return ((micros() - _lastHeartBeat) / 1e6) > _heartBeatTimeout;
     }
 
 protected:
-    AP_Board::port_e _port;
+    FastSerial * _link;
     AP_Navigator * _navigator;
-    AP_Controller * _controller;
     AP_Guide * _guide;
+    AP_Controller * _controller;
     AP_Board * _board;
+    uint16_t _heartBeatTimeout;              /// vehicle heartbeat timeout, s
     uint32_t _lastHeartBeat;                 /// time of last heartbeat, s
 };
 
 class MavlinkComm: public AP_CommLink {
 public:
-    MavlinkComm(AP_Board::port_e port, AP_Navigator * nav, AP_Guide * guide,
-                AP_Controller * controller, AP_Board * board);
+    MavlinkComm(FastSerial * link, AP_Navigator * nav, AP_Guide * guide,
+                AP_Controller * controller, AP_Board * board, uint16_t heartBeatTimeout);
 
     void send();
     void sendMessage(uint8_t id, uint32_t param = 0);
@@ -86,7 +86,7 @@ public:
     void sendText(uint8_t severity, const char *str);
     void sendText(uint8_t severity, const prog_char_t *str);
     void acknowledge(uint8_t id, uint8_t sum1, uint8_t sum2);
-    void initialize();
+    void setLink(FastSerial * link);
 
     /**
      * sends parameters one at a time
