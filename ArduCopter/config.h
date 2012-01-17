@@ -1,5 +1,7 @@
 // -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 //
+#ifndef __ARDUCOPTER_CONFIG_H__
+#define __ARDUCOPTER_CONFIG_H__
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -65,10 +67,10 @@
 // FRAME_CONFIG
 //
 #ifndef FRAME_CONFIG
-# define FRAME_CONFIG		QUAD_FRAME
+# define FRAME_CONFIG	QUAD_FRAME
 #endif
 #ifndef FRAME_ORIENTATION
-# define FRAME_ORIENTATION		PLUS_FRAME
+# define FRAME_ORIENTATION	X_FRAME
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -116,6 +118,8 @@
 # define USB_MUX_PIN      -1
 # define CLI_SLIDER_ENABLED DISABLED
 # define OPTFLOW_CS_PIN   34
+# define BATTERY_PIN_1      0
+# define CURRENT_PIN_1      1
 #elif CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
 # define A_LED_PIN        27
 # define B_LED_PIN        26
@@ -127,6 +131,8 @@
 # define CLI_SLIDER_ENABLED DISABLED
 # define USB_MUX_PIN      23
 # define OPTFLOW_CS_PIN   A6
+# define BATTERY_PIN_1      1
+# define CURRENT_PIN_1      2
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -170,7 +176,7 @@
 # endif
 #elif CONFIG_SONAR_SOURCE == SONAR_SOURCE_ANALOG_PIN
 # ifndef CONFIG_SONAR_SOURCE_ANALOG_PIN
-#  define CONFIG_SONAR_SOURCE_ANALOG_PIN AN4
+#  define CONFIG_SONAR_SOURCE_ANALOG_PIN A1
 # endif
 #else
 # warning Invalid value for CONFIG_SONAR_SOURCE, disabling sonar
@@ -310,6 +316,23 @@
 #ifndef OPTFLOW_FOV
 # define OPTFLOW_FOV 			AP_OPTICALFLOW_ADNS3080_08_FOV
 #endif
+// optical flow based loiter PI values
+#ifndef OPTFLOW_ROLL_P
+  #define OPTFLOW_ROLL_P 6.4
+#endif
+#ifndef OPTFLOW_ROLL_I
+  #define OPTFLOW_ROLL_I 0.068
+#endif
+#ifndef OPTFLOW_PITCH_P
+  #define OPTFLOW_PITCH_P 6.4
+#endif
+#ifndef OPTFLOW_PITCH_I
+  #define OPTFLOW_PITCH_I 0.068
+#endif
+#ifndef OPTFLOW_IMAX
+  #define OPTFLOW_IMAX 4
+#endif
+
 
 //////////////////////////////////////////////////////////////////////////////
 // RADIO CONFIGURATION
@@ -468,8 +491,6 @@
 #endif
 
 
-
-
 //////////////////////////////////////////////////////////////////////////////
 // Attitude Control
 //
@@ -591,18 +612,21 @@
 
 
 //////////////////////////////////////////////////////////////////////////////
-// Navigation control gains
+// Loiter control gains
 //
 #ifndef LOITER_P
-# define LOITER_P			.25		//
+# define LOITER_P			2.0		// was .25 in previous
 #endif
 #ifndef LOITER_I
-# define LOITER_I			0.1	// Wind control
+# define LOITER_I			0.04	// Wind control
 #endif
 #ifndef LOITER_IMAX
 # define LOITER_IMAX		30		// degrees°
 #endif
 
+//////////////////////////////////////////////////////////////////////////////
+// WP Navigation control gains
+//
 #ifndef NAV_P
 # define NAV_P				2.2			// 3 was causing rapid oscillations in Loiter
 #endif
@@ -833,3 +857,7 @@
 #ifndef MAVLINK_TELEMETRY_PORT_DELAY
 # define MAVLINK_TELEMETRY_PORT_DELAY 2000
 #endif
+
+
+
+#endif // __ARDUCOPTER_CONFIG_H__

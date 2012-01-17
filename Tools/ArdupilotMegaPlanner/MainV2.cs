@@ -641,6 +641,14 @@ namespace ArdupilotMega
         {
             givecomport = false;
 
+            if (comPort.BaseStream.IsOpen && cs.groundspeed > 4)
+            {
+                if (DialogResult.No == MessageBox.Show("Your model is still moving are you sure you want to disconnect?", "Disconnect", MessageBoxButtons.YesNo))
+                {
+                    return;
+                }
+            }
+
             if (comPort.BaseStream.IsOpen)
             {
                 try
@@ -1599,7 +1607,7 @@ namespace ArdupilotMega
                     }
                 }
                 if (loadinglabel != null)
-                    loadinglabel.Text = "Starting Updater";
+                    updatelabel(loadinglabel,"Starting Updater");
                 Console.WriteLine("Start " + P.StartInfo.FileName + " with " + P.StartInfo.Arguments);
                 P.Start();
                 try
@@ -1746,6 +1754,9 @@ namespace ArdupilotMega
                     if (loadinglabel != null)
                         updatelabel(loadinglabel, "Getting " + file);
 
+                    // from head
+                    long bytes = response.ContentLength;
+
                     // Create a request using a URL that can receive a post. 
                     request = WebRequest.Create(baseurl + file);
                     // Set the Method property of the request to POST.
@@ -1756,8 +1767,7 @@ namespace ArdupilotMega
                     Console.WriteLine(((HttpWebResponse)response).StatusDescription);
                     // Get the stream containing content returned by the server.
                     dataStream = response.GetResponseStream();
-
-                    long bytes = response.ContentLength;
+                    
                     long contlen = bytes;
 
                     byte[] buf1 = new byte[1024];
@@ -1776,7 +1786,7 @@ namespace ArdupilotMega
                             if (dt.Second != DateTime.Now.Second)
                             {
                                 if (loadinglabel != null)
-                                    updatelabel(loadinglabel, "Getting " + file + ": " + Math.Abs(bytes) + " bytes");//(((double)(contlen - bytes) / (double)contlen) * 100).ToString("0.0") + "%";
+                                    updatelabel(loadinglabel, "Getting " + file + ": " + (((double)(contlen - bytes) / (double)contlen) * 100).ToString("0.0") + "%"); //+ Math.Abs(bytes) + " bytes");
                                 dt = DateTime.Now;
                             }
                         }

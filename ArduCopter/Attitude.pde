@@ -166,12 +166,10 @@ static int16_t
 get_nav_throttle(int32_t z_error)
 {
 	static int16_t old_output = 0;
+	//static int16_t rate_d = 0;
 
 	int16_t rate_error;
 	int16_t output;
-
-	// XXX HACK, need a better way not to ramp this i term in large altitude changes.
-	float dt = (abs(z_error) < 400) ? .1 : 0.0;
 
 	// limit error to prevent I term run up
 	z_error 		= constrain(z_error, -ALT_ERROR_MAX, ALT_ERROR_MAX);
@@ -180,13 +178,19 @@ get_nav_throttle(int32_t z_error)
 	rate_error 	= g.pi_alt_hold.get_p(z_error); //_p = .85
 
 	// experiment to pipe iterm directly into the output
-	int16_t iterm = g.pi_alt_hold.get_i(z_error, dt);
+	int16_t iterm = g.pi_alt_hold.get_i(z_error, .1);
 
 	// calculate rate error
 	rate_error 		= rate_error - climb_rate;
 
 	// limit the rate - iterm is not used
 	output =  constrain((int)g.pi_throttle.get_p(rate_error), -160, 180);
+
+	// a positive climb rate means we're going up
+	//rate_d =  ((rate_d + climb_rate)>>1) * .1; // replace with gain
+
+	// slight adjustment to alt hold output
+	//output -= constrain(rate_d, -25, 25);
 
 	// light filter of output
 	output = (old_output * 3 + output) / 4;
@@ -225,26 +229,31 @@ get_rate_yaw(int32_t target_rate)
 	return (int)constrain(target_rate, -2500, 2500);
 }
 
-
-// Zeros out navigation Integrators if we are changing mode, have passed a waypoint, etc.
-// Keeps outdated data out of our calculations
-static void reset_hold_I(void)
-{
-	g.pi_loiter_lat.reset_I();
-	g.pi_loiter_lon.reset_I();
-}
-
 // Keeps old data out of our calculation / logs
 static void reset_nav(void)
 {
+	// forces us to update nav throttle
 	invalid_throttle 		= true;
 	nav_throttle 			= 0;
+
+	// always start Circle mode at same angle
 	circle_angle			= 0;
+
+	// We must be heading to a new WP, so XTrack must be 0
 	crosstrack_error 		= 0;
+
+	// Will be set by new command
 	target_bearing 			= 0;
+
+	// Will be set by new command
 	wp_distance 			= 0;
+
+	// Will be set by new command, used by loiter
 	long_error 				= 0;
 	lat_error  				= 0;
+
+	// Will be set by new command, used by loiter
+	next_WP.alt				= 0;
 }
 
 static void reset_rate_I()
@@ -258,6 +267,8 @@ static void reset_rate_I()
 	g.pi_rate_pitch.reset_I();
 	g.pi_acro_roll.reset_I();
 	g.pi_acro_pitch.reset_I();
+	g.pi_optflow_roll.reset_I();
+	g.pi_optflow_pitch.reset_I();
 }
 
 
@@ -430,3 +441,69 @@ static void init_z_damper()
 {
 }
 #endif
+
+// calculate modified roll/pitch depending upon optical flow values
+static int32_t
+get_of_roll(int32_t control_roll)
+{
+#ifdef OPTFLOW_ENABLED
+	//static int32_t of_roll = 0;  // we use global variable to make logging easier
+    static unsigned long last_of_roll_update = 0;
+	static float prev_value = 0;
+	float x_cm;
+
+	// check if new optflow data available
+	if( optflow.last_update != last_of_roll_update) {
+	    last_of_roll_update = optflow.last_update;
+
+		// filter movement
+		x_cm = (optflow.x_cm + prev_value) / 2.0 * 50.0;
+
+		// only stop roll if caller isn't modifying roll
+		if( control_roll == 0 && current_loc.alt < 1500) {
+			of_roll = g.pi_optflow_roll.get_pi(-x_cm, 1.0);  // we could use the last update time to calculate the time change
+		}else{
+		    g.pi_optflow_roll.reset_I();
+			prev_value = 0;
+		}
+	}
+	// limit maximum angle
+	of_roll	= constrain(of_roll, -1000, 1000);
+
+    return control_roll+of_roll;
+#else
+    return control_roll;
+#endif
+}
+
+static int32_t
+get_of_pitch(int32_t control_pitch)
+{
+#ifdef OPTFLOW_ENABLED
+    //static int32_t of_pitch = 0;  // we use global variable to make logging easier
+    static unsigned long last_of_pitch_update = 0;
+	static float prev_value = 0;
+	float y_cm;
+
+	// check if new optflow data available
+	if( optflow.last_update != last_of_pitch_update ) {
+	    last_of_pitch_update = optflow.last_update;
+
+		// filter movement
+		y_cm = (optflow.y_cm + prev_value) / 2.0 * 50.0;
+
+		// only stop roll if caller isn't modifying roll
+		if( control_pitch == 0 && current_loc.alt < 1500 ) {
+			of_pitch = g.pi_optflow_pitch.get_pi(y_cm, 1.0);  // we could use the last update time to calculate the time change
+		}else{
+		    g.pi_optflow_pitch.reset_I();
+			prev_value = 0;
+		}
+	}
+	// limit maximum angle
+	of_pitch = constrain(of_pitch, -1000, 1000);
+    return control_pitch+of_pitch;
+#else
+    return control_pitch;
+#endif
+}

@@ -41,7 +41,7 @@ public:
 	float           heading_x;      ///< compass vector X magnitude
 	float           heading_y;      ///< compass vector Y magnitude
 	unsigned long   last_update;    ///< millis() time of last update
-	bool		healthy;        ///< true if last read OK
+	bool			healthy;        ///< true if last read OK
 
 	/// Constructor
 	///
@@ -102,8 +102,6 @@ public:
 
 	/// Program new offset values.
 	///
-	/// XXX DEPRECATED
-	///
 	/// @param  x                   Offset to the raw mag_x value.
 	/// @param  y                   Offset to the raw mag_y value.
 	/// @param  z                   Offset to the raw mag_z value.
@@ -115,6 +113,16 @@ public:
 	/// @param  dcm_matrix          The DCM result matrix.
 	///
 	void null_offsets(const Matrix3f &dcm_matrix);
+
+
+	/// Enable/Start automatic offset updates 
+	///
+	void null_offsets_enable(void);
+
+
+	/// Disable/Stop automatic offset updates
+	///
+	void null_offsets_disable(void);
 
 
 	/// Sets the local magnetic field declination.
@@ -130,6 +138,7 @@ protected:
 	AP_VarS<Vector3f>   _offset;
 	AP_Float            _declination;
 
+	bool                _null_enable;        	///< enabled flag for offset nulling
 	bool                _null_init_done;        ///< first-time-around flag used by offset nulling
 	Matrix3f            _last_dcm_matrix;       ///< previous DCM matrix used by offset nulling
 	Vector3f            _mag_body_last;         ///< ?? used by offset nulling

@@ -64,20 +64,6 @@ handle_process_condition_command()
 			do_change_alt();
 			break;
 
-	/*	case MAV_CMD_NAV_LAND_OPTIONS:	//    TODO - Add the command or equiv to MAVLink (repair in verify_condition() also)
-			gcs_send_text_P(SEVERITY_LOW,PSTR("Landing options set"));
-
-			// pitch in deg, airspeed  m/s, throttle %, track WP 1 or 0
-			landing_pitch 		= next_nav_command.lng * 100;
-			g.airspeed_cruise   =  next_nav_command.alt * 100;
-			g.throttle_cruise   = next_nav_command.lat;
-			landing_distance 	= next_nav_command.p1;
-
-			SendDebug_P("MSG: throttle_cruise = ");
-			SendDebugln(g.throttle_cruise,DEC);
-			break;
-	*/
-
 		default:
 			break;
 	}
@@ -413,8 +399,9 @@ static void do_wait_delay()
 
 static void do_change_alt()
 {
-	condition_rate		= next_nonnav_command.lat;
+	condition_rate		= abs((int)next_nonnav_command.lat);
 	condition_value 	= next_nonnav_command.alt;
+	if(condition_value < current_loc.alt) condition_rate = -condition_rate;
 	target_altitude		= current_loc.alt + (condition_rate / 10);		// Divide by ten for 10Hz update
 	next_WP.alt 		= condition_value;								// For future nav calculations
 	offset_altitude 	= 0;											// For future nav calculations

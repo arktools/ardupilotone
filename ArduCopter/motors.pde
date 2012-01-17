@@ -121,6 +121,8 @@ static void init_disarm_motors()
 	motor_armed 	= false;
 	compass.save_offsets();
 
+	g.throttle_cruise.save();
+
 	// we are not in the air
 	takeoff_complete = false;
 
@@ -142,3 +144,18 @@ set_servos_4()
 		output_motors_disarmed();
 	}
 }
+
+int ch_of_mot( int mot ) {
+  switch (mot) {
+    case 1: return MOT_1;
+    case 2: return MOT_2;
+    case 3: return MOT_3;
+    case 4: return MOT_4;
+    case 5: return MOT_5;
+    case 6: return MOT_6;
+    case 7: return MOT_7;
+    case 8: return MOT_8;
+  }
+  return (-1);
+}
+

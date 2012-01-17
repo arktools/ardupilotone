@@ -18,6 +18,7 @@
 #define ROLL_PITCH_STABLE 	0
 #define ROLL_PITCH_ACRO 	1
 #define ROLL_PITCH_AUTO		2
+#define ROLL_PITCH_STABLE_OF	3
 
 #define THROTTLE_MANUAL 	0
 #define THROTTLE_HOLD 		1
@@ -105,6 +106,10 @@
 #define HIL_MODE_ATTITUDE			1
 #define HIL_MODE_SENSORS			2
 
+#define ASCENDING			1
+#define DESCENDING			-1
+#define REACHED_ALT			0
+
 // Auto Pilot modes
 // ----------------
 #define STABILIZE 0			// hold level position
@@ -154,6 +159,10 @@
 #define CH6_THR_HOLD_KP 14
 #define CH6_Z_GAIN 15
 #define CH6_DAMP 16
+
+// optical flow controller
+#define CH6_OPTFLOW_KP 17
+#define CH6_OPTFLOW_KI 18
 
 
 // nav byte mask
@@ -316,15 +325,8 @@ enum gcs_severity {
 #define AN14  68 // NC
 #define AN15  69 // NC
 
-#define VOLTAGE_PIN_0 0 // These are the pins for current sensor: voltage
-#define CURRENT_PIN_1 1 // and current
-
 #define RELAY_PIN 47
 
-#define BATTERY_PIN1 0		        // These are the pins for the voltage dividers
-#define BATTERY_PIN2 1
-#define BATTERY_PIN3 2
-#define BATTERY_PIN4 3
 #define PIEZO_PIN AN5           //Last pin on the back ADC connector
 
 

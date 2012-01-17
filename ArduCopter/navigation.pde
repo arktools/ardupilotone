@@ -44,37 +44,41 @@ static void calc_XY_velocity(){
 	// used for estimations below 1.5m/s
 	// our GPS is about 1m per
 	static int32_t last_longitude = 0;
-	static int32_t last_latutude  = 0;
+	static int32_t last_latitude  = 0;
+
+	//static int16_t x_speed_old = 0;
+	//static int16_t y_speed_old = 0;
 
 	// y_GPS_speed positve = Up
 	// x_GPS_speed positve = Right
 
 	// this speed is ~ in cm because we are using 10^7 numbers from GPS
 	float tmp = 1.0/dTnav;
-	//int8_t tmp = 5;
 
-	int16_t	x_diff	= (g_gps->longitude - last_longitude) * tmp;
-	int16_t	y_diff	= (g_gps->latitude  - last_latutude) * tmp;
+	// straightforward approach:
+	///*
+	int16_t	x_estimate	= (float)(g_gps->longitude - last_longitude) * tmp;
+	int16_t	y_estimate	= (float)(g_gps->latitude  - last_latitude)  * tmp;
 
-	// filter
-	x_GPS_speed = (x_GPS_speed * 3 + x_diff) / 4;
-	y_GPS_speed = (y_GPS_speed * 3 + y_diff) / 4;
+	// slight averaging filter
+	x_GPS_speed = (x_GPS_speed  + x_estimate) >> 1;
+	y_GPS_speed = (y_GPS_speed  + y_estimate) >> 1;
+	//*/
 
-	// Above simply works better than GPS groundspeed
-	// which is proving to be problematic
+	/*
+	// Ryan Beall's forward estimator:
+	int16_t	x_speed_new = (float)(g_gps->longitude - last_longitude) * tmp;
+	int16_t	y_speed_new = (float)(g_gps->latitude  - last_latitude)  * tmp;
 
-	/*if(g_gps->ground_speed > 120){
-		// Derive X/Y speed from GPS
-		// this is far more accurate when traveling about 1.5m/s
-		float temp		= g_gps->ground_course * RADX100;
-		x_GPS_speed 	= sin(temp) * (float)g_gps->ground_speed;
-		y_GPS_speed 	= cos(temp) * (float)g_gps->ground_speed;
-	}*/
+	x_GPS_speed 	= x_speed_new + (x_speed_new - x_speed_old);
+	y_GPS_speed 	= y_speed_new + (y_speed_new - y_speed_old);
+
+	x_speed_old 	= x_speed_new;
+	y_speed_old 	= y_speed_new;
+	*/
 
 	last_longitude 	= g_gps->longitude;
-	last_latutude 	= g_gps->latitude;
-
-	//Serial.printf("GS: %d  \tx:%d \ty:%d\n", g_gps->ground_speed, x_GPS_speed, y_GPS_speed);
+	last_latitude 	= g_gps->latitude;
 }
 
 static void calc_location_error(struct Location *next_loc)
@@ -95,9 +99,68 @@ static void calc_location_error(struct Location *next_loc)
 	lat_error	= next_loc->lat - current_loc.lat;							// 500 - 0 = 500 Go North
 }
 
+/*
+//static void calc_loiter3(int x_error, int y_error)
+{
+	static int32_t	gps_lat_I = 0;
+	static int32_t	gps_lon_I = 0;
+
+	// If close to goal <1m reset the I term
+	if (abs(x_error) < 50)
+		gps_lon_I = 0;
+	if (abs(y_error) < 50)
+		gps_lat_I = 0;
+
+	gps_lon_I += x_error;
+	gps_lat_I += y_error;
+
+	gps_lon_I = constrain(gps_lon_I,-3000,3000);
+	gps_lat_I = constrain(gps_lat_I,-3000,3000);
+
+	int16_t lon_P = 1.2 	* (float)x_error;
+	int16_t lon_I = 0.1 	* (float)gps_lon_I;  //.1
+	int16_t lon_D = 3 		* x_GPS_speed ; // this controls the small bumps
+
+	int16_t lat_P = 1.2 	* (float)y_error;
+	int16_t lat_I = 0.1 	* (float)gps_lat_I;
+	int16_t lat_D = 3 		* y_GPS_speed ;
+
+	//limit of terms
+	lon_I = constrain(lon_I,-3000,3000);
+	lat_I = constrain(lat_I,-3000,3000);
+	lon_D = constrain(lon_D,-500,500);  //this controls the long distance dampimg
+	lat_D = constrain(lat_D,-500,500);  //this controls the long distance dampimg
+
+	nav_lon 	= lon_P  + lon_I - lon_D;
+	nav_lat 	= lat_P  + lat_I - lat_D;
+
+	Serial.printf("%d, %d, %d, %d, %d, %d\n",
+				lon_P, lat_P,
+				lon_I, lat_I,
+				lon_D, lat_D);
+
+}
+*/
 
 #define NAV_ERR_MAX 800
 static void calc_loiter(int x_error, int y_error)
+{
+	int16_t lon_PI 	= g.pi_loiter_lon.get_pi(x_error, dTnav);
+	int16_t lon_D 	= 3 * x_actual_speed ; // this controls the small bumps
+
+	int16_t lat_PI 	= g.pi_loiter_lat.get_pi(y_error, dTnav);
+	int16_t lat_D 	= 3 * y_actual_speed ;
+
+	//limit of terms
+	lon_D = constrain(lon_D,-500,500);
+	lat_D = constrain(lat_D,-500,500);
+
+	nav_lon		= constrain(lon_PI - lon_D, -2500, 2500);
+	nav_lat		= constrain(lat_PI - lat_D, -2500, 2500);
+}
+
+
+static void calc_loiter1(int x_error, int y_error)
 {
 	// East/West
 	x_error 				= constrain(x_error, -NAV_ERR_MAX, NAV_ERR_MAX);	//800
@@ -193,65 +256,6 @@ static void calc_loiter_pitch_roll()
 
 	// flip pitch because forward is negative
 	nav_pitch = -nav_pitch;
-}
-
-// what's the update rate? 10hz GPS?
-static void calc_wind_compensation()
-{
-	// this idea is a function that converts user input into I term for position hold
-	// the concept is simple. The iterms always act upon flight no matter what mode were in.
-	// when our velocity is 0, we call this function to update our iterms
-	// otherwise we slowly reduce out iterms to 0
-
-	// take the pitch and roll of the copter and,
-	float roll 	=  dcm.roll_sensor;
-	float pitch = -dcm.pitch_sensor; // flip pitch to make positive pitch forward
-
-	// rotate it to eliminate yaw of Copter
-	int32_t roll_tmp 	= roll *  sin_yaw_y  - pitch * -cos_yaw_x;
-	int32_t pitch_tmp 	= roll * -cos_yaw_x  + pitch *  sin_yaw_y;
-
-	roll_tmp  = constrain(roll_tmp, -2000, 2000);
-	pitch_tmp = constrain(pitch_tmp, -2000, 2000);
-
-	// filter the input and apply it to out integrator value
-	// nav_lon and nav_lat will be applied to normal flight
-	nav_lon = ((int32_t)g.pi_loiter_lon.get_integrator() * 15 + roll_tmp) / 16;
-	nav_lat = ((int32_t)g.pi_loiter_lat.get_integrator() * 15 + pitch_tmp) / 16;
-
-	// save smoothed input to integrator
-	g.pi_loiter_lon.set_integrator(nav_lon);		// X
-	g.pi_loiter_lat.set_integrator(nav_lat);		// Y
-
-	//Serial.printf("build wind iterm X:%d  Y:%d, r:%d, p:%d\n",
-	//				nav_lon,
-	//				nav_lat,
-	//				nav_roll,
-	//				nav_pitch);
-}
-
-static void reduce_wind_compensation()
-{
-	//slow degradation of iterms
-	float tmp;
-
-	tmp = g.pi_loiter_lon.get_integrator();
-	tmp *= .98;
-	g.pi_loiter_lon.set_integrator(tmp);		// X
-
-	tmp = g.pi_loiter_lat.get_integrator();
-	tmp *= .98;
-	g.pi_loiter_lat.set_integrator(tmp);		// Y
-
-#if 0
-	// debug
-	int16_t t1 = g.pi_loiter_lon.get_integrator();
-	int16_t t2 = g.pi_loiter_lon.get_integrator();
-
-	//Serial.printf("reduce wind iterm X:%d  Y:%d \n",
-	//				t1,
-	//				t2);
-#endif
 }
 
 static int16_t calc_desired_speed(int16_t max_speed)
@@ -351,11 +355,117 @@ static void update_crosstrack(void)
 	}
 }
 
-
 static int32_t get_altitude_error()
 {
+	// Next_WP alt is our target alt
+	// It changes based on climb rate
+	// until it reaches the target_altitude
 	return next_WP.alt - current_loc.alt;
 }
+
+static void clear_new_altitude()
+{
+	alt_change_flag = REACHED_ALT;
+}
+
+static void set_new_altitude(int32_t _new_alt)
+{
+	// just to be clear
+	next_WP.alt = current_loc.alt;
+
+	// for calculating the delta time
+	alt_change_timer = millis();
+
+	// save the target altitude
+	target_altitude = _new_alt;
+
+	// reset our altitude integrator
+	alt_change = 0;
+
+	// save the original altitude
+	original_altitude = current_loc.alt;
+
+	// to decide if we have reached the target altitude
+	if(target_altitude > original_altitude){
+		// we are below, going up
+		alt_change_flag = ASCENDING;
+		Serial.printf("go up\n");
+	}else if(target_altitude < original_altitude){
+		// we are above, going down
+		alt_change_flag = DESCENDING;
+		Serial.printf("go down\n");
+	}else{
+		// No Change
+		alt_change_flag = REACHED_ALT;
+		Serial.printf("reached alt\n");
+	}
+
+	//Serial.printf("new alt: %d Org alt: %d\n", target_altitude, original_altitude);
+}
+
+static int32_t get_new_altitude()
+{
+	// returns a new next_WP.alt
+
+	if(alt_change_flag == ASCENDING){
+		// we are below, going up
+		if(current_loc.alt >=  target_altitude){
+			alt_change_flag = REACHED_ALT;
+		}
+
+		// we shouldn't command past our target
+		if(next_WP.alt >=  target_altitude){
+			return target_altitude;
+		}
+	}else if (alt_change_flag == DESCENDING){
+		// we are above, going down
+		if(current_loc.alt <=  target_altitude)
+			alt_change_flag = REACHED_ALT;
+
+		// we shouldn't command past our target
+		if(next_WP.alt <=  target_altitude){
+			return target_altitude;
+		}
+	}
+
+	// if we have reached our target altitude, return the target alt
+	if(alt_change_flag == REACHED_ALT){
+		return target_altitude;
+	}
+
+	int32_t diff 	= abs(next_WP.alt - target_altitude);
+	int8_t			_scale 	= 3;
+
+	if (next_WP.alt < target_altitude){
+		// we are below the target alt
+		if(diff < 200){
+			_scale = 5;
+		} else {
+			_scale = 4;
+		}
+	}else {
+		// we are above the target, going down
+		if(diff < 600){
+			_scale = 4;
+		}
+		if(diff < 300){
+			_scale = 5;
+		}
+	}
+
+	int32_t change = (millis() - alt_change_timer) >> _scale;
+
+	if(alt_change_flag == ASCENDING){
+		alt_change += change;
+	}else{
+		alt_change -= change;
+	}
+	// for generating delta time
+	alt_change_timer = millis();
+
+	return original_altitude + alt_change;
+}
+
 
 static int32_t wrap_360(int32_t error)
 {

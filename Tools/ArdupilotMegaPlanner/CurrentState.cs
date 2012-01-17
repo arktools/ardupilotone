@@ -138,7 +138,7 @@ namespace ArdupilotMega
         //battery
         public float battery_voltage { get { return _battery_voltage; } set { _battery_voltage = value / 1000; } }
         private float _battery_voltage;
-        public float battery_remaining { get { return _battery_remaining; } set { _battery_remaining = value / 1000; if (_battery_remaining < 0) _battery_remaining = 0; } }
+        public float battery_remaining { get { return _battery_remaining; } set { _battery_remaining = value / 1000; if (_battery_remaining < 0 || _battery_remaining > 100) _battery_remaining = 0; } }
         private float _battery_remaining;
 
         // HIL
@@ -361,6 +361,9 @@ namespace ArdupilotMega
                                 case (byte)(Common.ac2modes.CIRCLE):
                                     mode = "Circle";
                                     break;
+                                        case (byte)(Common.ac2modes.LAND):
+                            mode = "Land";
+                            break;
                                 default:
                                     mode = "Unknown";
                                     break;
@@ -392,7 +395,7 @@ namespace ArdupilotMega
 
                     //MAVLink.packets[ArdupilotMega.MAVLink.MAVLINK_MSG_ID_SYS_STATUS] = null;
                 }
-				#else
+#else
 
                 if (mavinterface.packets[ArdupilotMega.MAVLink.MAVLINK_MSG_ID_SYS_STATUS] != null)
                 {
@@ -439,6 +442,9 @@ namespace ArdupilotMega
                             break;
                         case (byte)(100 + Common.ac2modes.CIRCLE):
                             mode = "Circle";
+                            break;
+                        case (byte)(100 + Common.ac2modes.LAND):
+                            mode = "Land";
                             break;
                         case (byte)(100 + Common.ac2modes.POSITION):
                             mode = "Position";

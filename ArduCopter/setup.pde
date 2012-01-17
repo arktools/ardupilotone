@@ -271,7 +271,7 @@ setup_flightmodes(uint8_t argc, const Menu::arg *argv)
 {
 	byte _switchPosition = 0;
 	byte _oldSwitchPosition = 0;
-	byte mode = 0;
+	int8_t mode = 0;
 
 	Serial.printf_P(PSTR("\nMode switch to edit, aileron: select modes, rudder: Simple on/off\n"));
 	print_hit_enter();
@@ -395,7 +395,7 @@ setup_batt_monitor(uint8_t argc, const Menu::arg *argv)
 		g.battery_monitoring.set_and_save(argv[1].i);
 
 	} else {
-		Serial.printf_P(PSTR("\nOp: off, 1-4"));
+		Serial.printf_P(PSTR("\nOp: off, 3-4"));
 	}
 
 	report_batt_monitor();
@@ -778,8 +778,6 @@ static void report_batt_monitor()
 	Serial.printf_P(PSTR("\nBatt Mon:\n"));
 	print_divider();
 	if(g.battery_monitoring == 0)	print_enabled(false);
-	if(g.battery_monitoring == 1)	Serial.printf_P(PSTR("3c"));
-	if(g.battery_monitoring == 2)	Serial.printf_P(PSTR("4c"));
 	if(g.battery_monitoring == 3)	Serial.printf_P(PSTR("volts"));
 	if(g.battery_monitoring == 4)	Serial.printf_P(PSTR("volts and cur"));
 	print_blanks(2);
@@ -1102,16 +1100,16 @@ init_esc()
 		read_radio();
 		delay(100);
 		dancing_light();
-		APM_RC.OutputCh(CH_1, g.rc_3.radio_in);
-		APM_RC.OutputCh(CH_2, g.rc_3.radio_in);
-		APM_RC.OutputCh(CH_3, g.rc_3.radio_in);
-		APM_RC.OutputCh(CH_4, g.rc_3.radio_in);
-		APM_RC.OutputCh(CH_7, g.rc_3.radio_in);
-		APM_RC.OutputCh(CH_8, g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_1, g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_2, g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_3, g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_4, g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_5, g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_6, g.rc_3.radio_in);
 
 		#if FRAME_CONFIG ==	OCTA_FRAME
-		APM_RC.OutputCh(CH_10,   g.rc_3.radio_in);
-		APM_RC.OutputCh(CH_11,   g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_7,   g.rc_3.radio_in);
+		APM_RC.OutputCh(MOT_8,   g.rc_3.radio_in);
 		#endif
 
 	}

@@ -50,7 +50,7 @@ def takeoff(mavproxy, mav, alt_min = 30):
     '''takeoff get to 30m altitude'''
     mavproxy.send('switch 6\n') # stabilize mode
     wait_mode(mav, 'STABILIZE')
-    mavproxy.send('rc 3 1500\n')
+    mavproxy.send('rc 3 1510\n')
     m = mav.recv_match(type='VFR_HUD', blocking=True)
     if (m.alt < alt_min):
         wait_altitude(mav, alt_min, (alt_min + 5))
@@ -168,7 +168,7 @@ def fly_RTL(mavproxy, mav, side=60):
     print("# Enter RTL")
     mavproxy.send('switch 3\n')
     tstart = time.time()
-    while time.time() < tstart + 120:
+    while time.time() < tstart + 200:
         m = mav.recv_match(type='VFR_HUD', blocking=True)
         pos = current_location(mav)
         #delta = get_distance(start, pos)
@@ -208,7 +208,7 @@ def fly_simple(mavproxy, mav, side=60, timeout=120):
     '''fly Simple, flying N then E'''
     mavproxy.send('switch 6\n')
     wait_mode(mav, 'STABILIZE')
-    mavproxy.send('rc 3 1430\n')
+    mavproxy.send('rc 3 1440\n')
     tstart = time.time()
     failed = False
 
@@ -246,7 +246,7 @@ def land(mavproxy, mav, timeout=60):
     mavproxy.send('switch 2\n')
     wait_mode(mav, 'LAND')
     print("Entered Landing Mode")
-    ret = wait_altitude(mav, -5, 5)
+    ret = wait_altitude(mav, -5, 1)
     print("LANDING: ok= %s" % ret)
     return ret
 
@@ -374,8 +374,9 @@ def fly_ArduCopter(viewerip=None):
         os.unlink(buildlog)
     os.link(logfile, buildlog)
 
-    mavproxy.expect('Received [0-9]+ parameters')
-    mavproxy.expect("Ready to FLY")
+    # the received parameters can come before or after the ready to fly message
+    mavproxy.expect(['Received [0-9]+ parameters', 'Ready to FLY'])
+    mavproxy.expect(['Received [0-9]+ parameters', 'Ready to FLY'])
 
     util.expect_setup_callback(mavproxy, expect_callback)
 
@@ -436,8 +437,8 @@ def fly_ArduCopter(viewerip=None):
             failed = True
 
         # Loiter for 30 seconds
-        print("# Loiter for 30 seconds")
-        if not loiter(mavproxy, mav, 30):
+        print("# Loiter for 45 seconds")
+        if not loiter(mavproxy, mav, 45):
             print("loiter failed")
             failed = True
 

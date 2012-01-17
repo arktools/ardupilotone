@@ -257,18 +257,24 @@ namespace ArdupilotMega.GCSViews
                         {
                             System.Diagnostics.ProcessStartInfo _procstartinfo = new System.Diagnostics.ProcessStartInfo();
                             _procstartinfo.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
-                            _procstartinfo.Arguments = "--realtime --suspend --nice --simulation-rate=50 --logdirectivefile=jsbsim/fgout.xml --script=jsbsim/rascal_test.xml";
+                            _procstartinfo.Arguments = "--realtime --suspend --nice --simulation-rate=1000 --logdirectivefile=jsbsim/fgout.xml --script=jsbsim/rascal_test.xml";
                             _procstartinfo.FileName = "JSBSim.exe";
                             // Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar +
 
                             _procstartinfo.UseShellExecute = true;
+                            //_procstartinfo.RedirectStandardOutput = true;
+                            
 
                             System.Diagnostics.Process.Start(_procstartinfo);
 
+                            System.Threading.Thread.Sleep(2000);
+
                             SITLSEND = new UdpClient(simIP, 5501);
+
+                            SetupTcpJSBSim(); // old style
                         }
 
-                        SetupTcpJSBSim(); // old style
+
                         SetupUDPXplanes(); // fg udp style
                         SetupUDPMavLink(); // pass traffic - raw
                     }
@@ -543,11 +549,15 @@ namespace ArdupilotMega.GCSViews
                     udpdata = new byte[udpdata.Length];
                     try
                     {
-                        int recv = SimulatorRECV.ReceiveFrom(udpdata, ref Remote);
+                        while (SimulatorRECV.Available > 0)
+                        {
+                            int recv = SimulatorRECV.ReceiveFrom(udpdata, ref Remote);
 
-                        RECVprocess(udpdata, recv, comPort);
+                            RECVprocess(udpdata, recv, comPort);
+                        }
                     }
-                    catch (Exception ex) { OutputLog.AppendText("Xplanes Data Problem - You need DATA IN/OUT 3, 4, 17, 18, 19, 20\n" + ex.Message + "\n"); }
+                    catch (Exception ex) { //OutputLog.AppendText("Xplanes Data Problem - You need DATA IN/OUT 3, 4, 17, 18, 19, 20\n" + ex.Message + "\n");
+                    }
                 }
                 if (MavLink != null && MavLink.Client != null && MavLink.Client.Connected && MavLink.Available > 0)
                 {
@@ -583,7 +593,7 @@ namespace ArdupilotMega.GCSViews
 
                 if (hzcounttime.Second != DateTime.Now.Second)
                 {
-                                        //Console.WriteLine("SIM hz {0}", hzcount);
+//                                        Console.WriteLine("SIM hz {0}", hzcount);
                     hzcount = 0;
                     hzcounttime = DateTime.Now;
                 }
@@ -619,18 +629,23 @@ namespace ArdupilotMega.GCSViews
             {
                 JSBSimSEND = new TcpClient();
                 JSBSimSEND.Client.NoDelay = true;
-                JSBSimSEND.Connect(simIP, simPort);
+                JSBSimSEND.Connect("127.0.0.1", simPort);
                 OutputLog.AppendText("Sending to port TCP " + simPort + " (planner->sim)\n");
 
-                System.Threading.Thread.Sleep(2000);
+                //JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set position/h-agl-ft 0\r\n"));
 
-                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("info\n"));
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set position/lat-gc-deg " + MainV2.HomeLocation.Lat + "\r\n"));
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set position/long-gc-deg " + MainV2.HomeLocation.Lng + "\r\n"));
 
-                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set attitude/phi-rad 0\n"));
-                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set attitude/theta-rad 0\n"));
-                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("resume\n"));
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set attitude/phi-rad 0\r\n"));
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set attitude/theta-rad 0\r\n"));
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("set attitude/psi-rad 0\r\n"));
+
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("info\r\n"));
+
+                JSBSimSEND.Client.Send(System.Text.Encoding.ASCII.GetBytes("resume\r\n"));
             }
-            catch { }
+            catch { Console.WriteLine("JSB console fail"); }
         }
 
         private void SetupUDPXplanes()
@@ -645,84 +660,6 @@ namespace ArdupilotMega.GCSViews
         {
             // setup sender
             MavLink = new UdpClient("127.0.0.1", 14550);
-        }
-
-        /// <summary>
-        /// From http://code.google.com/p/gentlenav/source/browse/trunk/Tools/XP_UDB_HILSIM/utility.cpp
-        /// Converts from xplanes to fixed body ref
-        /// </summary>
-        /// <param name="x"></param>
-        /// <param name="y"></param>
-        /// <param name="z"></param>
-        /// <param name="alpha"></param>
-        /// <param name="beta"></param>
-        public static void FLIGHTtoBCBF(ref float x, ref float y, ref float z, float alpha, float beta)
-        {
-            ﻿float Ca = (float)Math.Cos(alpha);
-             float Cb = (float)Math.Cos(beta);
-             float Sa = (float)Math.Sin(alpha);
-             float Sb = (float)Math.Sin(beta);
-
-             float X_plane = (x * Ca * Cb) - (z * Sa * Cb) - (y * Sb);
-             float Y_plane = (z * Sa * Sb) - (x * Ca * Sb) - (y * Cb);
-             float Z_plane = (x * Sa) + (z * Ca);
-
-             x = X_plane;
-            ﻿y = Y_plane;
-            ﻿z = Z_plane;
-        }
-
-        void OGLtoBCBF(ref float x, ref float y, ref float z, float phi, float theta, float psi)
-        {
-            float x_NED, y_NED, z_NED;
-            float Cr, Cp, Cy;
-            float Sr, Sp, Sy;
-
-            //Accelerations in X-Plane are expressed in the local OpenGL reference frame, for whatever reason. 
-            //This coordinate system is defined as follows (taken from the X-Plane SDK Wiki):
-
-            //	The origin 0,0,0 is on the surface of the earth at sea level at some "reference point".
-            //	The +X axis points east from the reference point.
-            //	The +Z axis points south from the reference point.
-            //	The +Y axis points straight up away from the center of the earth at the reference point.
-
-            // First we shall convert from this East Up South frame, to a more conventional NED (North East Down) frame.
-            x_NED = -1.0f * z;
-            y_NED = x;
-            z_NED = -1.0f * y;
-
-            // Next calculate cos & sin of angles for use in the transformation matrix.
-            // r, p & y subscripts stand for roll pitch and yaw.
-
-            Cr = (float)Math.Cos(phi);
-            Cp = (float)Math.Cos(theta);
-            Cy = (float)Math.Cos(psi);
-            Sr = (float)Math.Sin(phi);
-            Sp = (float)Math.Sin(theta);
-            Sy = (float)Math.Sin(psi);
-
-            // Next we need to rotate our accelerations from the NED reference frame, into the body fixed reference frame
-
-            // THANKS TO GEORGE M SIOURIS WHOSE "MISSILE GUIDANCE AND CONTROL SYSTEMS" BOOK SEEMS TO BE THE ONLY EASY TO FIND REFERENCE THAT
-            // ACTUALLY GETS THE NED TO BODY FRAME ROTATION MATRIX CORRECT!!
-
-            // CpCy, CpSy, -Sp					| local_ax
-            // SrSpCy-CrSy, SrSpSy+CrCy, SrCp	| local_ay
-            // CrSpCy+SrSy, CrSpSy-SrCy, CrCp	| local_az
-
-            x = (x_NED * Cp * Cy) + (y_NED * Cp * Sy) - (z_NED * Sp);
-            y = (x_NED * ((Sr * Sp * Cy) - (Cr * Sy))) + (y_NED * ((Sr * Sp * Sy) + (Cr * Cy))) + (z_NED * Sr * Cp);
-            z = (x_NED * ((Cr * Sp * Cy) + (Sr * Sy))) + (y_NED * ((Cr * Sp * Sy) - (Sr * Cy))) + (z_NED * Cr * Cp);
-        }
-
-        double sin(double rad)
-        {
-            return Math.Sin(rad);
-        }
-
-        double cos(double rad)
-        {
-            return Math.Cos(rad);
         }
 
         float oldax =0, olday =0, oldaz = 0;
@@ -780,12 +717,24 @@ namespace ArdupilotMega.GCSViews
                     count += 36; // 8 * float
                 }
 
-                att.pitch = (DATA[18][0] * deg2rad);
-                att.roll = (DATA[18][1] * deg2rad);
-                att.yaw = (DATA[18][2] * deg2rad);
-                att.pitchspeed = (DATA[17][0]);
-                att.rollspeed = (DATA[17][1]);
-                att.yawspeed = (DATA[17][2]);
+                bool xplane9 = !CHK_xplane10.Checked;
+
+                if (xplane9)
+                {
+                    att.pitch = (DATA[18][0] * deg2rad);
+                    att.roll = (DATA[18][1] * deg2rad);
+                    att.yaw = (DATA[18][2] * deg2rad);
+                    att.pitchspeed = (DATA[17][0]);
+                    att.rollspeed = (DATA[17][1]);
+                    att.yawspeed = (DATA[17][2]);
+                } else {
+                    att.pitch = (DATA[17][0] * deg2rad);
+                    att.roll = (DATA[17][1] * deg2rad);
+                    att.yaw = (DATA[17][2] * deg2rad);
+                    att.pitchspeed = (DATA[16][0]);
+                    att.rollspeed = (DATA[16][1]);
+                    att.yawspeed = (DATA[16][2]);
+                }
 
                 TimeSpan timediff = DateTime.Now - oldtime;
 
@@ -796,10 +745,19 @@ namespace ArdupilotMega.GCSViews
                 //Console.WriteLine("{0:0.00000} {1:0.00000} {2:0.00000} \t {3:0.00000} {4:0.00000} {5:0.00000}", pdiff, rdiff, ydiff, DATA[17][0], DATA[17][1], DATA[17][2]);
 
                 oldatt = att;
+                if (xplane9)
+                {
+                    rdiff = DATA[17][1];
+                    pdiff = DATA[17][0];
+                    ydiff = DATA[17][2];
+                }
+                else
+                {
+                    rdiff = DATA[16][1];
+                    pdiff = DATA[16][0];
+                    ydiff = DATA[16][2];
 
-                rdiff = DATA[17][1];
-                pdiff = DATA[17][0];
-                ydiff = DATA[17][2];
+                }
 
                 Int16 xgyro = Constrain(rdiff * 1000.0, Int16.MinValue, Int16.MaxValue);
                 Int16 ygyro = Constrain(pdiff * 1000.0, Int16.MinValue, Int16.MaxValue);
@@ -1125,30 +1083,37 @@ namespace ArdupilotMega.GCSViews
 
             if (RAD_JSBSim.Checked && chkSensor.Checked)
             {
+                byte[] buffer = new byte[1500];
+                while (JSBSimSEND.Client.Available > 5)
+                {
+                    int read = JSBSimSEND.Client.Receive(buffer);
+                }
 
                 byte[] sitlout = new byte[16 * 8 + 1 * 4]; // 16 * double + 1 * int
                 int a = 0;
 
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.latitude), a, sitlout, a, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.longitude), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.latitude * rad2deg), a, sitlout, a, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.longitude * rad2deg), 0, sitlout, a += 8, 8);
                 Array.Copy(BitConverter.GetBytes((double)lastfdmdata.altitude), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.psi), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.v_north), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.v_east), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.A_X_pilot), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.A_Y_pilot), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.psi * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.v_north * ft2m), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.v_east * ft2m), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.A_X_pilot * ft2m), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.A_Y_pilot * ft2m), 0, sitlout, a += 8, 8);
 
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.A_Z_pilot), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.phidot), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.thetadot), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.psidot), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.phi), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.theta), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.psi), 0, sitlout, a += 8, 8);
-                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.vcas), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.A_Z_pilot * ft2m), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.phidot * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.thetadot * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.psidot * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.phi * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.theta * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.psi * rad2deg), 0, sitlout, a += 8, 8);
+                Array.Copy(BitConverter.GetBytes((double)lastfdmdata.vcas * ft2m), 0, sitlout, a += 8, 8);
+
+//                Console.WriteLine(lastfdmdata.theta);
 
                 Array.Copy(BitConverter.GetBytes((int)0x4c56414e), 0, sitlout, a += 8, 4);
-
+                
                 SITLSEND.Send(sitlout, sitlout.Length);
 
                 return;
@@ -1414,7 +1379,15 @@ namespace ArdupilotMega.GCSViews
                 {
                     if (RAD_softXplanes.Checked)
                     {
-                        updateScreenDisplay(DATA[20][0] * deg2rad, DATA[20][1] * deg2rad, DATA[20][2] * .3048, DATA[18][1] * deg2rad, DATA[18][0] * deg2rad, DATA[19][2] * deg2rad, DATA[18][2] * deg2rad, roll_out, pitch_out, rudder_out, throttle_out);
+
+                        bool xplane9 = !CHK_xplane10.Checked;
+                        if (xplane9)
+                        {
+                            updateScreenDisplay(DATA[20][0] * deg2rad, DATA[20][1] * deg2rad, DATA[20][2] * .3048, DATA[18][1] * deg2rad, DATA[18][0] * deg2rad, DATA[19][2] * deg2rad, DATA[18][2] * deg2rad, roll_out, pitch_out, rudder_out, throttle_out);
+                        } else {
+
+                            updateScreenDisplay(DATA[20][0] * deg2rad, DATA[20][1] * deg2rad, DATA[20][2] * .3048, DATA[17][1] * deg2rad, DATA[17][0] * deg2rad, DATA[18][2] * deg2rad, DATA[17][2] * deg2rad, roll_out, pitch_out, rudder_out, throttle_out);
+                        }
                     }
 
                     if (RAD_softFlightGear.Checked || RAD_JSBSim.Checked)
@@ -1538,7 +1511,7 @@ namespace ArdupilotMega.GCSViews
                 Array.Copy(BitConverter.GetBytes((float)(rudder_out * REV_rudder)), 0, Xplane, 53, 4);
                 Array.Copy(BitConverter.GetBytes((int)-999), 0, Xplane, 57, 4);
 
-                Array.Copy(BitConverter.GetBytes((float)(roll_out * REV_roll * 5)), 0, Xplane, 61, 4);
+                Array.Copy(BitConverter.GetBytes((float)(roll_out * REV_roll * 0.5)), 0, Xplane, 61, 4);
                 Array.Copy(BitConverter.GetBytes((int)-999), 0, Xplane, 65, 4);
                 Array.Copy(BitConverter.GetBytes((int)-999), 0, Xplane, 69, 4);
                 Array.Copy(BitConverter.GetBytes((int)-999), 0, Xplane, 73, 4);

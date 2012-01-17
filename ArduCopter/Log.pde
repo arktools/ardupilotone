@@ -308,7 +308,7 @@ static void Log_Read_Raw()
 	for (int y = 0; y < 6; y++) {
 		logvar = (float)DataFlash.ReadLong() / t7;
 		Serial.print(logvar);
-		Serial.print(comma);
+		Serial.print(",");
 	}
 	Serial.println(" ");
 }
@@ -321,9 +321,9 @@ static void Log_Write_Current()
 
 	DataFlash.WriteInt(g.rc_3.control_in);			// 1
 	DataFlash.WriteLong(throttle_integrator);		// 2
-	DataFlash.WriteInt(battery_voltage 	* 100.0);	// 3
-	DataFlash.WriteInt(current_amps 	* 100.0);	// 4
-	DataFlash.WriteInt(current_total);				// 5
+	DataFlash.WriteInt(battery_voltage1 	* 100.0);	// 3
+	DataFlash.WriteInt(current_amps1 	* 100.0);	// 4
+	DataFlash.WriteInt(current_total1);				// 5
 
 	DataFlash.WriteByte(END_BYTE);
 }
@@ -482,8 +482,12 @@ static void Log_Write_Optflow()
 	DataFlash.WriteInt((int)optflow.dx);
 	DataFlash.WriteInt((int)optflow.dy);
 	DataFlash.WriteInt((int)optflow.surface_quality);
+	DataFlash.WriteInt((int)optflow.x_cm);
+	DataFlash.WriteInt((int)optflow.y_cm);
 	DataFlash.WriteLong(optflow.vlat);//optflow_offset.lat + optflow.lat);
 	DataFlash.WriteLong(optflow.vlon);//optflow_offset.lng + optflow.lng);
+	DataFlash.WriteLong(of_roll);
+	DataFlash.WriteLong(of_pitch);
 	DataFlash.WriteByte(END_BYTE);
 	#endif
 }
@@ -495,15 +499,23 @@ static void Log_Read_Optflow()
 	int16_t temp1 	= DataFlash.ReadInt();			// 1
 	int16_t temp2 	= DataFlash.ReadInt();			// 2
 	int16_t temp3 	= DataFlash.ReadInt();			// 3
-	float temp4 	= DataFlash.ReadLong();			// 4
-	float temp5 	= DataFlash.ReadLong();			// 5
+	int16_t temp4 	= DataFlash.ReadInt();			// 4
+	int16_t temp5 	= DataFlash.ReadInt();			// 5
+	float temp6 	= DataFlash.ReadLong();			// 6
+	float temp7 	= DataFlash.ReadLong();			// 7
+	int32_t temp8 	= DataFlash.ReadLong();			// 8
+	int32_t temp9 	= DataFlash.ReadLong();			// 9
 
-	Serial.printf_P(PSTR("OF, %d, %d, %d, %4.7f, %4.7f\n"),
+	Serial.printf_P(PSTR("OF, %d, %d, %d, %d, %d, %4.7f, %4.7f, %d, %d\n"),
 			temp1,
 			temp2,
 			temp3,
 			temp4,
-			temp5);
+			temp5,
+			temp6,
+			temp7,
+			temp8,
+			temp9);
 	#endif
 }
 

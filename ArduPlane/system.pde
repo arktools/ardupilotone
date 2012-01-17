@@ -188,6 +188,7 @@ static void init_ardupilot()
         } else {
             dcm.set_compass(&compass);
             compass.get_offsets();						// load offsets to account for airframe magnetic interference
+            compass.null_offsets_enable();
         }
 	}
 #endif

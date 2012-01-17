@@ -178,6 +178,8 @@ public:
 	k_param_pi_throttle,
 	k_param_pi_acro_roll,
 	k_param_pi_acro_pitch,
+	k_param_pi_optflow_roll,
+	k_param_pi_optflow_pitch,  // 250
 
 
     // 254,255: reserved
@@ -196,7 +198,7 @@ public:
 	AP_Int16	RTL_altitude;
 	AP_Int8		sonar_enabled;
 	AP_Int8		sonar_type;   // 0 = XL, 1 = LV, 2 = XLL (XL with 10m range)
-	AP_Int8		battery_monitoring;	// 0=disabled, 1=3 cell lipo, 2=4 cell lipo, 3=total voltage only, 4=total voltage and current
+	AP_Int8		battery_monitoring;	// 0=disabled, 3=voltage only, 4=voltage and current
 	AP_Int16	pack_capacity;		// Battery pack capacity less reserve
 	AP_Int8		compass_enabled;
     AP_Int8		optflow_enabled;
@@ -297,6 +299,9 @@ public:
 
 	APM_PI		pi_acro_roll;
 	APM_PI		pi_acro_pitch;
+
+	APM_PI		pi_optflow_roll;
+	APM_PI		pi_optflow_pitch;
 
 	uint8_t		junk;
 
@@ -416,6 +421,9 @@ public:
 
 	pi_acro_roll		(k_param_pi_acro_roll,			PSTR("ACRO_RLL_"),	ACRO_ROLL_P,		ACRO_ROLL_I,		ACRO_ROLL_IMAX * 100),
 	pi_acro_pitch		(k_param_pi_acro_pitch,			PSTR("ACRO_PIT_"),	ACRO_PITCH_P,		ACRO_PITCH_I,		ACRO_PITCH_IMAX * 100),
+
+	pi_optflow_roll		(k_param_pi_optflow_roll,		PSTR("OF_RLL_"),	OPTFLOW_ROLL_P,		OPTFLOW_ROLL_I,		OPTFLOW_IMAX * 100),
+	pi_optflow_pitch	(k_param_pi_optflow_pitch,		PSTR("OF_PIT_"),	OPTFLOW_PITCH_P,	OPTFLOW_PITCH_I,	OPTFLOW_IMAX * 100),
 
 	junk(0)		// XXX just so that we can add things without worrying about the trailing comma
 	{
