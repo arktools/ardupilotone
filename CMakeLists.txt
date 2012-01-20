@@ -23,7 +23,7 @@ set(APPLICATION_VERSION_MINOR "2")
 set(APPLICATION_VERSION_PATCH "0")
 
 # dependencies
-find_package(Arduino 22 REQUIRED)
+find_package(Arduino 1.0 REQUIRED)
 
 # cmake settigns
 set(APPLICATION_NAME ${PROJECT_NAME})
@@ -70,7 +70,7 @@ set(CPACK_GENERATOR "ZIP")
 set(CPACK_PACKAGE_NAME "${APPLICATION_NAME}_${BOARD}")
 include(CPack)
 
-find_package(Arduino 22 REQUIRED)
+find_package(Arduino 1.0 REQUIRED)
 
 # determine board being used
 if (NOT DEFINED BOARD)
