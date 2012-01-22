@@ -575,6 +575,7 @@ find_program(ARDUINO_AVRDUDE_PROGRAM
     NAMES avrdude
     PATHS ${ARDUINO_SDK_PATH}
     PATH_SUFFIXES hardware/tools
+		  hardware/tools/avr/bin
     NO_DEFAULT_PATH) 
 
 find_file(ARDUINO_AVRDUDE_CONFIG_PATH
