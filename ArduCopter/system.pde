@@ -104,6 +104,17 @@ static void init_ardupilot()
                     memcheck_available_memory());
 
 	//
+	// Initialize Wire and SPI libraries
+	//
+#ifndef DESKTOP_BUILD
+    I2c.begin();
+    I2c.timeOut(5);
+    // initially set a fast I2c speed, and drop it on first failures
+    I2c.setSpeed(true);
+#endif
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
+	//
 	// Initialize the isr_registry.
 	//
     isr_registry.init();
@@ -164,33 +175,11 @@ static void init_ardupilot()
 		delay(100); // wait for serial send
 		AP_Var::erase_all();
 
-		// erase DataFlash on format version change
-		#if LOGGING_ENABLED == ENABLED
-		DataFlash.Init();
-		erase_logs(NULL, NULL);
-		#endif
-
 		// save the new format version
 		g.format_version.set_and_save(Parameters::k_format_version);
 
 		// save default radio values
 		default_dead_zones();
-
-		Serial.printf_P(PSTR("Please Run Setup...\n"));
-		while (true) {
-			delay(1000);
-			if(motor_light){
-				digitalWrite(A_LED_PIN, LED_ON);
-				digitalWrite(B_LED_PIN, LED_ON);
-				digitalWrite(C_LED_PIN, LED_ON);
-			}else{
-				digitalWrite(A_LED_PIN, LED_OFF);
-				digitalWrite(B_LED_PIN, LED_OFF);
-				digitalWrite(C_LED_PIN, LED_OFF);
-			}
-			motor_light = !motor_light;
-		}
-
 	}else{
 		// save default radio values
 		//default_dead_zones();
@@ -216,6 +205,20 @@ static void init_ardupilot()
 
     // identify ourselves correctly with the ground station
 	mavlink_system.sysid = g.sysid_this_mav;
+
+#if LOGGING_ENABLED == ENABLED
+    DataFlash.Init();
+    if (!DataFlash.CardInserted()) {
+        gcs_send_text_P(SEVERITY_LOW, PSTR("No dataflash inserted"));
+        g.log_bitmask.set(0);
+    } else if (DataFlash.NeedErase()) {
+        gcs_send_text_P(SEVERITY_LOW, PSTR("ERASING LOGS"));
+		do_erase_logs();
+    }
+	if (g.log_bitmask != 0){
+		DataFlash.start_new_log();
+	}
+#endif
 
 	#ifdef RADIO_OVERRIDE_DEFAULTS
 	{
@@ -244,11 +247,7 @@ static void init_ardupilot()
         adc.Init(&timer_scheduler);       // APM ADC library initialization
 #endif // CONFIG_ADC
 
-#if CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
-        barometer.Init(1, true);
-#else
-        barometer.Init(1, false);
-#endif // CONFIG_APM_HARDWARE
+        barometer.init(&timer_scheduler);
 
 #endif // HIL_MODE
 
@@ -260,21 +259,16 @@ static void init_ardupilot()
 	if(g.compass_enabled)
 		init_compass();
 
-	#ifdef OPTFLOW_ENABLED
 	// init the optical flow sensor
 	if(g.optflow_enabled) {
 		init_optflow();
 	}
-	#endif
+
 
 // agmatthews USERHOOKS
 #ifdef USERHOOK_INIT
    USERHOOK_INIT
 #endif
-
-	#if LOGGING_ENABLED == ENABLED
-	DataFlash.Init();
-	#endif
 
 #if CLI_ENABLED == ENABLED && CLI_SLIDER_ENABLED == ENABLED
 	// If the switch is in 'menu' mode, run the main menu.
@@ -291,14 +285,6 @@ static void init_ardupilot()
 #else
     Serial.printf_P(PSTR("\nPress ENTER 3 times for CLI\n\n"));
 #endif // CLI_ENABLED
-
-	#if LOGGING_ENABLED == ENABLED
-	if(g.log_bitmask != 0){
-		//	TODO - Here we will check  on the length of the last log
-		//  We don't want to create a bunch of little logs due to powering on and off
-		start_new_log();
-	}
-	#endif
 
     GPS_enabled = false;
 
@@ -334,6 +320,11 @@ static void init_ardupilot()
 	init_barometer();
 	#endif
 
+	// initialise sonar
+	#if CONFIG_SONAR == ENABLED
+	init_sonar();
+	#endif
+
 	// initialize commands
 	// -------------------
 	init_commands();
@@ -352,7 +343,7 @@ static void init_ardupilot()
 
 	// init the Z damopener
 	// --------------------
-	#if ACCEL_ALT_HOLD == 1
+	#if ACCEL_ALT_HOLD != 0
 	init_z_damper();
 	#endif
 
@@ -370,6 +361,30 @@ static void init_ardupilot()
 	SendDebug("\nReady to FLY ");
 }
 
+/*
+  reset all I integrators
+ */
+static void reset_I_all(void)
+{
+	g.pi_rate_roll.reset_I();
+	g.pi_rate_pitch.reset_I();
+	g.pi_rate_yaw.reset_I();
+	g.pi_stabilize_roll.reset_I();
+	g.pi_stabilize_pitch.reset_I();
+	g.pi_stabilize_yaw.reset_I();
+	g.pi_loiter_lat.reset_I();
+	g.pi_loiter_lon.reset_I();
+	g.pi_nav_lat.reset_I();
+	g.pi_nav_lon.reset_I();
+	g.pi_alt_hold.reset_I();
+	g.pi_throttle.reset_I();
+	g.pi_acro_roll.reset_I();
+	g.pi_acro_pitch.reset_I();
+	g.pi_optflow_roll.reset_I();
+	g.pi_optflow_pitch.reset_I();
+}
+
+
 //********************************************************************************
 //This function does all the calibrations, etc. that we need during a ground start
 //********************************************************************************
@@ -380,7 +395,7 @@ static void startup_ground(void)
 	#if HIL_MODE != HIL_MODE_ATTITUDE
 		// Warm up and read Gyro offsets
 		// -----------------------------
-		imu.init(IMU::COLD_START, mavlink_delay, &timer_scheduler);
+        imu.init(IMU::COLD_START, mavlink_delay, flash_leds, &timer_scheduler);
 		#if CLI_ENABLED == ENABLED
 			report_imu();
 		#endif
@@ -389,6 +404,10 @@ static void startup_ground(void)
 	// reset the leds
 	// ---------------------------
 	clear_leds();
+
+    // when we re-calibrate the gyros, all previous I values now
+    // make no sense
+    reset_I_all();
 }
 
 /*
@@ -409,15 +428,16 @@ static void startup_ground(void)
 
 static void set_mode(byte mode)
 {
-	if(control_mode == mode){
-		// don't switch modes if we are already in the correct mode.
-		return;
-	}
-
 	// if we don't have GPS lock
 	if(home_is_set == false){
 		// our max mode should be
 		if (mode > ALT_HOLD)
+			mode = STABILIZE;
+	}
+
+	// nothing but Loiter for OptFlow only
+	if (g.optflow_enabled && GPS_enabled == false){
+		if (mode > ALT_HOLD && mode != LOITER)
 			mode = STABILIZE;
 	}
 
@@ -432,6 +452,16 @@ static void set_mode(byte mode)
 	// clearing value used in interactive alt hold
 	manual_boost = 0;
 
+	// clearing value used to force the copter down in landing mode
+	landing_boost = 0;
+
+	// do not auto_land if we are leaving RTL
+	auto_land_timer = 0;
+
+	// if we change modes, we must clear landed flag
+	land_complete 	= false;
+
+	// debug to Serial terminal
 	Serial.println(flight_mode_strings[control_mode]);
 
 	// report the GPS and Motor arming status
@@ -443,6 +473,7 @@ static void set_mode(byte mode)
 			yaw_mode 		= YAW_ACRO;
 			roll_pitch_mode = ROLL_PITCH_ACRO;
 			throttle_mode 	= THROTTLE_MANUAL;
+			reset_rate_I();
 			break;
 
 		case STABILIZE:
@@ -456,7 +487,7 @@ static void set_mode(byte mode)
 			roll_pitch_mode = ALT_HOLD_RP;
 			throttle_mode 	= ALT_HOLD_THR;
 
-			next_WP = current_loc;
+			set_next_WP(&current_loc);
 			break;
 
 		case AUTO:
@@ -472,33 +503,37 @@ static void set_mode(byte mode)
 			yaw_mode 		= CIRCLE_YAW;
 			roll_pitch_mode = CIRCLE_RP;
 			throttle_mode 	= CIRCLE_THR;
-
-			next_WP 		= current_loc;
+			set_next_WP(&current_loc);
+			circle_angle 	= 0;
 			break;
 
 		case LOITER:
 			yaw_mode 		= LOITER_YAW;
 			roll_pitch_mode = LOITER_RP;
 			throttle_mode 	= LOITER_THR;
-
-			next_WP 		= current_loc;
+			set_next_WP(&current_loc);
 			break;
 
 		case POSITION:
 			yaw_mode 		= YAW_HOLD;
 			roll_pitch_mode = ROLL_PITCH_AUTO;
 			throttle_mode 	= THROTTLE_MANUAL;
-
-			next_WP 		= current_loc;
+			set_next_WP(&current_loc);
 			break;
 
 		case GUIDED:
 			yaw_mode 		= YAW_AUTO;
 			roll_pitch_mode = ROLL_PITCH_AUTO;
 			throttle_mode 	= THROTTLE_AUTO;
-
-			next_WP = current_loc;
+			next_WP 		= current_loc;
 			set_next_WP(&guided_WP);
+			break;
+
+		case LAND:
+			yaw_mode 		= LOITER_YAW;
+			roll_pitch_mode = LOITER_RP;
+			throttle_mode 	= THROTTLE_AUTO;
+			do_land();
 			break;
 
 		case RTL:
@@ -513,19 +548,26 @@ static void set_mode(byte mode)
 			break;
 	}
 
+	if(failsafe){
+		// this is to allow us to fly home without interactive throttle control
+		throttle_mode = THROTTLE_AUTO;
+		// does not wait for us to be in high throttle, since the
+		// Receiver will be outputting low throttle
+		motor_auto_armed = true;
+	}
+
 	if(throttle_mode == THROTTLE_MANUAL){
 		// reset all of the throttle iterms
-		g.pi_alt_hold.reset_I();
-		g.pi_throttle.reset_I();
-	}else { // an automatic throttle
-
+		update_throttle_cruise();
+	}else {
+		// an automatic throttle
 		// todo: replace with a throttle cruise estimator
 		init_throttle_cruise();
 	}
 
 	if(roll_pitch_mode <= ROLL_PITCH_ACRO){
 		// We are under manual attitude control
-		// reset out nav parameters
+		// removes the navigation from roll and pitch commands, but leaves the wind compensation
 		reset_nav();
 	}
 
@@ -551,33 +593,9 @@ static void set_failsafe(boolean mode)
 			// We've lost radio contact
 			// ------------------------
 			failsafe_on_event();
-
 		}
 	}
 }
-
-
-static void
-init_compass()
-{
-	compass.set_orientation(MAG_ORIENTATION);						// set compass's orientation on aircraft
-	dcm.set_compass(&compass);
-	compass.init();
-	compass.get_offsets();					// load offsets to account for airframe magnetic interference
-}
-
-#ifdef OPTFLOW_ENABLED
-static void
-init_optflow()
-{
-	if( optflow.init() == false ) {
-	    g.optflow_enabled = false;
-	    //SendDebug("\nFailed to Init OptFlow ");
-	}
-	optflow.set_orientation(OPTFLOW_ORIENTATION);			// set optical flow sensor's orientation on aircraft
-	optflow.set_field_of_view(OPTFLOW_FOV);					// set optical flow sensor's field of view
-}
-#endif
 
 static void
 init_simple_bearing()
@@ -585,15 +603,27 @@ init_simple_bearing()
 	initial_simple_bearing = dcm.yaw_sensor;
 }
 
+static void update_throttle_cruise()
+{
+	int16_t tmp = g.pi_alt_hold.get_integrator();
+	if(tmp != 0){
+		g.throttle_cruise += tmp;
+		g.pi_alt_hold.reset_I();
+		g.pi_throttle.reset_I();
+	}
+}
+
 static void
 init_throttle_cruise()
 {
+#if AUTO_THROTTLE_HOLD == 0
 	// are we moving from manual throttle to auto_throttle?
 	if((old_control_mode <= STABILIZE) && (g.rc_3.control_in > MINIMUM_THROTTLE)){
 		g.pi_throttle.reset_I();
 		g.pi_alt_hold.reset_I();
 		g.throttle_cruise.set_and_save(g.rc_3.control_in);
 	}
+#endif
 }
 
 #if CLI_SLIDER_ENABLED == ENABLED && CLI_ENABLED == ENABLED
@@ -638,3 +668,13 @@ static void check_usb_mux(void)
     }
 }
 #endif
+
+/*
+  called by gyro/accel init to flash LEDs so user
+  has some mesmerising lights to watch while waiting
+ */
+void flash_leds(bool on)
+{
+    digitalWrite(A_LED_PIN, on?LED_OFF:LED_ON);
+    digitalWrite(C_LED_PIN, on?LED_ON:LED_OFF);
+}

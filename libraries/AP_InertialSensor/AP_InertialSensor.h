@@ -1,3 +1,4 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #ifndef __AP_INERTIAL_SENSOR_H__
 #define __AP_INERTIAL_SENSOR_H__
@@ -10,9 +11,7 @@
 class AP_InertialSensor
 {
   public:
-  AP_InertialSensor() {}
-
-  virtual void init( AP_PeriodicProcess * scheduler ) = 0;
+  AP_InertialSensor(AP_PeriodicProcess * scheduler) {}
 
   /* Update the sensor data, so that getters are nonblocking.
    * Returns a bool of whether data was updated or not.

@@ -61,8 +61,11 @@ static void stabilize()
 
 	// Mix Stick input to allow users to override control surfaces
 	// -----------------------------------------------------------
-	if ((control_mode < FLY_BY_WIRE_A) || (ENABLE_STICK_MIXING == 1 && control_mode > FLY_BY_WIRE_B && failsafe == FAILSAFE_NONE)) {
-
+	if ((control_mode < FLY_BY_WIRE_A) ||
+        (ENABLE_STICK_MIXING == 1 &&
+         geofence_stickmixing() &&
+         control_mode > FLY_BY_WIRE_B &&
+         failsafe == FAILSAFE_NONE)) {
 
 		// TODO: use RC_Channel control_mix function?
 		ch1_inf = (float)g.channel_roll.radio_in - (float)g.channel_roll.radio_trim;
@@ -92,7 +95,10 @@ static void stabilize()
 	// stick mixing performed for rudder for all cases including FBW unless disabled for higher modes
 	// important for steering on the ground during landing
 	// -----------------------------------------------
-	if (control_mode <= FLY_BY_WIRE_B || (ENABLE_STICK_MIXING == 1 && failsafe == FAILSAFE_NONE)) {
+	if (control_mode <= FLY_BY_WIRE_B ||
+        (ENABLE_STICK_MIXING == 1 &&
+         geofence_stickmixing() &&
+         failsafe == FAILSAFE_NONE)) {
 		ch4_inf = (float)g.channel_rudder.radio_in - (float)g.channel_rudder.radio_trim;
 		ch4_inf = fabs(ch4_inf);
 		ch4_inf = min(ch4_inf, 400.0);
@@ -126,6 +132,11 @@ static void calc_throttle()
 {
   if (g.airspeed_enabled == false) {
 	int throttle_target = g.throttle_cruise + throttle_nudge;
+
+    // TODO: think up an elegant way to bump throttle when
+    // groundspeed_undershoot > 0 in the no airspeed sensor case; PID
+    // control?
+
 
 		// no airspeed sensor, we use nav pitch to determine the proper throttle output
 		// AUTO, RTL, etc
@@ -162,7 +173,7 @@ static void calc_nav_yaw(float speed_scaler)
 {
 #if HIL_MODE != HIL_MODE_ATTITUDE
 	Vector3f temp = imu.get_accel();
-	long error = -temp.y;
+	long error = (long)(-temp.y*100.0);
 
 	// Control is a feedforward from the aileron control + a PID to coordinate the turn (drive y axis accel to zero)
 	g.channel_rudder.servo_out = g.kff_rudder_mix * g.channel_roll.servo_out + g.pidServoRudder.get_pid(error, delta_ms_fast_loop, speed_scaler);
@@ -236,9 +247,8 @@ static void throttle_slew_limit()
 {
 	static int last = 1000;
 	if(g.throttle_slewrate) {		// if slew limit rate is set to zero then do not slew limit
-	
+
 		float temp = g.throttle_slewrate * G_Dt * 10.f;		//  * 10 to scale % to pwm range of 1000 to 2000
-Serial.print("radio ");	Serial.print(g.channel_throttle.radio_out); Serial.print("   temp "); Serial.print(temp); Serial.print("   last "); Serial.println(last);
 		g.channel_throttle.radio_out = constrain(g.channel_throttle.radio_out, last - (int)temp, last + (int)temp);
 		last = g.channel_throttle.radio_out;
 	}
@@ -262,7 +272,7 @@ static void reset_I(void)
 static void set_servos(void)
 {
 	int flapSpeedSource = 0;
-	
+
 	// vectorize the rc channels
 	RC_Channel_aux* rc_array[NUM_CHANNELS];
 	rc_array[CH_1] = NULL;
@@ -325,7 +335,7 @@ static void set_servos(void)
 		#else
 			// convert 0 to 100% into PWM
 			g.channel_throttle.servo_out = constrain(g.channel_throttle.servo_out, g.throttle_min.get(), g.throttle_max.get());
-			
+
 			// We want to supress the throttle if we think we are on the ground and in an autopilot controlled throttle mode.
 			/* Disable throttle if following conditions are met:
 				1 - We are in Circle mode (which we use for short term failsafe), or in FBW-B or higher
@@ -336,7 +346,7 @@ static void set_servos(void)
 				OR
 				5 - Home location is not set
 			*/
-			if ( 
+			if (
 					(control_mode == CIRCLE || control_mode >= FLY_BY_WIRE_B) &&
 					(abs(home.alt - current_loc.alt) < 1000) &&
 					((g.airspeed_enabled ? airspeed : g_gps->ground_speed) < 500 ) &&
@@ -345,7 +355,7 @@ static void set_servos(void)
 				g.channel_throttle.servo_out = 0;
 				g.channel_throttle.calc_pwm();
 			}
-			
+
 		#endif
 
 		g.channel_throttle.calc_pwm();
@@ -356,7 +366,11 @@ static void set_servos(void)
 		#endif
 		*/
 
-		throttle_slew_limit();
+        if (control_mode >= FLY_BY_WIRE_B) {
+            /* only do throttle slew limiting in modes where throttle
+               control is automatic */
+            throttle_slew_limit();
+        }
 	}
 
 	// Auto flap deployment
@@ -369,8 +383,9 @@ static void set_servos(void)
 				g_rc_function[RC_Channel_aux::k_flap_auto]->radio_out = g_rc_function[RC_Channel_aux::k_flap_auto]->radio_trim;
 			}
 		} else if (control_mode >= FLY_BY_WIRE_B) {
+            // FIXME: use target_airspeed in both FBW_B and g.airspeed_enabled cases - Doug?
 			if (control_mode == FLY_BY_WIRE_B) {
-				flapSpeedSource = airspeed_fbwB/100;
+				flapSpeedSource = ((float)target_airspeed)/100;
 			} else if (g.airspeed_enabled == true) {
 				flapSpeedSource = g.airspeed_cruise/100;
 			} else {
@@ -417,4 +432,3 @@ static void demo_servos(byte i) {
 		i--;
 	}
 }
-

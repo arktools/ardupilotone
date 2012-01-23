@@ -103,17 +103,17 @@ static void process_now_command()
 	}
 }
 
+
 //static void handle_no_commands()
-//{
-	/*
+/*{
 	switch (control_mode){
 		default:
 			set_mode(RTL);
 			break;
-	}*/
-	//return;
-	//Serial.println("Handle No CMDs");
-//}
+	}
+	return;
+	Serial.println("Handle No CMDs");
+}*/
 
 /********************************************************************************/
 // Verify command Handlers
@@ -199,7 +199,7 @@ static void do_RTL(void)
 
 	//so we know where we are navigating from
 	// --------------------------------------
-	next_WP = current_loc;
+	next_WP 		= current_loc;
 
 	// Loads WP from Memory
 	// --------------------
@@ -229,9 +229,6 @@ static void do_takeoff()
 		temp.alt = command_nav_queue.alt;
 		//Serial.printf("abs alt: %ld",temp.alt);
 	}
-
-	takeoff_complete = false;
-	// set flag to use g_gps ground course during TO.  IMU will be doing yaw drift correction
 
 	// Set our waypoint
 	set_next_WP(&temp);
@@ -268,22 +265,13 @@ static void do_land()
 {
 	wp_control = LOITER_MODE;
 
-	//Serial.println("dlnd ");
-
-	// not really used right now, might be good for debugging
 	land_complete		= false;
-
-	// A value that drives to 0 when the altitude doesn't change
-	velocity_land		= 2000;
-
-	// used to limit decent rate
-	land_start 			= millis();
-
-	// used to limit decent rate
-	original_alt		= current_loc.alt;
 
 	// hold at our current location
 	set_next_WP(&current_loc);
+
+	// Set a new target altitude
+	set_new_altitude(-200);
 }
 
 static void do_loiter_unlimited()
@@ -301,14 +289,26 @@ static void do_loiter_turns()
 {
 	wp_control = CIRCLE_MODE;
 
-	if(command_nav_queue.lat == 0)
+	// reset desired location
+
+
+	if(command_nav_queue.lat == 0){
+		// allow user to specify just the altitude
+		if(command_nav_queue.alt > 0){
+			current_loc.alt = command_nav_queue.alt;
+		}
 		set_next_WP(&current_loc);
-	else
+	}else{
 		set_next_WP(&command_nav_queue);
+	}
 
 	loiter_total = command_nav_queue.p1 * 360;
 	loiter_sum	 = 0;
 	old_target_bearing = target_bearing;
+
+	circle_angle = target_bearing + 18000;
+	circle_angle = wrap_360(circle_angle);
+	circle_angle *= RADX100;
 }
 
 static void do_loiter_time()
@@ -336,47 +336,52 @@ static bool verify_takeoff()
 	if(g.rc_3.control_in == 0){
 		return false;
 	}
-
-	if (current_loc.alt > next_WP.alt){
-		//Serial.println("Y");
-		takeoff_complete = true;
-		return true;
-
-	}else{
-
-		//Serial.println("N");
-		return false;
-	}
+	// are we above our target altitude?
+	//return (current_loc.alt > next_WP.alt);
+	return (current_loc.alt > target_altitude);
 }
 
 static bool verify_land()
 {
-	// land at 1 meter per second
-	next_WP.alt  = original_alt - ((millis() - land_start) / 20);			// condition_value = our initial
 
-	velocity_land  = ((old_alt - current_loc.alt) *.2) + (velocity_land * .8);
+	static int32_t 	old_alt = 0;
+	static int16_t	velocity_land = -1;
+
+	// landing detector
+	if ((current_loc.alt - home.alt) > 300){
+		old_alt = current_loc.alt;
+		velocity_land = 2000;
+	}else{
+		// a LP filter used to tell if we have landed
+		// will drive to 0 if we are on the ground - maybe, the baro is noisy
+		int16_t delta = (old_alt - current_loc.alt) << 3;
+		velocity_land = ((velocity_land * 7) + delta ) / 8;
+	}
+
+	//Serial.printf("velocity_land %d \n", velocity_land);
+
+	// remenber altitude for climb_rate
 	old_alt = current_loc.alt;
 
-	if(g.sonar_enabled){
-		// decide which sensor we're using
-		if(sonar_alt < 300){
-			next_WP = current_loc; // don't pitch or roll
-			next_WP.alt = -200; // force us down
-		}
-		if(sonar_alt < 40){
-			land_complete = true;
-			//Serial.println("Y");
-			//return true;
-		}
+	if ((current_loc.alt - home.alt) < 200){
+		// don't bank to hold position
+		wp_control = NO_NAV_MODE;
+		// try and come down faster
+		landing_boost++;
+		landing_boost 	= min(landing_boost, 30);
+	}else{
+		landing_boost 	= 0;
+		wp_control 		= LOITER_MODE;
 	}
 
-	if(velocity_land <= 0){
+	if((current_loc.alt - home.alt)  < 100 && velocity_land <= 50){
 		land_complete = true;
-		//return true;
-	}
-	//Serial.printf("N, %d\n", velocity_land);
-	//Serial.printf("N_alt, %ld\n", next_WP.alt);
+		landing_boost = 0;
 
+		// reset old_alt
+		old_alt = 0;
+		return true;
+	}
 	return false;
 }
 
@@ -385,7 +390,9 @@ static bool verify_nav_wp()
 	// Altitude checking
 	if(next_WP.options & MASK_OPTIONS_RELATIVE_ALT){
 		// we desire a certain minimum altitude
-		if (current_loc.alt > next_WP.alt){
+		//if (current_loc.alt > next_WP.alt){
+		if (current_loc.alt > target_altitude){
+
 			// we have reached that altitude
 			wp_verify_byte |= NAV_ALTITUDE;
 		}
@@ -498,7 +505,7 @@ static void do_change_alt()
 {
 	Location temp	= next_WP;
 	condition_start = current_loc.alt;
-	condition_value	= command_cond_queue.alt;
+	//condition_value	= command_cond_queue.alt;
 	temp.alt		= command_cond_queue.alt;
 	set_next_WP(&temp);
 }
@@ -571,9 +578,9 @@ static void do_yaw()
 static bool verify_wait_delay()
 {
 	//Serial.print("vwd");
-	if ((unsigned)(millis() - condition_start) > condition_value){
+	if ((unsigned)(millis() - condition_start) > (unsigned)condition_value){
 		//Serial.println("y");
-		condition_value		= 0;
+		condition_value = 0;
 		return true;
 	}
 	//Serial.println("n");
@@ -583,16 +590,14 @@ static bool verify_wait_delay()
 static bool verify_change_alt()
 {
 	//Serial.printf("change_alt, ca:%d, na:%d\n", (int)current_loc.alt, (int)next_WP.alt);
-	if (condition_start < next_WP.alt){
+	if ((int32_t)condition_start < next_WP.alt){
 		// we are going higer
 		if(current_loc.alt > next_WP.alt){
-			condition_value = 0;
 			return true;
 		}
 	}else{
 		// we are going lower
 		if(current_loc.alt < next_WP.alt){
-			condition_value = 0;
 			return true;
 		}
 	}
@@ -660,6 +665,11 @@ static void do_loiter_at_location()
 
 static void do_jump()
 {
+	// Used to track the state of the jump command in Mission scripting
+	// -10 is a value that means the register is unused
+	// when in use, it contains the current remaining jumps
+	static int8_t jump = -10;								// used to track loops in jump command
+
 	//Serial.printf("do Jump: %d\n", jump);
 
 	if(jump == -10){

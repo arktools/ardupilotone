@@ -7,11 +7,20 @@ import mavutil, mavwp, random
 # get location of scripts
 testdir=os.path.dirname(os.path.realpath(__file__))
 
-
+FRAME='octa'
+TARGET='sitl-octa'
 HOME=location(-35.362938,149.165085,584,270)
 
 homeloc = None
 num_wp = 0
+
+def calibrate_level(mavproxy, mav):
+    '''init the accelerometers'''
+    print("Initialising accelerometers")
+    MAV_ACTION_CALIBRATE_ACC = 19
+    mav.mav.action_send(mav.target_system, mav.target_component, MAV_ACTION_CALIBRATE_ACC)
+    mavproxy.expect('APM: action received')
+    return True
 
 def arm_motors(mavproxy, mav):
     '''arm motors'''
@@ -37,28 +46,33 @@ def disarm_motors(mavproxy, mav):
     return True
 
 
-def takeoff(mavproxy, mav):
+def takeoff(mavproxy, mav, alt_min = 30):
     '''takeoff get to 30m altitude'''
     mavproxy.send('switch 6\n') # stabilize mode
     wait_mode(mav, 'STABILIZE')
-    mavproxy.send('rc 3 1500\n')
-    wait_altitude(mav, 30, 40)
+    mavproxy.send('rc 3 1510\n')
+    m = mav.recv_match(type='VFR_HUD', blocking=True)
+    if (m.alt < alt_min):
+        wait_altitude(mav, alt_min, (alt_min + 5))
+    mavproxy.send('rc 3 1430\n')
     print("TAKEOFF COMPLETE")
     return True
 
-
-def loiter(mavproxy, mav, maxaltchange=10, holdtime=10, timeout=60):
+def loiter(mavproxy, mav, holdtime=60, maxaltchange=20):
     '''hold loiter position'''
     mavproxy.send('switch 5\n') # loiter mode
     wait_mode(mav, 'LOITER')
     m = mav.recv_match(type='VFR_HUD', blocking=True)
     start_altitude = m.alt
+    start = current_location(mav)
     tstart = time.time()
     tholdstart = time.time()
     print("Holding loiter at %u meters for %u seconds" % (start_altitude, holdtime))
-    while time.time() < tstart + timeout:
+    while time.time() < tstart + holdtime:
         m = mav.recv_match(type='VFR_HUD', blocking=True)
-        print("Altitude %u" % m.alt)
+        pos = current_location(mav)
+        delta = get_distance(start, pos)
+        print("Loiter Dist: %.2fm, alt:%u" % (delta, m.alt))
         if math.fabs(m.alt - start_altitude) > maxaltchange:
             tholdstart = time.time()
         if time.time() - tholdstart > holdtime:
@@ -66,6 +80,20 @@ def loiter(mavproxy, mav, maxaltchange=10, holdtime=10, timeout=60):
             return True
     print("Loiter FAILED")
     return False
+
+def change_alt(mavproxy, mav, alt_min):
+    '''change altitude'''
+    m = mav.recv_match(type='VFR_HUD', blocking=True)
+    if(m.alt < alt_min):
+        print("Rise to alt:%u from %u" % (alt_min, m.alt))
+        mavproxy.send('rc 3 1800\n')
+        wait_altitude(mav, alt_min, (alt_min + 5))
+    else:
+        print("Lower to alt:%u from %u" % (alt_min, m.alt))
+        mavproxy.send('rc 3 1100\n')
+        wait_altitude(mav, (alt_min -5), alt_min)
+    mavproxy.send('rc 3 1430\n')
+    return True
 
 
 def fly_square(mavproxy, mav, side=50, timeout=120):
@@ -75,7 +103,7 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
     tstart = time.time()
     failed = False
 
-    print("Save WP 1")
+    print("Save WP 1 and 2")
     save_wp(mavproxy, mav)
 
     print("turn")
@@ -91,7 +119,7 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
         failed = True
     mavproxy.send('rc 2 1500\n')
 
-    print("Save WP 2")
+    print("Save WP 3")
     save_wp(mavproxy, mav)
 
     print("Going east %u meters" % side)
@@ -100,7 +128,7 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
         failed = True
     mavproxy.send('rc 1 1500\n')
 
-    print("Save WP 3")
+    print("Save WP 4")
     save_wp(mavproxy, mav)
 
     print("Going south %u meters" % side)
@@ -110,7 +138,7 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
     mavproxy.send('rc 2 1500\n')
     mav.recv_match(condition='RC_CHANNELS_RAW.chan7_raw==1000', blocking=True)
 
-    print("Save WP 4")
+    print("Save WP 5")
     save_wp(mavproxy, mav)
 
     print("Going west %u meters" % side)
@@ -119,9 +147,94 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
         failed = True
     mavproxy.send('rc 1 1500\n')
 
-    print("Save WP 5")
+    print("Save WP 6")
     save_wp(mavproxy, mav)
 
+    return not failed
+
+def fly_RTL(mavproxy, mav, side=60):
+    '''Fly, return, land'''
+    mavproxy.send('switch 6\n')
+    wait_mode(mav, 'STABILIZE')
+    mavproxy.send('rc 3 1430\n')
+    failed = False
+
+    print("# Going forward %u meters" % side)
+    mavproxy.send('rc 2 1350\n')
+    if not wait_distance(mav, side, 5, 60):
+        failed = True
+    mavproxy.send('rc 2 1500\n')
+
+    print("# Enter RTL")
+    mavproxy.send('switch 3\n')
+    tstart = time.time()
+    while time.time() < tstart + 200:
+        m = mav.recv_match(type='VFR_HUD', blocking=True)
+        pos = current_location(mav)
+        #delta = get_distance(start, pos)
+        print("Alt: %u" % m.alt)
+        if(m.alt <= 1):
+            return True
+    return True
+
+def fly_failsafe(mavproxy, mav, side=60):
+    '''Fly, Failsafe, return, land'''
+    mavproxy.send('switch 6\n')
+    wait_mode(mav, 'STABILIZE')
+    mavproxy.send('rc 3 1430\n')
+    failed = False
+
+    print("# Going forward %u meters" % side)
+    mavproxy.send('rc 2 1350\n')
+    if not wait_distance(mav, side, 5, 60):
+        failed = True
+    mavproxy.send('rc 2 1500\n')
+
+    print("# Enter Failsafe")
+    mavproxy.send('rc 3 900\n')
+    tstart = time.time()
+    while time.time() < tstart + 120:
+        m = mav.recv_match(type='VFR_HUD', blocking=True)
+        pos = current_location(mav)
+        #delta = get_distance(start, pos)
+        print("Alt: %u" % m.alt)
+        if(m.alt <= 1):
+            mavproxy.send('rc 3 1100\n')
+            return True
+    return True
+
+
+def fly_simple(mavproxy, mav, side=60, timeout=120):
+    '''fly Simple, flying N then E'''
+    mavproxy.send('switch 6\n')
+    wait_mode(mav, 'STABILIZE')
+    mavproxy.send('rc 3 1440\n')
+    tstart = time.time()
+    failed = False
+
+    print("# Going forward %u meters" % side)
+    mavproxy.send('rc 2 1390\n')
+    if not wait_distance(mav, side, 5, 60):
+        failed = True
+    mavproxy.send('rc 2 1500\n')
+
+    print("# Going east for 30 seconds")
+    mavproxy.send('rc 1 1610\n')
+    tstart = time.time()
+    while time.time() < (tstart + 30):
+        m = mav.recv_match(type='VFR_HUD', blocking=True)
+        delta = (time.time() - tstart)
+        #print("%u" % delta)
+    mavproxy.send('rc 1 1500\n')
+
+    print("# Going back %u meters" % side)
+    mavproxy.send('rc 2 1610\n')
+    if not wait_distance(mav, side, 5, 60):
+        failed = True
+    mavproxy.send('rc 2 1500\n')
+    #restore to default
+    mavproxy.send('param set SIMPLE 0\n')
+    mavproxy.send('rc 3 1430\n')
     return not failed
 
 
@@ -130,20 +243,11 @@ def fly_square(mavproxy, mav, side=50, timeout=120):
 def land(mavproxy, mav, timeout=60):
     '''land the quad'''
     print("STARTING LANDING")
-    mavproxy.send('switch 6\n')
-    wait_mode(mav, 'STABILIZE')
-
-    # start by dropping throttle till we have lost 5m
-    mavproxy.send('rc 3 1380\n')
-    m = mav.recv_match(type='VFR_HUD', blocking=True)
-    wait_altitude(mav, 0, m.alt-5)
-
-    # now let it settle gently
-    mavproxy.send('rc 3 1400\n')
-    tstart = time.time()
-
-    ret = wait_altitude(mav, -5, 0)
-    print("LANDING: ok=%s" % ret)
+    mavproxy.send('switch 2\n')
+    wait_mode(mav, 'LAND')
+    print("Entered Landing Mode")
+    ret = wait_altitude(mav, -5, 1)
+    print("LANDING: ok= %s" % ret)
     return ret
 
 
@@ -230,19 +334,16 @@ def fly_ArduCopter(viewerip=None):
     '''
     global homeloc
 
-    simquad_cmd = util.reltopdir('Tools/autotest/pysim/sim_quad.py') + ' --rate=400 --home=%f,%f,%u,%u' % (
-        HOME.lat, HOME.lng, HOME.alt, HOME.heading)
+    if TARGET != 'sitl':
+        util.build_SIL('ArduCopter', target=TARGET)
+
+    sim_cmd = util.reltopdir('Tools/autotest/pysim/sim_multicopter.py') + ' --frame=%s --rate=400 --home=%f,%f,%u,%u' % (
+        FRAME, HOME.lat, HOME.lng, HOME.alt, HOME.heading)
+    sim_cmd += ' --wind=6,45,.3'
     if viewerip:
-        simquad_cmd += ' --fgout=%s:5503' % viewerip
+        sim_cmd += ' --fgout=%s:5503' % viewerip
 
     sil = util.start_SIL('ArduCopter', wipe=True)
-    mavproxy = util.start_MAVProxy_SIL('ArduCopter')
-    mavproxy.expect('Please Run Setup')
-
-    # we need to restart it after eeprom erase
-    util.pexpect_close(mavproxy)
-    util.pexpect_close(sil)
-    sil = util.start_SIL('ArduCopter')
     mavproxy = util.start_MAVProxy_SIL('ArduCopter', options='--sitl=127.0.0.1:5501 --out=127.0.0.1:19550 --quadcopter')
     mavproxy.expect('Received [0-9]+ parameters')
 
@@ -256,10 +357,10 @@ def fly_ArduCopter(viewerip=None):
     util.pexpect_close(sil)
 
     sil = util.start_SIL('ArduCopter', height=HOME.alt)
-    simquad = pexpect.spawn(simquad_cmd, logfile=sys.stdout, timeout=10)
-    simquad.delaybeforesend = 0
-    util.pexpect_autoclose(simquad)
-    options = '--sitl=127.0.0.1:5501 --out=127.0.0.1:19550 --quadcopter --streamrate=1'
+    sim = pexpect.spawn(sim_cmd, logfile=sys.stdout, timeout=10)
+    sim.delaybeforesend = 0
+    util.pexpect_autoclose(sim)
+    options = '--sitl=127.0.0.1:5501 --out=127.0.0.1:19550 --quadcopter --streamrate=5'
     if viewerip:
         options += ' --out=%s:14550' % viewerip
     mavproxy = util.start_MAVProxy_SIL('ArduCopter', options=options)
@@ -273,13 +374,14 @@ def fly_ArduCopter(viewerip=None):
         os.unlink(buildlog)
     os.link(logfile, buildlog)
 
-    mavproxy.expect('Received [0-9]+ parameters')
-    mavproxy.expect("Ready to FLY")
+    # the received parameters can come before or after the ready to fly message
+    mavproxy.expect(['Received [0-9]+ parameters', 'Ready to FLY'])
+    mavproxy.expect(['Received [0-9]+ parameters', 'Ready to FLY'])
 
     util.expect_setup_callback(mavproxy, expect_callback)
 
     expect_list_clear()
-    expect_list_extend([simquad, sil, mavproxy])
+    expect_list_extend([sim, sil, mavproxy])
 
     # get a mavlink connection going
     try:
@@ -298,57 +400,128 @@ def fly_ArduCopter(viewerip=None):
         mav.recv_match(type='GPS_RAW', blocking=True)
         setup_rc(mavproxy)
         homeloc = current_location(mav)
-        if not arm_motors(mavproxy, mav):
+
+        print("# Calibrate level")
+        if not calibrate_level(mavproxy, mav):
+            print("calibrate_level failed")
             failed = True
 
-        if not takeoff(mavproxy, mav):
+        print("# Arm motors")
+        if not arm_motors(mavproxy, mav):
+            print("arm_motors failed")
             failed = True
+
+        print("# Takeoff")
+        if not takeoff(mavproxy, mav, 10):
+            print("takeoff failed")
+            failed = True
+
+        print("# Test RTL")
+        if not fly_RTL(mavproxy, mav):
+            print("RTL failed")
+            failed = True
+
+        print("# Takeoff")
+        if not takeoff(mavproxy, mav, 10):
+            print("takeoff failed")
+            failed = True
+
+        print("# Test Failsafe")
+        if not fly_failsafe(mavproxy, mav):
+            print("FS failed")
+            failed = True
+
+        print("# Takeoff")
+        if not takeoff(mavproxy, mav, 10):
+            print("takeoff failed")
+            failed = True
+
+        # Loiter for 30 seconds
+        print("# Loiter for 45 seconds")
+        if not loiter(mavproxy, mav, 45):
+            print("loiter failed")
+            failed = True
+
+        print("# Change alt to 60m")
+        if not change_alt(mavproxy, mav, 60):
+            print("change_alt failed")
+            failed = True
+
+        print("# Change alt to 20m")
+        if not change_alt(mavproxy, mav, 20):
+            print("change_alt failed")
+            failed = True
+
+        print("# Change alt to 20m")
+        if not change_alt(mavproxy, mav, 20):
+            print("change_alt failed")
+            failed = True
+
 
         print("# Fly A square")
         if not fly_square(mavproxy, mav):
+            print("fly_square failed")
             failed = True
+
+        print("# Land")
+        if not land(mavproxy, mav):
+            print("land failed")
+            failed = True
+
+        print("Save landing WP")
+        save_wp(mavproxy, mav)
 
         # save the stored mission
         print("# Save out the C7 mission")
         if not save_mission_to_file(mavproxy, mav, os.path.join(testdir, "ch7_mission.txt")):
-            failed = True
-
-        # Loiter for 10 seconds
-        print("# Loiter for 10 seconds")
-        if not loiter(mavproxy, mav):
-            failed = True
-
-        #Fly a circle for 60 seconds
-        print("# Fly a Circle")
-        if not circle(mavproxy, mav):
+            print("save_mission_to_file failed")
             failed = True
 
         # save the stored mission
         print("# Fly CH 7 saved mission")
         if not fly_mission(mavproxy, mav,height_accuracy = 0.5, target_altitude=10):
+            print("fly_mission failed")
             failed = True
+
+        #set SIMPLE mode
+        mavproxy.send('param set SIMPLE 63\n')
+
+        if not takeoff(mavproxy, mav, 10):
+            print("takeoff failed")
+            failed = True
+
+        print("# Fly in SIMPLE mode")
+        if not fly_simple(mavproxy, mav):
+            print("fly_simple failed")
+            failed = True
+
 
         print("# Upload mission1")
         if not upload_mission_from_file(mavproxy, mav, os.path.join(testdir, "mission2.txt")):
+            print("upload_mission_from_file failed")
             failed = True
 
         # this grabs our mission count
         print("# store mission1 locally")
         if not load_mission_from_file(mavproxy, mav, os.path.join(testdir, "mission2.txt")):
+            print("load_mission_from_file failed")
             failed = True
 
         print("# Fly mission 2")
         if not fly_mission(mavproxy, mav,height_accuracy = 0.5, target_altitude=10):
+            print("fly_mission failed")
             failed = True
         else:
             print("Flew mission2 OK")
 
         print("# Land")
         if not land(mavproxy, mav):
+            print("land failed")
             failed = True
 
         print("# disarm motors")
         if not disarm_motors(mavproxy, mav):
+            print("disarm_motors failed")
             failed = True
     except pexpect.TIMEOUT, e:
         failed = True
@@ -356,7 +529,7 @@ def fly_ArduCopter(viewerip=None):
     mav.close()
     util.pexpect_close(mavproxy)
     util.pexpect_close(sil)
-    util.pexpect_close(simquad)
+    util.pexpect_close(sim)
 
     if os.path.exists('ArduCopter-valgrind.log'):
         os.chmod('ArduCopter-valgrind.log', 0644)
@@ -366,3 +539,37 @@ def fly_ArduCopter(viewerip=None):
         print("FAILED: %s" % e)
         return False
     return True
+
+
+
+
+
+
+#!	        mavproxy.send('rc 2 1390\n')
+#!	        #adjust till the rate is 0;
+#!
+#!	        mavproxy.send('rc 4 1610\n')
+#!	        if not wait_heading(mav, 0):
+#!	            return False
+#!	        mavproxy.send('rc 4 1500\n')
+#!
+#!	        mavproxy.send('rc 2 1455\n')
+#!	        #adjust till the rate is 0;
+#!	        pitch_test = 1455
+#!	        roll_test = 1500
+#!	        old_lat = 0
+#!	        old_lon = 0
+#!
+#!	        while(1):
+#!	            pos = current_location(mav)
+#!	            tmp = (pos.lat *10e7) - (old_lat *10e7)
+#!	            print("tmp %d " % tmp)
+#!	            if(tmp > 0 ):
+#!	                print("higher tmp %d " % (tmp))
+#!	                pitch_test += 1
+#!	            if(tmp < 0 ):
+#!	                print("lower tmp %d " % (tmp))
+#!	                pitch_test -= 1
+#!	            mavproxy.send('rc 2 %u\n' % math.floor(pitch_test))
+#!	            old_lat = pos.lat
+#!	            #old_lon = pos.lon

@@ -19,10 +19,26 @@ heli:
 	make -f Makefile EXTRAFLAGS="-DFRAME_CONFIG=HELI_FRAME"
 
 apm2:
-	make -f Makefile EXTRAFLAGS="-DCONFIG_APM_HARDWARE=APM_HARDWARE_APM2 -DCLI_SLIDER_ENABLED=DISABLED"
+	make -f Makefile EXTRAFLAGS="-DCONFIG_APM_HARDWARE=APM_HARDWARE_APM2"
+
+apm2beta:
+	make -f Makefile EXTRAFLAGS="-DCONFIG_APM_HARDWARE=APM_HARDWARE_APM2 -DAPM2_BETA_HARDWARE"
 
 mavlink10:
 	make -f Makefile EXTRAFLAGS="-DMAVLINK10"
 
+sitl:
+	make -f ../libraries/Desktop/Makefile.desktop
+
+sitl-octa:
+	make -f ../libraries/Desktop/Makefile.desktop octa
+
+sitl-hexa:
+	make -f ../libraries/Desktop/Makefile.desktop hexa
+
+sitl-y6:
+	make -f ../libraries/Desktop/Makefile.desktop y6
+
 etags:
 	cd .. && etags -f ArduCopter/TAGS --langmap=C++:.pde.cpp.h $$(git ls-files ArduCopter libraries)
+

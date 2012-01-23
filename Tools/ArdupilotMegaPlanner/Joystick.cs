@@ -322,11 +322,12 @@ namespace ArdupilotMega
                     {
                         if (but.buttonno != -1 && getButtonState(but.buttonno))
                         {
-                            MainV2.instance.Invoke((System.Windows.Forms.MethodInvoker)delegate()
+                            string mode = but.mode;
+                            MainV2.instance.BeginInvoke((System.Windows.Forms.MethodInvoker)delegate()
                             {
                                 try
                                 {
-									MainV2.comPort.setMode(but.mode); 
+                                    MainV2.comPort.setMode(mode); 
 
                                 }
                                 catch { System.Windows.Forms.MessageBox.Show("Failed to change Modes"); }
@@ -470,7 +471,7 @@ namespace ArdupilotMega
         {
             byte[] buts = state.GetButtons();
 
-            if (buts == null)
+            if (buts == null || JoyButtons[buttonno].buttonno < 0)
                 return false;
 
             return buts[JoyButtons[buttonno].buttonno] > 0;
@@ -483,7 +484,7 @@ namespace ArdupilotMega
                 state = joystick.CurrentJoystickState;
 
                 ushort ans = pickchannel(channel, JoyChannels[channel].axis, JoyChannels[channel].reverse, JoyChannels[channel].expo);
-
+                Console.WriteLine("{0} = {1} = {2}",channel,ans, state.X);
                 return ans;
         }
 

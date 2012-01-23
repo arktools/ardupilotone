@@ -21,6 +21,7 @@
 FastSerialPort0(Serial);        // FTDI/console
 
 AP_OpticalFlow_ADNS3080 flowSensor;
+//AP_OpticalFlow_ADNS3080 flowSensor(A6);  // override chip select pin to use A6 if using APM2
 
 void setup()
 {  
@@ -200,7 +201,7 @@ void set_resolution()
     Serial.print("resolution: ");
 	Serial.println(resolution);
 	Serial.println("Choose new value:");
-	Serial.println("    1) 1200");
+	Serial.println("    1) 1600");
 	Serial.println("    4) 400");
 	Serial.println("    x) exit");
 	Serial.println();
@@ -214,10 +215,9 @@ void set_resolution()
 	
 	// update resolution
 	if( value == '1' ) {
-	    flowSensor.set_resolution(ADNS3080_RESOLUTION_1200);
+	    flowSensor.set_resolution(ADNS3080_RESOLUTION_1600);
 	}
 	if( value == '4' ) {
-	    Serial.println("you want 1200!");
 	    flowSensor.set_resolution(ADNS3080_RESOLUTION_400);
 	}
 	
@@ -309,7 +309,7 @@ void display_motion()
 	delay(1000);
 	
 	while( !Serial.available() ) {
-	    flowSensor.read();
+	    flowSensor.update();
 		flowSensor.update_position(0,0,0,1,100);
 
 		// x,y,squal

@@ -23,28 +23,28 @@ public:
                   throttleI, throttleD, throttleIMax, throttleYMax,
                   throttleDFCut), _strCmd(0), _sailCmd(0)
     {
-        _board->debug->println_P(PSTR("initializing sailboat controller"));
+        _board->getDebug()->println_P(PSTR("initializing sailboat controller"));
 
-        _board->rc.push_back(
-            new AP_RcChannel(k_chMode, PSTR("MODE_"), board->radio, 5, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chMode, PSTR("MODE_"), board->getRadio(), 5, 1100,
                              1500, 1900, RC_MODE_IN, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chStr, PSTR("STR_"), board->radio, 3, 1100, 1500,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chStr, PSTR("STR_"), board->getRadio(), 3, 1100, 1500,
                              1900, RC_MODE_INOUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chSail, PSTR("SAIL_"), board->radio, 2, 1100, 1500,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chSail, PSTR("SAIL_"), board->getRadio(), 2, 1100, 1500,
                              1900, RC_MODE_INOUT, false));
     }
 
 private:
     // methods
     void manualLoop(const float dt) {
-        _strCmd = -_board->rc[ch_str]->getRadioPosition();
-        _sailCmd = _board->rc[ch_sail]->getRadioPosition();
-        _board->debug->printf_P(PSTR("sail: %f, steering: %f\n"),_sailCmd,_strCmd);
+        _strCmd = -_board->getRadioChannels()[ch_str]->getRadioPosition();
+        _sailCmd = _board->getRadioChannels()[ch_sail]->getRadioPosition();
+        _board->getDebug()->printf_P(PSTR("sail: %f, steering: %f\n"),_sailCmd,_strCmd);
     }
     void autoLoop(const float dt) {
-        //_board->debug->printf_P(PSTR("cont: ch1: %f\tch2: %f\n"),_board->rc[ch_sail]->getRadioPosition(), _board->rc[ch_str]->getRadioPosition());
+        //_board->getDebug()->printf_P(PSTR("cont: ch1: %f\tch2: %f\n"),_board->getRadioChannels()[ch_sail]->getRadioPosition(), _board->getRadioChannels()[ch_str]->getRadioPosition());
         float windDir = -.339373*analogRead(1)+175.999;       
 
 
@@ -53,7 +53,7 @@ private:
         float sail = 0.00587302*fabs(windDir) - 0.05;
         if (sail < 0.0) sail = 0.0;
 
-        //_board->debug->printf_P(PSTR("heading: %f\n"),heading);       //Print Heading 
+        //_board->getDebug()->printf_P(PSTR("heading: %f\n"),heading);       //Print Heading 
      
         //if(fabs(psi)<45)                                    //Tacking Logic
         //{
@@ -75,8 +75,8 @@ private:
         _sailCmd = sail;
     }
     void setMotors() {
-        _board->rc[ch_str]->setPosition(_strCmd);
-        _board->rc[ch_sail]->setPosition(_sailCmd);
+        _board->getRadioChannels()[ch_str]->setPosition(_strCmd);
+        _board->getRadioChannels()[ch_sail]->setPosition(_sailCmd);
     }
     void handleFailsafe() {
         // turn off

@@ -31,9 +31,7 @@ namespace ArdupilotMega
         {
             InitializeComponent();
 
-            Control.CheckForIllegalCrossThreadCalls = false; // so can update display from another thread
-
-                CreateChart(zg1, "Raw Sensors", "Time", "Raw Data");
+            CreateChart(zg1, "Raw Sensors", "Time", "Raw Data");
         }
 
         public struct plot
@@ -291,7 +289,7 @@ namespace ArdupilotMega
                     }
                     catch
                     {
-                        MessageBox.Show("Comport open failed - Please try again and make sure your not in CLI mode");
+                        MessageBox.Show("Comport open failed");
                         return;
                     }
                 timer1.Start();

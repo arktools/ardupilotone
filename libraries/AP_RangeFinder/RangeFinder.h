@@ -18,18 +18,13 @@
 #define AP_RANGEFINDER_ORIENTATION_BACK_LEFT 	  5, -5,  0
 #define AP_RANGEFINDER_ORIENTATION_FRONT_LEFT 	  5,  5,  0
 */
-//#define AP_RANGEFINDER_PITOT_TUBE 1007
-
-//#define AP_RANGEFINDER_NUM_AVERAGES 4
 
 class RangeFinder
 {
   protected:
-	//GPS(Stream *s) : _port(s) {};
 	RangeFinder(AP_AnalogSource * source, ModeFilter *filter) :
 		_analog_source(source),
-		_mode_filter(filter)
-	{}
+		_mode_filter(filter) {}
   public:
 
 	int raw_value;     // raw value from the sensor
@@ -43,6 +38,6 @@ class RangeFinder
 	virtual int read();   // read value from sensor and return distance in cm
 
 	AP_AnalogSource *_analog_source;
-  	ModeFilter  *_mode_filter;
+	ModeFilter  *_mode_filter;
 };
 #endif

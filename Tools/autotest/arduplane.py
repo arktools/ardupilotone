@@ -9,6 +9,7 @@ testdir=os.path.dirname(os.path.realpath(__file__))
 
 
 HOME_LOCATION='-35.362938,149.165085,584,270'
+WIND="0,180,0.2" # speed,direction,variance
 
 homeloc = None
 
@@ -18,19 +19,26 @@ def takeoff(mavproxy, mav):
     wait_mode(mav, 'FBWA')
 
     # some rudder to counteract the prop torque
-    mavproxy.send('rc 4 1600\n')
+    mavproxy.send('rc 4 1700\n')
 
-    # get it moving a bit first to avoid bad JSBSim ground physics
-    mavproxy.send('rc 3 1040\n')
-    mav.recv_match(condition='VFR_HUD.groundspeed>3', blocking=True)
+    # some up elevator to keep the tail down
+    mavproxy.send('rc 2 1200\n')
+
+    # get it moving a bit first
+    mavproxy.send('rc 3 1150\n')
+    mav.recv_match(condition='VFR_HUD.groundspeed>2', blocking=True)
 
     # a bit faster
-    mavproxy.send('rc 3 1600\n')
-    mav.recv_match(condition='VFR_HUD.groundspeed>10', blocking=True)
+    mavproxy.send('rc 3 1300\n')
+    mav.recv_match(condition='VFR_HUD.groundspeed>6', blocking=True)
 
-    # hit the gas harder now, and give it some elevator
+    # a bit faster again, straighten rudder
+    mavproxy.send('rc 3 1600\n')
     mavproxy.send('rc 4 1500\n')
-    mavproxy.send('rc 2 1200\n')
+    mav.recv_match(condition='VFR_HUD.groundspeed>12', blocking=True)
+
+    # hit the gas harder now, and give it some more elevator
+    mavproxy.send('rc 2 1100\n')
     mavproxy.send('rc 3 1800\n')
 
     # gain a bit of altitude
@@ -67,8 +75,8 @@ def fly_RTL(mavproxy, mav):
     print("Flying home in RTL")
     mavproxy.send('switch 2\n')
     wait_mode(mav, 'RTL')
-    wait_location(mav, homeloc, accuracy=80,
-                  target_altitude=100, height_accuracy=10)
+    wait_location(mav, homeloc, accuracy=90,
+                  target_altitude=100, height_accuracy=20)
     print("RTL Complete")
     return True
 
@@ -181,9 +189,9 @@ def fly_mission(mavproxy, mav, filename, height_accuracy=-1, target_altitude=Non
     mavproxy.expect('Requesting [0-9]+ waypoints')
     mavproxy.send('switch 1\n') # auto mode
     wait_mode(mav, 'AUTO')
-    if not wait_distance(mav, 30, timeout=120):
+    if not wait_waypoint(mav, 1, 7, max_dist=60):
         return False
-    if not wait_location(mav, homeloc, accuracy=50, timeout=600, target_altitude=target_altitude, height_accuracy=height_accuracy):
+    if not wait_groundspeed(mav, 0, 0.5, timeout=60):
         return False
     print("Mission OK")
     return True
@@ -215,8 +223,7 @@ def fly_ArduPlane(viewerip=None):
     util.pexpect_close(sil)
 
     cmd = util.reltopdir("Tools/autotest/jsbsim/runsim.py")
-    cmd += " --home=%s --script=%s/rascal_test.xml" % (
-        HOME_LOCATION, util.reltopdir("Tools/autotest/jsbsim"))
+    cmd += " --home=%s --wind=%s" % (HOME_LOCATION, WIND)
     if viewerip:
         cmd += " --fgout=%s:5503" % viewerip
 

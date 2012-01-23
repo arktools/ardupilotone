@@ -21,7 +21,7 @@ class AP_DCM
 {
 public:
 	// Constructors
-	AP_DCM(IMU *imu, GPS *&gps, Compass *withCompass = NULL) :
+	AP_DCM(IMU *imu, GPS *gps, Compass *withCompass = NULL) :
 		_compass(withCompass),
 		_gps(gps),
 		_imu(imu),
@@ -54,6 +54,7 @@ public:
 	// Methods
 	void 		update_DCM(void);
 	void 		update_DCM_fast(void);
+	void 		matrix_reset(void);
 
 	long		roll_sensor;					// Degrees * 100
 	long		pitch_sensor;					// Degrees * 100

@@ -14,7 +14,6 @@ static int8_t	test_adc(uint8_t argc, 			const Menu::arg *argv);
 #endif
 static int8_t	test_imu(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_battery(uint8_t argc, 		const Menu::arg *argv);
-static int8_t	test_current(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_relay(uint8_t argc,	 	const Menu::arg *argv);
 static int8_t	test_wp(uint8_t argc, 			const Menu::arg *argv);
 static int8_t	test_airspeed(uint8_t argc, 	const Menu::arg *argv);
@@ -27,24 +26,25 @@ static int8_t	test_modeswitch(uint8_t argc, 		const Menu::arg *argv);
 #if CONFIG_APM_HARDWARE != APM_HARDWARE_APM2
 static int8_t	test_dipswitches(uint8_t argc, 		const Menu::arg *argv);
 #endif
+static int8_t	test_logging(uint8_t argc, 		const Menu::arg *argv);
 
 // Creates a constant array of structs representing menu options
 // and stores them in Flash memory, not RAM.
 // User enters the string in the console to call the functions on the right.
 // See class Menu in AP_Common for implementation details
 static const struct Menu::command test_menu_commands[] PROGMEM = {
-	{"pwm",			test_radio_pwm},
-	{"radio",		test_radio},
-	{"passthru",	test_passthru},
-	{"failsafe",	test_failsafe},
-	{"battery",		test_battery},
-	{"relay",		test_relay},
-	{"waypoints",	test_wp},
-	{"xbee",		test_xbee},
-	{"eedump",		test_eedump},
-	{"modeswitch",	test_modeswitch},
+	{"pwm",				test_radio_pwm},
+	{"radio",			test_radio},
+	{"passthru",		test_passthru},
+	{"failsafe",		test_failsafe},
+	{"battery",	test_battery},
+	{"relay",			test_relay},
+	{"waypoints",		test_wp},
+	{"xbee",			test_xbee},
+	{"eedump",			test_eedump},
+	{"modeswitch",		test_modeswitch},
 #if CONFIG_APM_HARDWARE != APM_HARDWARE_APM2
-	{"dipswitches",	test_dipswitches},
+	{"dipswitches",		test_dipswitches},
 #endif
 
 	// Tests below here are for hardware sensors only present
@@ -59,7 +59,6 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"airspeed",	test_airspeed},
 	{"airpressure",	test_pressure},
 	{"compass",		test_mag},
-	{"current",		test_current},
 #elif HIL_MODE == HIL_MODE_SENSORS
 	{"adc", 		test_adc},
 	{"gps",			test_gps},
@@ -67,6 +66,7 @@ static const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"compass",		test_mag},
 #elif HIL_MODE == HIL_MODE_ATTITUDE
 #endif
+	{"logging",		test_logging},
 
 };
 
@@ -258,26 +258,7 @@ test_failsafe(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_battery(uint8_t argc, const Menu::arg *argv)
 {
-if (g.battery_monitoring >=1 && g.battery_monitoring < 4) {
-	for (int i = 0; i < 80; i++){	//  Need to get many samples for filter to stabilize
-		delay(20);
-		read_battery();
-	}
-	Serial.printf_P(PSTR("Volts: 1:%2.2f, 2:%2.2f, 3:%2.2f, 4:%2.2f\n"),
-			battery_voltage1,
-			battery_voltage2,
-			battery_voltage3,
-			battery_voltage4);
-} else {
-	Serial.printf_P(PSTR("Not enabled\n"));
-}
-	return (0);
-}
-
-static int8_t
-test_current(uint8_t argc, const Menu::arg *argv)
-{
-if (g.battery_monitoring == 4) {
+if (g.battery_monitoring == 3 || g.battery_monitoring == 4) {
 	print_hit_enter();
 	delta_ms_medium_loop = 100;
 
@@ -285,10 +266,17 @@ if (g.battery_monitoring == 4) {
 		delay(100);
 		read_radio();
 		read_battery();
-		Serial.printf_P(PSTR("V: %4.4f, A: %4.4f, mAh: %4.4f\n"),
-						battery_voltage,
-						current_amps,
-						current_total);
+		if (g.battery_monitoring == 3){
+			Serial.printf_P(PSTR("V: %4.4f\n"),
+						battery_voltage1,
+						current_amps1,
+						current_total1);
+		} else {
+			Serial.printf_P(PSTR("V: %4.4f, A: %4.4f, mAh: %4.4f\n"),
+						battery_voltage1,
+						current_amps1,
+						current_total1);
+		}
 
 		// write out the servo PWM values
 		// ------------------------------
@@ -407,6 +395,30 @@ test_modeswitch(uint8_t argc, const Menu::arg *argv)
 	}
 }
 
+/*
+  test the dataflash is working
+ */
+static int8_t
+test_logging(uint8_t argc, const Menu::arg *argv)
+{
+	Serial.println_P(PSTR("Testing dataflash logging"));
+    if (!DataFlash.CardInserted()) {
+        Serial.println_P(PSTR("ERR: No dataflash inserted"));
+        return 0;
+    }
+    DataFlash.ReadManufacturerID();
+    Serial.printf_P(PSTR("Manufacturer: 0x%02x   Device: 0x%04x\n"),
+                    (unsigned)DataFlash.df_manufacturer,
+                    (unsigned)DataFlash.df_device);
+    Serial.printf_P(PSTR("NumPages: %u  PageSize: %u\n"),
+                    (unsigned)DataFlash.df_NumPages+1,
+                    (unsigned)DataFlash.df_PageSize);
+    DataFlash.StartRead(DataFlash.df_NumPages+1);
+    Serial.printf_P(PSTR("Format version: %lx  Expected format version: %lx\n"),
+                    (unsigned long)DataFlash.ReadLong(), (unsigned long)DF_LOGGING_FORMAT);
+    return 0;
+}
+
 #if CONFIG_APM_HARDWARE != APM_HARDWARE_APM2
 static int8_t
 test_dipswitches(uint8_t argc, const Menu::arg *argv)
@@ -450,16 +462,11 @@ test_dipswitches(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_adc(uint8_t argc, const Menu::arg *argv)
 {
-	print_hit_enter();
-    isr_registry.init();
-    timer_scheduler.init( &isr_registry );
-	adc.Init(&timer_scheduler);
-	delay(1000);
 	Serial.printf_P(PSTR("ADC\n"));
 	delay(1000);
 
 	while(1){
-		for (int i=0;i<9;i++) Serial.printf_P(PSTR("%u\t"),adc.Ch(i));
+		for (int i=0;i<9;i++) Serial.printf_P(PSTR("%.1f\t"),adc.Ch(i));
 		Serial.println();
 		delay(100);
 		if(Serial.available() > 0){
@@ -503,9 +510,8 @@ static int8_t
 test_imu(uint8_t argc, const Menu::arg *argv)
 {
 	//Serial.printf_P(PSTR("Calibrating."));
-    isr_registry.init();
-    timer_scheduler.init( &isr_registry );
-	imu.init(IMU::COLD_START, delay, &timer_scheduler);
+    imu.coldStart();
+    dcm.matrix_reset();
 
 	print_hit_enter();
 	delay(1000);
@@ -524,9 +530,10 @@ test_imu(uint8_t argc, const Menu::arg *argv)
 			if(g.compass_enabled) {
 				medium_loopCounter++;
 				if(medium_loopCounter == 5){
-					compass.read();		 				// Read magnetometer
-					compass.calculate(dcm.get_dcm_matrix());		// Calculate heading
-					medium_loopCounter = 0;
+					if (compass.read()) {
+                        compass.calculate(dcm.get_dcm_matrix());		// Calculate heading
+                    }
+                    medium_loopCounter = 0;
 				}
 			}
 
@@ -562,13 +569,13 @@ test_mag(uint8_t argc, const Menu::arg *argv)
         Serial.println_P(PSTR("Compass initialisation failed!"));
         return 0;
     }
+    compass.null_offsets_enable();
     dcm.set_compass(&compass);
     report_compass();
 
     // we need the DCM initialised for this test
-    isr_registry.init();
-    timer_scheduler.init( &isr_registry );
-	imu.init(IMU::COLD_START, delay, &timer_scheduler);
+    imu.coldStart();
+    dcm.matrix_reset();
 
 	int counter = 0;
 		//Serial.printf_P(PSTR("MAG_ORIENTATION: %d\n"), MAG_ORIENTATION);
@@ -588,23 +595,28 @@ test_mag(uint8_t argc, const Menu::arg *argv)
 
             medium_loopCounter++;
             if(medium_loopCounter == 5){
-                compass.read();		 				// Read magnetometer
-                compass.calculate(dcm.get_dcm_matrix());		// Calculate heading
-                compass.null_offsets(dcm.get_dcm_matrix());
+                if (compass.read()) {
+                    compass.calculate(dcm.get_dcm_matrix());		// Calculate heading
+                    compass.null_offsets(dcm.get_dcm_matrix());
+                }
                 medium_loopCounter = 0;
             }
 
 			counter++;
 			if (counter>20) {
-                Vector3f maggy = compass.get_offsets();
-                Serial.printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d,\tXYZoff: %6.2f, %6.2f, %6.2f\n"),
-                                (wrap_360(ToDeg(compass.heading) * 100)) /100,
-                                compass.mag_x,
-                                compass.mag_y,
-                                compass.mag_z,
-                                maggy.x,
-                                maggy.y,
-                                maggy.z);
+                if (compass.healthy) {
+                    Vector3f maggy = compass.get_offsets();
+                    Serial.printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d,\tXYZoff: %6.2f, %6.2f, %6.2f\n"),
+                                    (wrap_360(ToDeg(compass.heading) * 100)) /100,
+                                    compass.mag_x,
+                                    compass.mag_y,
+                                    compass.mag_z,
+                                    maggy.x,
+                                    maggy.y,
+                                    maggy.z);
+                } else {
+                    Serial.println_P(PSTR("compass not healthy"));
+                }
                 counter=0;
             }
 		}
@@ -630,9 +642,9 @@ test_mag(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_airspeed(uint8_t argc, const Menu::arg *argv)
 {
-    unsigned airspeed_ch = adc.Ch(AIRSPEED_CH);
-	// Serial.println(adc.Ch(AIRSPEED_CH));
-    Serial.printf_P(PSTR("airspeed_ch: %u\n"), airspeed_ch);
+    float airspeed_ch = pitot_analog_source.read();
+	// Serial.println(pitot_analog_source.read());
+    Serial.printf_P(PSTR("airspeed_ch: %.1f\n"), airspeed_ch);
 
 	if (g.airspeed_enabled == false){
 		Serial.printf_P(PSTR("airspeed: "));
@@ -648,7 +660,7 @@ test_airspeed(uint8_t argc, const Menu::arg *argv)
 		while(1){
 			delay(20);
 			read_airspeed();
-			Serial.printf_P(PSTR("%fm/s\n"), airspeed / 100.0);
+			Serial.printf_P(PSTR("%.1f m/s\n"), airspeed / 100.0);
 
 			if(Serial.available() > 0){
 				return (0);
@@ -672,9 +684,13 @@ test_pressure(uint8_t argc, const Menu::arg *argv)
 		delay(100);
 		current_loc.alt = read_barometer() + home.alt;
 
-		Serial.printf_P(PSTR("Alt: %0.2fm, Raw: %ld\n"),
-						current_loc.alt / 100.0,
-						abs_pressure);
+        if (!barometer.healthy) {
+            Serial.println_P(PSTR("not healthy"));
+        } else {
+            Serial.printf_P(PSTR("Alt: %0.2fm, Raw: %ld Temperature: %.1f\n"),
+                            current_loc.alt / 100.0,
+                            abs_pressure, 0.1*barometer.get_temperature());
+        }
 
 		if(Serial.available() > 0){
 			return (0);

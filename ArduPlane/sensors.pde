@@ -11,23 +11,25 @@ static void init_barometer(void)
 	long 			ground_pressure = 0;
 	int 			ground_temperature;
 
-	while(ground_pressure == 0){
-		barometer.Read(); 					// Get initial data from absolute pressure sensor
-		ground_pressure 	= barometer.Press;
-		ground_temperature 	= barometer.Temp;
+	while (ground_pressure == 0 || !barometer.healthy) {
+		barometer.read(); 					// Get initial data from absolute pressure sensor
+		ground_pressure 	= barometer.get_pressure();
+		ground_temperature 	= barometer.get_temperature();
 		mavlink_delay(20);
-		//Serial.printf("barometer.Press %ld\n", barometer.Press);
+		//Serial.printf("barometer.Press %ld\n", barometer.get_pressure());
 	}
 
 	for(int i = 0; i < 30; i++){		// We take some readings...
 
 		#if HIL_MODE == HIL_MODE_SENSORS
-			gcs_update(); 				// look for inbound hil packets
+        gcs_update(); 				// look for inbound hil packets
 		#endif
-
-		barometer.Read(); 				// Get initial data from absolute pressure sensor
-		ground_pressure		= (ground_pressure * 9l   + barometer.Press) / 10l;
-		ground_temperature	= (ground_temperature * 9 + barometer.Temp) / 10;
+        
+        do {
+            barometer.read(); 				// Get pressure sensor
+        } while (!barometer.healthy);
+		ground_pressure		= (ground_pressure * 9l   + barometer.get_pressure()) / 10l;
+		ground_temperature	= (ground_temperature * 9 + barometer.get_temperature()) / 10;
 
 		mavlink_delay(20);
 		if(flashcount == 5) {
@@ -57,11 +59,10 @@ static long read_barometer(void)
 {
  	float x, scaling, temp;
 
-	barometer.Read();		// Get new data from absolute pressure sensor
+	barometer.read();		// Get new data from absolute pressure sensor
 
-
-	//abs_pressure 			= (abs_pressure + barometer.Press) >> 1;		// Small filtering
-	abs_pressure 			= ((float)abs_pressure * .7) + ((float)barometer.Press * .3);		// large filtering
+	//abs_pressure 			= (abs_pressure + barometer.get_pressure()) >> 1;		// Small filtering
+	abs_pressure 			= ((float)abs_pressure * .7) + ((float)barometer.get_pressure() * .3);		// large filtering
 	scaling 				= (float)g.ground_pressure / (float)abs_pressure;
 	temp 					= ((float)g.ground_temperature) + 273.15f;
 	x 						= log(scaling) * temp * 29271.267f;
@@ -77,12 +78,12 @@ static void read_airspeed(void)
             // calibration before we can use it. This isn't as
             // accurate as the 50 point average in zero_airspeed(),
             // but it is better than using it uncalibrated
-            airspeed_raw = (float)adc.Ch(AIRSPEED_CH);
+            airspeed_raw = pitot_analog_source.read();
             g.airspeed_offset.set_and_save(airspeed_raw);
 		}
-		airspeed_raw 		= ((float)adc.Ch(AIRSPEED_CH) * .25) + (airspeed_raw * .75);
-		airspeed_pressure 	= max(((int)airspeed_raw - g.airspeed_offset), 0);
-		airspeed 			= sqrt((float)airspeed_pressure * g.airspeed_ratio) * 100;
+		airspeed_raw 		= (pitot_analog_source.read() * 0.1) + (airspeed_raw * 0.9);
+		airspeed_pressure 	= max((airspeed_raw - g.airspeed_offset), 0);
+		airspeed 			= sqrt(airspeed_pressure * g.airspeed_ratio) * 100;
 	#endif
 
 	calc_airspeed_errors();
@@ -90,37 +91,36 @@ static void read_airspeed(void)
 
 static void zero_airspeed(void)
 {
-	airspeed_raw = (float)adc.Ch(AIRSPEED_CH);
-	for(int c = 0; c < 10; c++){
-		delay(20);
-		airspeed_raw = (airspeed_raw * .90) + ((float)adc.Ch(AIRSPEED_CH) * .10);
+    float sum = 0;
+    int c;
+	airspeed_raw = pitot_analog_source.read();
+	for(c = 0; c < 250; c++) {
+		delay(2);
+		sum += pitot_analog_source.read();
 	}
-	g.airspeed_offset.set_and_save(airspeed_raw);
+    sum /= c;
+	g.airspeed_offset.set_and_save((int16_t)sum);
 }
 
 #endif // HIL_MODE != HIL_MODE_ATTITUDE
 
 static void read_battery(void)
 {
-	battery_voltage1 = BATTERY_VOLTAGE(analogRead(BATTERY_PIN1)) * .1 + battery_voltage1 * .9;
-	battery_voltage2 = BATTERY_VOLTAGE(analogRead(BATTERY_PIN2)) * .1 + battery_voltage2 * .9;
-	battery_voltage3 = BATTERY_VOLTAGE(analogRead(BATTERY_PIN3)) * .1 + battery_voltage3 * .9;
-	battery_voltage4 = BATTERY_VOLTAGE(analogRead(BATTERY_PIN4)) * .1 + battery_voltage4 * .9;
-
-	if(g.battery_monitoring == 1) 
-		battery_voltage = battery_voltage3; // set total battery voltage, for telemetry stream	
-	if(g.battery_monitoring == 2) 
-		battery_voltage = battery_voltage4;
+	if(g.battery_monitoring == 0) {
+		battery_voltage1 = 0;
+		return;
+	}
+	
 	if(g.battery_monitoring == 3 || g.battery_monitoring == 4) 
-		battery_voltage = battery_voltage1;
+		battery_voltage1 = BATTERY_VOLTAGE(analogRead(BATTERY_PIN_1)) * .1 + battery_voltage1 * .9;
 	if(g.battery_monitoring == 4) {
-		current_amps	 = CURRENT_AMPS(analogRead(CURRENT_PIN_1)) * .1 + current_amps * .9; //reads power sensor current pin
-		current_total	 += current_amps * (float)delta_ms_medium_loop * 0.000278;
+		current_amps1	 = CURRENT_AMPS(analogRead(CURRENT_PIN_1)) * .1 + current_amps1 * .9; 	//reads power sensor current pin
+		current_total1	 += current_amps1 * (float)delta_ms_medium_loop * 0.0002778;				// .0002778 is 1/3600 (conversion to hours)
 	}
 	
 	#if BATTERY_EVENT == ENABLED
-		if(battery_voltage < LOW_VOLTAGE)	low_battery_event();
-		if(g.battery_monitoring == 4 && current_total > g.pack_capacity)	low_battery_event();
+		if(battery_voltage1 < LOW_VOLTAGE)	low_battery_event();
+		if(g.battery_monitoring == 4 && current_total1 > g.pack_capacity)	low_battery_event();
 	#endif
 }
 

@@ -18,6 +18,7 @@
 #define ROLL_PITCH_STABLE 	0
 #define ROLL_PITCH_ACRO 	1
 #define ROLL_PITCH_AUTO		2
+#define ROLL_PITCH_STABLE_OF	3
 
 #define THROTTLE_MANUAL 	0
 #define THROTTLE_HOLD 		1
@@ -90,16 +91,11 @@
 #define GPS_PROTOCOL_MTK16	6
 #define GPS_PROTOCOL_AUTO	7
 
-// SONAR types:
-#define MAX_SONAR_UNKNOWN	0
-#define MAX_SONAR_XL		1
-
 #define CH_ROLL CH_1
 #define CH_PITCH CH_2
 #define CH_THROTTLE CH_3
 #define CH_RUDDER CH_4
 #define CH_YAW CH_4
-
 
 #define RC_CHANNEL_ANGLE 0
 #define RC_CHANNEL_RANGE 1
@@ -109,6 +105,10 @@
 #define HIL_MODE_DISABLED			0
 #define HIL_MODE_ATTITUDE			1
 #define HIL_MODE_SENSORS			2
+
+#define ASCENDING			1
+#define DESCENDING			-1
+#define REACHED_ALT			0
 
 // Auto Pilot modes
 // ----------------
@@ -121,7 +121,8 @@
 #define RTL 6				// AUTO control
 #define CIRCLE 7			// AUTO control
 #define POSITION 8			// AUTO control
-#define NUM_MODES 9
+#define LAND 9				// AUTO control
+#define NUM_MODES 10
 
 #define INITIALISING 9     // in startup routines
 
@@ -156,6 +157,13 @@
 
 // altitude controller
 #define CH6_THR_HOLD_KP 14
+#define CH6_Z_GAIN 15
+#define CH6_DAMP 16
+
+// optical flow controller
+#define CH6_OPTFLOW_KP 17
+#define CH6_OPTFLOW_KI 18
+
 
 // nav byte mask
 // -------------
@@ -172,6 +180,7 @@
 #define LOITER_MODE 1
 #define WP_MODE 2
 #define CIRCLE_MODE 3
+#define NO_NAV_MODE 4
 
 // Waypoint options
 #define MASK_OPTIONS_RELATIVE_ALT 		1
@@ -283,8 +292,8 @@ enum gcs_severity {
 #define	ALTITUDE_HISTORY_LENGTH 8	//Number of (time,altitude) points to regress a climb rate from
 
 
-#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1024.0))*VOLT_DIV_RATIO
-#define CURRENT_AMPS(x) ((x*(g.input_voltage/1024.0))-CURR_AMPS_OFFSET)*CURR_AMP_PER_VOLT
+#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1023.0))*VOLT_DIV_RATIO
+#define CURRENT_AMPS(x) ((x*(g.input_voltage/1023.0))-CURR_AMPS_OFFSET)*CURR_AMP_PER_VOLT
 //#define BARO_FILTER_SIZE 8
 
 /* ************************************************************** */
@@ -316,16 +325,8 @@ enum gcs_severity {
 #define AN14  68 // NC
 #define AN15  69 // NC
 
-#define VOLTAGE_PIN_0 0 // These are the pins for current sensor: voltage
-#define CURRENT_PIN_1 1 // and current
-
 #define RELAY_PIN 47
 
-#define	AIRSPEED_CH 7			// The external ADC channel for the airspeed sensor
-#define BATTERY_PIN1 0		        // These are the pins for the voltage dividers
-#define BATTERY_PIN2 1
-#define BATTERY_PIN3 2
-#define BATTERY_PIN4 3
 #define PIEZO_PIN AN5           //Last pin on the back ADC connector
 
 
@@ -357,5 +358,11 @@ enum gcs_severity {
 // APM Hardware selection
 #define APM_HARDWARE_APM1 1
 #define APM_HARDWARE_APM2 2
+
+#define AP_BARO_BMP085    1
+#define AP_BARO_MS5611    2
+
+#define LOGGING_SIMPLE    1
+#define LOGGING_VERBOSE   2
 
 #endif // _DEFINES_H

@@ -77,14 +77,14 @@ namespace ArdupilotMega.GCSViews
             if (MainV2.APMFirmware == MainV2.Firmwares.ArduPlane)
             {
                 ConfigTabs.SelectedIndex = 0;
-                TabAPM2.Enabled = true;
-                TabAC2.Enabled = false;
+                TabAP.Enabled = true;
+                TabAC.Enabled = false;
             }
             else
             {
                 ConfigTabs.SelectedIndex = 1;
-                TabAPM2.Enabled = false;
-                TabAC2.Enabled = true;
+                TabAP.Enabled = false;
+                TabAC.Enabled = true;
             }
 
             // read tooltips
@@ -167,7 +167,7 @@ namespace ArdupilotMega.GCSViews
 
             // setup language selection
             CultureInfo ci = null;
-            foreach (string name in new string[] { "en-US", "zh-Hans", "ru-RU" })
+            foreach (string name in new string[] { "en-US", "zh-Hans", "zh-TW", "ru-RU", "Fr", "Pl" })
             {
                 ci = MainV2.getcultureinfo(name);
                 if (ci != null)
@@ -314,8 +314,8 @@ namespace ArdupilotMega.GCSViews
             toolTip1.RemoveAll();
             Params.Rows.Clear();
 
-            disableNumericUpDownControls(TabAC2);
-            disableNumericUpDownControls(TabAPM2);
+            disableNumericUpDownControls(TabAC);
+            disableNumericUpDownControls(TabAP);
 
             // process hashdefines and update display
             foreach (string value in param.Keys)
@@ -349,45 +349,50 @@ namespace ArdupilotMega.GCSViews
                 {
                     try
                     {
-                        NumericUpDown thisctl = ((NumericUpDown)ctl);
-                        thisctl.Maximum = 9000;
-                        thisctl.Minimum = -9000;
-                        thisctl.Value = (decimal)(float)param[value];
-                        thisctl.Increment = (decimal)0.001;
-                        if (thisctl.Name.EndsWith("_P") || thisctl.Name.EndsWith("_I") || thisctl.Name.EndsWith("_D") || thisctl.Value == 0 || thisctl.Value.ToString("0.###", new System.Globalization.CultureInfo("en-US")).Contains("."))
+                        if (ctl.GetType() == typeof(NumericUpDown))
                         {
-                            thisctl.DecimalPlaces = 3;
-                        }
-                        else
-                        {
-                            thisctl.Increment = (decimal)1;
-                            thisctl.DecimalPlaces = 1;
-                        }
 
-                        thisctl.Enabled = true;
-
-                        thisctl.BackColor = Color.FromArgb(0x43, 0x44, 0x45);
-                        thisctl.Validated += null;
-                        if (tooltips[value] != null)
-                        {
-                            try
+                            NumericUpDown thisctl = ((NumericUpDown)ctl);
+                            thisctl.Maximum = 9000;
+                            thisctl.Minimum = -9000;
+                            thisctl.Value = (decimal)(float)param[value];
+                            thisctl.Increment = (decimal)0.001;
+                            if (thisctl.Name.EndsWith("_P") || thisctl.Name.EndsWith("_I") || thisctl.Name.EndsWith("_D") || thisctl.Value == 0 || thisctl.Value.ToString("0.###", new System.Globalization.CultureInfo("en-US")).Contains("."))
                             {
-                                toolTip1.SetToolTip(ctl, ((paramsettings)tooltips[value]).desc);
+                                thisctl.DecimalPlaces = 3;
                             }
-                            catch { }
+                            else
+                            {
+                                thisctl.Increment = (decimal)1;
+                                thisctl.DecimalPlaces = 1;
+                            }
+
+                            thisctl.Enabled = true;
+
+                            thisctl.BackColor = Color.FromArgb(0x43, 0x44, 0x45);
+                            thisctl.Validated += null;
+                            if (tooltips[value] != null)
+                            {
+                                try
+                                {
+                                    toolTip1.SetToolTip(ctl, ((paramsettings)tooltips[value]).desc);
+                                }
+                                catch { }
+                            }
+                            thisctl.Validated += new EventHandler(EEPROM_View_float_TextChanged);
+
                         }
-                        thisctl.Validated += new EventHandler(EEPROM_View_float_TextChanged);
+                        else if (ctl.GetType() == typeof(ComboBox))
+                        {
+
+                            ComboBox thisctl = ((ComboBox)ctl);
+
+                            thisctl.SelectedIndex = (int)(float)param[value];
+
+                            thisctl.Validated += new EventHandler(ComboBox_Validated);
+                        }
                     }
                     catch { }
-
-                    try
-                    {
-                        ComboBox thisctl = ((ComboBox)ctl);
-
-                        thisctl.SelectedIndex = (int)(float)param[value];
-
-                        thisctl.Validated += new EventHandler(ComboBox_Validated);
-                    } catch {}
 
                 }
                 if (text.Length == 0)
@@ -545,13 +550,13 @@ namespace ArdupilotMega.GCSViews
             {
                 if (text.Length > 0)
                 {
-                        if (sender.GetType() == typeof(NumericUpDown))
+                    if (text[0].GetType() == typeof(NumericUpDown))
                         {
                             decimal option = (decimal)(float.Parse(Params[e.ColumnIndex, e.RowIndex].Value.ToString()));
                             ((NumericUpDown)text[0]).Value = option;
                             ((NumericUpDown)text[0]).BackColor = Color.Green;
                         }
-                        else if (sender.GetType() == typeof(ComboBox))
+                    else if (text[0].GetType() == typeof(ComboBox))
                         {
                             int option = (int)(float.Parse(Params[e.ColumnIndex, e.RowIndex].Value.ToString()));
                             ((ComboBox)text[0]).SelectedIndex = option;
@@ -605,6 +610,20 @@ namespace ArdupilotMega.GCSViews
                         if (name == "WP_TOTAL")
                             continue;
                         if (name == "CMD_TOTAL")
+                            continue;
+                        if (name == "FENCE_TOTAL")
+                            continue;
+                        if (name == "SYS_NUM_RESETS")
+                            continue;
+                        if (name == "ARSPD_OFFSET")
+                            continue;
+                        if (name == "GND_ABS_PRESS")
+                            continue;
+                        if (name == "GND_TEMP")
+                            continue;
+                        if (name == "CMD_INDEX")
+                            continue;
+                        if (name == "LOG_LASTFILE")
                             continue;
                         if (row.Cells[0].Value.ToString() == name)
                         {
@@ -666,7 +685,7 @@ namespace ArdupilotMega.GCSViews
                         Control[] text = this.Controls.Find(value, true);
                         if (text.Length > 0)
                         {
-                            ((NumericUpDown)text[0]).BackColor = Color.FromArgb(0x43, 0x44, 0x45);
+                            ((Control)text[0]).BackColor = Color.FromArgb(0x43, 0x44, 0x45);
                         }
                     }
                     catch { }

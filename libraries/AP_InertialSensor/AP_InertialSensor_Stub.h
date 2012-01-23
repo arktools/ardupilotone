@@ -1,3 +1,4 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #ifndef __AP_INERTIAL_SENSOR_STUB_H__
 #define __AP_INERTIAL_SENSOR_STUB_H__
@@ -12,9 +13,7 @@ class AP_InertialSensor_Stub : public AP_InertialSensor
 {
   public:
 
-  AP_InertialSensor_Stub() {}
-
-  void init( AP_PeriodicProcess * scheduler );
+  AP_InertialSensor_Stub(AP_PeriodicProcess * scheduler) : AP_InertialSensor(scheduler) {}
 
   /* Concrete implementation of AP_InertialSensor functions: */
   bool update();
@@ -30,6 +29,6 @@ class AP_InertialSensor_Stub : public AP_InertialSensor
   float temperature();
   uint32_t sample_time();
   void reset_sample_time();
-  };
+};
 
 #endif // __AP_INERTIAL_SENSOR_STUB_H__

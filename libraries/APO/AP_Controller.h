@@ -20,11 +20,10 @@
 #define AP_Controller_H
 
 // inclusions
-#include "../AP_Common/AP_Common.h"
-#include "../AP_Common/AP_Var.h"
+#include <AP_Common.h>
 #include <inttypes.h>
 #include <math.h>
-#include "../GCS_MAVLink/GCS_MAVLink.h"
+#include <GCS_MAVLink.h>
 
 namespace apo {
 

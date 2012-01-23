@@ -35,7 +35,11 @@ static void update_commands()
 	//Serial.printf("update_commands: %d\n",increment );
 	// A: if we do not have any commands there is nothing to do
 	// B: We have completed the mission, don't redo the mission
-	if (g.command_total <= 1 || g.command_index == 255)
+	// XXX debug
+	//uint8_t tmp = g.command_index.get();
+	//Serial.printf("command_index %u \n", tmp);
+
+	if (g.command_total <= 1 || g.command_index > 127)
 		return;
 
 	if(command_nav_queue.id == NO_COMMAND){
@@ -54,7 +58,21 @@ static void update_commands()
 				command_nav_queue.id = NO_COMMAND;
 			}
 		}else{
-			command_nav_index == 255;
+			// we are out of commands
+			g.command_index  = command_nav_index = 255;
+			// if we are on the ground, enter stabilize, else Land
+			if (land_complete == true){
+				// So what state does this leave us in?
+				// We are still in the same mode as what landed us,
+				// so maybe we try to continue to descend just in case we are still in the air
+				// This will also drive down the Iterm to -300
+
+				// We can't disarm the motors easily. We could very well be wrong
+				//
+				//init_disarm_motors();
+			} else {
+				set_mode(LAND);
+			}
 		}
 	}
 
@@ -118,11 +136,11 @@ static void execute_nav_command(void)
 	if (g.log_bitmask & MASK_LOG_CMD)
 		Log_Write_Cmd(g.command_index, &command_nav_queue);
 
-	// Act on the new command
-	process_nav_command();
-
 	// clear navigation prameters
 	reset_nav();
+
+	// Act on the new command
+	process_nav_command();
 
 	// clear May indexes to force loading of more commands
 	// existing May commands are tossed.

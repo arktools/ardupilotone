@@ -1171,10 +1171,10 @@
     <value>NoControl</value>
   </data>
   <data name="lbl_winddir.Location" type="System.Drawing.Point, System.Drawing">
-    <value>4, 7</value>
+    <value>4, 3</value>
   </data>
   <data name="lbl_winddir.Size" type="System.Drawing.Size, System.Drawing">
-    <value>32, 13</value>
+    <value>46, 17</value>
   </data>
   <data name="lbl_winddir.TabIndex" type="System.Int32, mscorlib">
     <value>68</value>
@@ -1201,10 +1201,10 @@
     <value>NoControl</value>
   </data>
   <data name="lbl_windvel.Location" type="System.Drawing.Point, System.Drawing">
-    <value>4, 20</value>
+    <value>4, 23</value>
   </data>
   <data name="lbl_windvel.Size" type="System.Drawing.Size, System.Drawing">
-    <value>34, 13</value>
+    <value>48, 10</value>
   </data>
   <data name="lbl_windvel.TabIndex" type="System.Int32, mscorlib">
     <value>69</value>

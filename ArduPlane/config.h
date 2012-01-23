@@ -50,6 +50,11 @@
 # define CONFIG_APM_HARDWARE APM_HARDWARE_APM1
 #endif
 
+#if defined( __AVR_ATmega1280__ )
+#define CLI_ENABLED DISABLED
+#define LOGGING_ENABLED DISABLED
+#endif
+
 //////////////////////////////////////////////////////////////////////////////
 // APM2 HARDWARE DEFAULTS
 //
@@ -60,8 +65,16 @@
 # define CONFIG_RELAY      DISABLED
 # define MAG_ORIENTATION   AP_COMPASS_APM2_SHIELD
 # define CONFIG_SONAR_SOURCE SONAR_SOURCE_ANALOG_PIN
+# define CONFIG_PITOT_SOURCE PITOT_SOURCE_ANALOG_PIN
+# define MAGNETOMETER ENABLED
+# ifdef APM2_BETA_HARDWARE
+#  define CONFIG_BARO     AP_BARO_BMP085
+# else // APM2 Production Hardware (default)
+#  define CONFIG_BARO     AP_BARO_MS5611
+# endif
 #endif
 
+//////////////////////////////////////////////////////////////////////////////
 // LED and IO Pins
 //
 #if CONFIG_APM_HARDWARE == APM_HARDWARE_APM1
@@ -73,6 +86,9 @@
 # define SLIDE_SWITCH_PIN 40
 # define PUSHBUTTON_PIN   41
 # define USB_MUX_PIN      -1
+# define CONFIG_RELAY     ENABLED
+# define BATTERY_PIN_1	  0
+# define CURRENT_PIN_1	  1
 #elif CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
 # define A_LED_PIN        27
 # define B_LED_PIN        26
@@ -83,6 +99,8 @@
 # define PUSHBUTTON_PIN   (-1)
 # define CLI_SLIDER_ENABLED DISABLED
 # define USB_MUX_PIN 23
+# define BATTERY_PIN_1	  1
+# define CURRENT_PIN_1	  2
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -122,6 +140,14 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
+// Barometer
+//
+
+#ifndef CONFIG_BARO
+# define CONFIG_BARO AP_BARO_BMP085
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
 // Pitot
 //
 
@@ -139,10 +165,10 @@
 # endif
 #elif CONFIG_PITOT_SOURCE == PITOT_SOURCE_ANALOG_PIN
 # ifndef CONFIG_PITOT_SOURCE_ANALOG_PIN
-#  define CONFIG_PITOT_SOURCE_ANALOG_PIN AN4
+#  define CONFIG_PITOT_SOURCE_ANALOG_PIN 0
 # endif
 #else
-# warning Invalid value for CONFIG_PITOT_SOURCE, disabling sonar
+# warning Invalid value for CONFIG_PITOT_SOURCE, disabling airspeed
 # undef PITOT_ENABLED
 # define PITOT_ENABLED DISABLED
 #endif
@@ -151,10 +177,9 @@
 # define SONAR_TYPE             MAX_SONAR_LV	// MAX_SONAR_XL,  
 #endif
 
-/* In ArduPlane PITOT usually takes the place of SONAR, but some bits
- * still depend on SONAR.
- */
-#define SONAR_ENABLED PITOT_ENABLED
+#ifndef SONAR_ENABLED
+#define SONAR_ENABLED DISABLED
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // HIL_MODE                                 OPTIONAL
@@ -203,12 +228,17 @@
 # define LOW_VOLTAGE			9.6
 #endif
 #ifndef VOLT_DIV_RATIO
-# define VOLT_DIV_RATIO			3.56
+# define VOLT_DIV_RATIO			3.56	// This is the proper value for an on-board APM1 voltage divider with a 3.9kOhm resistor
+//# define VOLT_DIV_RATIO		15.70	// This is the proper value for the AttoPilot 50V/90A sensor
+//# define VOLT_DIV_RATIO		4.127	// This is the proper value for the AttoPilot 13.6V/45A sensor
+
 #endif
 
 #ifndef CURR_AMP_PER_VOLT
-# define CURR_AMP_PER_VOLT		27.32
+# define CURR_AMP_PER_VOLT		27.32	// This is the proper value for the AttoPilot 50V/90A sensor
+//# define CURR_AMP_PER_VOLT	13.66	// This is the proper value for the AttoPilot 13.6V/45A sensor
 #endif
+
 #ifndef CURR_AMPS_OFFSET
 # define CURR_AMPS_OFFSET		0.0
 #endif
@@ -455,6 +485,16 @@
 # define AIRSPEED_CRUISE		12 // 12 m/s
 #endif
 #define AIRSPEED_CRUISE_CM AIRSPEED_CRUISE*100
+
+
+//////////////////////////////////////////////////////////////////////////////
+// MIN_GNDSPEED
+//
+#ifndef MIN_GNDSPEED
+# define MIN_GNDSPEED			0 // m/s (0 disables)
+#endif
+#define MIN_GNDSPEED_CM MIN_GNDSPEED*100
+
 
 //////////////////////////////////////////////////////////////////////////////
 // FLY_BY_WIRE_B airspeed control
@@ -769,4 +809,28 @@
 // delay to prevent Xbee bricking, in milliseconds
 #ifndef MAVLINK_TELEMETRY_PORT_DELAY
 # define MAVLINK_TELEMETRY_PORT_DELAY 2000
+#endif
+
+// use this to disable gen-fencing
+#ifndef GEOFENCE_ENABLED
+# define GEOFENCE_ENABLED ENABLED
+#endif
+
+// pwm value on FENCE_CHANNEL to use to enable fenced mode
+#ifndef FENCE_ENABLE_PWM
+# define FENCE_ENABLE_PWM 1750
+#endif
+
+// a digital pin to set high when the geo-fence triggers. Defaults
+// to -1, which means don't activate a pin
+#ifndef FENCE_TRIGGERED_PIN
+# define FENCE_TRIGGERED_PIN -1
+#endif
+
+// if RESET_SWITCH_CH is not zero, then this is the PWM value on
+// that channel where we reset the control mode to the current switch
+// position (to for example return to switched mode after failsafe or
+// fence breach)
+#ifndef RESET_SWITCH_CHAN_PWM
+# define RESET_SWITCH_CHAN_PWM 1750
 #endif

@@ -9,8 +9,8 @@ class AP_AnalogSource_ADC : public AP_AnalogSource
 {
     public:
     AP_AnalogSource_ADC( AP_ADC * adc, int ch, float prescale = 1.0 ) :
-        _adc(adc), _ch(ch) {}
-    int read(void);
+        _adc(adc), _ch(ch), _prescale(prescale) {}
+    float read(void);
 
     private:
     AP_ADC * _adc;
