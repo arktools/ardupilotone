@@ -8,7 +8,7 @@
 #ifndef AP_AUTOPILOT_H_
 #define AP_AUTOPILOT_H_
 
-#include "../AP_Common/AP_Loop.h"
+//#include "../AP_Common/AP_Loop.h"
 
 /**
  * ArduPilotOne namespace to protect variables
@@ -32,9 +32,7 @@ class AP_CommLink;
  * The constructor takes guide, navigator, and controller
  * as well as the hardware abstraction layer.
  *
- * It inherits from loop to manage
- * the sub-loops and sets the overall
- * frequency for the autopilot.
+ * Subloop managment is done using RTOS tasks.
  *
 
  */
@@ -89,7 +87,7 @@ private:
      * @param data A void pointer used to pass the apo class
      *  so that the apo public interface may be accessed.
      */
-    static void callback(void * data);
+    static void navigationTask(void * data);
 
     /**
      * Loop 0 Callbacks
@@ -97,7 +95,7 @@ private:
      * - compass reading
      * @see callback
      */
-    static void callback0(void * data);
+    static void controllerTask(void * data);
 
     /**
      * Loop 1 Callbacks
