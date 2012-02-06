@@ -6,8 +6,8 @@ set(CMAKE_TOOLCHAIN_FILE ${CMAKE_SOURCE_DIR}/cmake/toolchains/Arduino.cmake)
 # modify flags from default toolchain flags
 set(APM_OPT_FLAGS "-Wformat -Wall -Wshadow -Wpointer-arith -Wcast-align -Wwrite-strings -Wformat=2")
 
-set(ARDUINO_C_FLAGS "${APM_OPT_FLAGS} -mcall-prologues -ffunction-sections -fdata-sections")
-set(ARDUINO_CXX_FLAGS "${APM_OPT_FLAGS} -mcall-prologues -ffunction-sections -fdata-sections -fno-exceptions -Wno-reorder")
+set(ARDUINO_C_FLAGS "${APM_OPT_FLAGS} -mcall-prologues -ffunction-sections -fdata-sections -fomit-frame-pointer")
+set(ARDUINO_CXX_FLAGS "${APM_OPT_FLAGS} -mcall-prologues -ffunction-sections -fdata-sections -fno-exceptions -Wno-reorder -fomit-frame-pointer")
 set(ARDUINO_LINKER_FLAGS "-lc -lm ${APM_OPT_FLAGS} -Wl,--gc-sections")
 
 project(ArduPilotMega C CXX)
@@ -79,6 +79,54 @@ if (NOT DEFINED BOARD)
 endif()
 message(STATUS "Board configured as: ${BOARD}")
 
+# Add BeRTOS files
+
+set(BERTOS_DIR ${CMAKE_SOURCE_DIR}/bertos)
+set(BERTOS_CPU_DIR ${BERTOS_DIR}/cpu/avr)
+
+set(BERTOS_COMPILE_DEFINITIONS   -D__linux__=1
+                                 -D_AVR__=1
+                                -D__AVR_ATmega1280=1
+                                -DCPU_FREQ=16000000L
+                                -std=gnu99
+                                -mmcu=atmega1280
+                                )
+add_definitions(${BERTOS_COMPILE_DEFINITIONS})
+
+add_library(BeRTOS  ${BERTOS_CPU_DIR}/drv/timer_mega.c
+                    ${BERTOS_CPU_DIR}/drv/timer_mega.h
+                    ${BERTOS_CPU_DIR}/drv/ser_mega.h
+                    ${BERTOS_CPU_DIR}/drv/ser_mega.c
+                    ${BERTOS_CPU_DIR}/hw/switch_ctx_avr.S
+                    ${BERTOS_DIR}/cpu/detect.h
+                    ${BERTOS_DIR}/cpu/frame.h
+                    ${BERTOS_DIR}/drv/ser.c
+                    ${BERTOS_DIR}/drv/ser.h
+                    ${BERTOS_DIR}/drv/timer.c
+                    ${BERTOS_DIR}/drv/timer.h
+                    ${BERTOS_DIR}/io/kfile.c
+                    ${BERTOS_DIR}/io/kfile.h
+                    ${BERTOS_DIR}/kern/monitor.h
+                    ${BERTOS_DIR}/kern/monitor.c
+                    ${BERTOS_DIR}/kern/proc.c
+                    ${BERTOS_DIR}/kern/proc.c
+                    ${BERTOS_DIR}/kern/proc_p.h
+                    ${BERTOS_DIR}/kern/sem.c
+                    ${BERTOS_DIR}/kern/sem.h
+                    ${BERTOS_DIR}/kern/signal.c
+                    ${BERTOS_DIR}/kern/signal.h
+                    ${BERTOS_DIR}/mware/event.c
+                    ${BERTOS_DIR}/mware/event.h
+                    ${BERTOS_DIR}/mware/hex.c
+                    ${BERTOS_DIR}/mware/hex.h
+                    ${BERTOS_DIR}/struct/heap.c
+                    ${BERTOS_DIR}/struct/heap.h                
+                    )
+set_property(SOURCE ${CMAKE_SOURCE_DIR}/bertos/cpu/avr/hw/switch_ctx_avr.S
+                        PROPERTY LANGUAGE C)
+include_directories(${BERTOS_DIR})
+include_directories(${BERTOS_CPU_DIR})
+
 # add a sketch
 macro(add_sketch SKETCH_NAME BOARD PORT) 
 
@@ -146,6 +194,7 @@ macro(add_sketch SKETCH_NAME BOARD PORT)
 	include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${SKETCH_NAME})
 	generate_arduino_firmware(${SKETCH_NAME})
 	set_target_properties(${SKETCH_NAME} PROPERTIES LINKER_LANGUAGE CXX)
+    target_link_libraries(${SKETCH_NAME} BeRTOS)
 
 	# install settings
 	install(FILES
