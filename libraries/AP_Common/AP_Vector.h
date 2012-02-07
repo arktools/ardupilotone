@@ -24,6 +24,8 @@
 #include <inttypes.h>
 #include <WProgram.h>
 
+#undef ASSERT
+
 #ifdef ASSERT
 const static char vectorSource[] ="Vector.hpp";
 #endif

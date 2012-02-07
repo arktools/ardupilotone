@@ -8,6 +8,32 @@
 #ifndef AP_PROCESS_H_
 #define AP_PROCESS_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <cpu/irq.h>
+#include <cpu/power.h>
+#include <drv/timer.h>
+#include <kern/proc.h>
+#include <kern/monitor.h>
+
+#ifdef __cplusplus
+}
+#endif
+
+/*
+void * operator new(size_t size);
+void operator delete(void *ptr);
+
+void * operator new(size_t size) {
+    return malloc(size);
+}
+
+void operator delete(void * ptr) {
+    free(ptr);
+}
+*/
 
 /**
  * ArduPilotOne namespace to protect variables
@@ -37,10 +63,23 @@ namespace apo {
             float proc_dt() {
                 return _proc_dt;
             }
+
+            void setupTimer();
+            void waitOnTimer();
+
+             virtual void update();
+
+            void createProcess() {
+                _proc = proc_new(this->update, NULL, KERN_MINSTACKSIZE*2,NULL);
+                proc_setPri(_proc,_priority);
+            }
+               
             
         protected:
             int _priority;
             float _proc_dt;
+            struct Process * _proc;
+            Timer _timer;
     };
 
 } // namespace apo

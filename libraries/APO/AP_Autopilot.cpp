@@ -15,6 +15,7 @@
 #include "AP_Navigator.h"
 #include "AP_Controller.h"
 #include "AP_Guide.h"
+#include "AP_Process.h"
 #include "AP_BatteryMonitor.h"
 
 namespace apo {
@@ -112,6 +113,16 @@ namespace apo {
             controller->setState(MAV_STATE_STANDBY);
 
             /*
+             * Set up the processes.
+             */
+
+            proc_forbid();
+//            navigator->createProcess(navigationTask, this);
+            proc_permit();
+
+
+
+            /*
              * Attach loops, stacking for priority
              */
             /*
@@ -131,7 +142,9 @@ namespace apo {
         AP_Navigator * nav = apo->getNavigator();
         //apo->getBoard()->getDebug()->println_P(PSTR("callback"));
 
+        nav->setupTimer();
         while(1) {
+
             apo->callbackCalls++;
             // Get the navigator if it hasn't already been
             if(!nav) {
@@ -141,7 +154,7 @@ namespace apo {
             if(nav) {
                 nav->updateFast(nav->proc_dt());
             }
-            // Set Signal Blocking
+            nav->waitOnTimer();
            }
         }
 
