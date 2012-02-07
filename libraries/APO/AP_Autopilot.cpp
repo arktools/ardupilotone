@@ -23,8 +23,8 @@ namespace apo {
 
     AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
             AP_Controller * controller, AP_Board * board) :
-        Loop(board->getParameters().loopRate, callback, this), _navigator(navigator), _guide(guide),
-        _controller(controller), _board(board),
+        //Loop(board->getParameters().loopRate, callback, this), _navigator(navigator), _guide(guide),
+        //_controller(controller), _board(board),
         callbackCalls(0) {
 
             // allow hardware to call autopilot public routines
@@ -114,11 +114,13 @@ namespace apo {
             /*
              * Attach loops, stacking for priority
              */
+            /*
             board->getDebug()->println_P(PSTR("attaching loops"));
             subLoops().push_back(new Loop(board->getParameters().loop0Rate, callback0, this));
             subLoops().push_back(new Loop(board->getParameters().loop1Rate, callback1, this));
             subLoops().push_back(new Loop(board->getParameters().loop2Rate, callback2, this));
             subLoops().push_back(new Loop(board->getParameters().loop3Rate, callback3, this));
+            */
 
             board->getDebug()->println_P(PSTR("running"));
             //board->getGcs()->sendText(SEVERITY_LOW, PSTR("running"));
@@ -137,9 +139,10 @@ namespace apo {
             } 
 
             if(nav) {
-                nav->updateFast(apo->dt());
+                nav->updateFast(nav->proc_dt());
             }
             // Set Signal Blocking
+           }
         }
 
 
@@ -147,7 +150,7 @@ namespace apo {
             AP_Autopilot * apo = (AP_Autopilot *) data;
             AP_CommLink * hil = apo->getBoard()->getHil();
             AP_Controller * ctrl = apo->getController();
-            parameters_t parameters = apo->getBoard()->getParameters();
+            //parameters_t parameters = apo->getBoard()->getParameters();
             //apo->getBoard()->getDebug()->println_P(PSTR("callback 0"));
 
             while(1) {
@@ -158,7 +161,7 @@ namespace apo {
                     hil = apo->getBoard()->getHil();
                 }
 
-                if(hil && parameters.mode != AP_Board::MODE_LIVE) {
+                if(hil && apo->getBoard()->getParameters().mode != AP_Board::MODE_LIVE) {
                     hil->receive();
                     hil->sendMessage(MAVLINK_MSG_ID_RC_CHANNELS_SCALED);
                 }
@@ -166,120 +169,146 @@ namespace apo {
                 /*
                  * update control laws
                  */
-                if(!ctlr) {
-                    ctlr = apo->getController();
+                if(!ctrl) {
+                    ctrl = apo->getController();
                 }
-                if(ctlr) {
-                    ctlr->update(apo->subLoops()[0]->dt());
+                if(ctrl) {
+                    ctrl->update(ctrl->proc_dt());
                 }
                 /*
                    char msg[50];
                    sprintf(msg, "c_hdg: %f, c_thr: %f", apo->guide()->headingCommand, apo->guide()->groundSpeedCommand);
                    apo->board()->gcs->sendText(AP_CommLink::SEVERITY_LOW, msg);
                    */
+
+                // Set Signal Blocking
             }
         }
 
-        void AP_Autopilot::callback1(void * data) {
+        void AP_Autopilot::gpsFusion(void * data) {
             AP_Autopilot * apo = (AP_Autopilot *) data;
+            AP_Navigator * nav = apo->getNavigator();
+            AP_Guide * guide = apo->getGuide();
+            AP_CommLink * gcs = apo->getBoard()->getGcs();
             //apo->getBoard()->getDebug()->println_P(PSTR("callback 1"));
 
-            /*
-             * update guidance laws
-             */
-            if (apo->getGuide())
-            {
-                //apo->getBoard()->getDebug()->println_P(PSTR("updating guide"));
-                apo->getGuide()->update();
+            while(1) {
+                /*
+                 * update guidance laws
+                 */
+                if(!guide) {
+                    guide = apo->getGuide();
+                }
+                if(guide) {
+                    //apo->getBoard()->getDebug()->println_P(PSTR("updating guide"));
+                    guide->update();
+                }
+
+                /*
+                 * slow navigation loop update
+                 */
+                if(!nav) {
+                    nav = apo->getNavigator();
+                }
+                if(nav) {
+                    nav->updateSlow(nav->proc_dt());
+                }
+
+                /*
+                 * send telemetry
+                 */
+                if(!gcs) {
+                    gcs = apo->getBoard()->getGcs();
+                }
+                if(gcs) {
+                    gcs->sendMessage(MAVLINK_MSG_ID_ATTITUDE);
+                    gcs->sendMessage(MAVLINK_MSG_ID_GLOBAL_POSITION);
+
+                    gcs->receive();
+                }
+
+                /*
+                 * navigator debug
+                 */
+                /*
+                   if (apo->navigator()) {
+                   apo->getBoard()->getDebug()->printf_P(PSTR("roll: %f deg\tpitch: %f deg\tyaw: %f deg\n"),
+                   apo->navigator()->getRoll()*rad2Deg,
+                   apo->navigator()->getPitch()*rad2Deg,
+                   apo->navigator()->getYaw()*rad2Deg);
+                   apo->getBoard()->getDebug()->printf_P(PSTR("lat: %f deg\tlon: %f deg\talt: %f m\n"),
+                   apo->navigator()->getLat()*rad2Deg,
+                   apo->navigator()->getLon()*rad2Deg,
+                   apo->navigator()->getAlt());
+                   }
+                   */
+
+                // Set Signal Wait
             }
-
-            /*
-             * slow navigation loop update
-             */
-            if (apo->getNavigator()) {
-                apo->getNavigator()->updateSlow(apo->subLoops()[1]->dt());
-            }
-
-            /*
-             * send telemetry
-             */
-            if (apo->getBoard()->getGcs()) {
-                apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_ATTITUDE);
-                apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_GLOBAL_POSITION);
-            }
-
-            /*
-             * handle ground control station communication
-             */
-            if (apo->getBoard()->getGcs()) {
-                // send messages
-                apo->getBoard()->getGcs()->requestCmds();
-                apo->getBoard()->getGcs()->sendParameters();
-
-                // receive messages
-                apo->getBoard()->getGcs()->receive();
-            }
-
-            /*
-             * navigator debug
-             */
-            /*
-               if (apo->navigator()) {
-               apo->getBoard()->getDebug()->printf_P(PSTR("roll: %f deg\tpitch: %f deg\tyaw: %f deg\n"),
-               apo->navigator()->getRoll()*rad2Deg,
-               apo->navigator()->getPitch()*rad2Deg,
-               apo->navigator()->getYaw()*rad2Deg);
-               apo->getBoard()->getDebug()->printf_P(PSTR("lat: %f deg\tlon: %f deg\talt: %f m\n"),
-               apo->navigator()->getLat()*rad2Deg,
-               apo->navigator()->getLon()*rad2Deg,
-               apo->navigator()->getAlt());
-               }
-               */
         }
 
-        void AP_Autopilot::callback2(void * data) {
+        void AP_Autopilot::slowMessages(void * data) {
             AP_Autopilot * apo = (AP_Autopilot *) data;
+            AP_Board * board = apo->getBoard();
+            AP_CommLink * gcs = board->getGcs();
+            AP_BatteryMonitor * batt = board->getBatteryMonitor();
+
             //apo->getBoard()->getDebug()->println_P(PSTR("callback 2"));
 
             /*
              * send telemetry
              */
-            if (apo->getBoard()->getGcs()) {
-                // send messages
-                //apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_GPS_RAW_INT);
-                //apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_LOCAL_POSITION);
-                apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_RC_CHANNELS_SCALED);
-                apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_RC_CHANNELS_RAW);
-                apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_SCALED_IMU);
+            while(1) {
+                if(!gcs) {
+                    gcs = apo->getBoard()->getGcs();
+                }
+                if(gcs) {
+                    gcs->sendMessage(MAVLINK_MSG_ID_RC_CHANNELS_SCALED);
+                    gcs->sendMessage(MAVLINK_MSG_ID_RC_CHANNELS_RAW);
+                    gcs->sendMessage(MAVLINK_MSG_ID_SCALED_IMU);                    
+                }
+
+                /*
+                 * Update battery monitor
+                 */
+                if(!batt) {
+                    batt = apo->getBoard()->getBatteryMonitor();
+                }
+                if(batt) {
+                    batt->update();
+                }
+
+                /*
+                 * Send heartbeat
+                 */
+                if(gcs){
+                    gcs->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
+                }
+
+
+                /*
+                 * load/loop rate/ram debug
+                 */
+                if(board) {
+                    //board->setLoad(apo->load());
+                    board->getDebug()->printf_P(PSTR("callback calls: %d\n"),apo->callbackCalls);
+                    apo->callbackCalls = 0;
+                    //board->getDebug()->printf_P(PSTR("load: %d%%\trate: %f Hz\tfree ram: %d bytes\n"),
+                            //apo->load(),1.0/apo->dt(),freeMemory());
+                    board->getGcs()->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
+                }
+
+                /*
+                 * adc debug
+                 */
+                //apo->getDebug().printf_P(PSTR("adc: %d %d %d %d %d %d %d %d\n"),
+                //apo->adc()->Ch(0), apo->adc()->Ch(1), apo->adc()->Ch(2),
+                //apo->adc()->Ch(3), apo->adc()->Ch(4), apo->adc()->Ch(5),
+                //apo->adc()->Ch(6), apo->adc()->Ch(7), apo->adc()->Ch(8));
+                //
+
+                // Set Signal Wait
             }
-
-            /*
-             * update battery monitor
-             */
-            if (apo->getBoard()->getBatteryMonitor()) apo->getBoard()->getBatteryMonitor()->update();
-
-            /*
-             * send heartbeat
-             */
-            apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
-
-            /*
-             * load/loop rate/ram debug
-             */
-            apo->getBoard()->setLoad(apo->load());
-            apo->getBoard()->getDebug()->printf_P(PSTR("callback calls: %d\n"),apo->callbackCalls);
-            apo->callbackCalls = 0;
-            apo->getBoard()->getDebug()->printf_P(PSTR("load: %d%%\trate: %f Hz\tfree ram: %d bytes\n"),
-                    apo->load(),1.0/apo->dt(),freeMemory());
-            apo->getBoard()->getGcs()->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
-
-            /*
-             * adc debug
-             */
-            //apo->getDebug().printf_P(PSTR("adc: %d %d %d %d %d %d %d %d\n"),
-            //apo->adc()->Ch(0), apo->adc()->Ch(1), apo->adc()->Ch(2),
-            //apo->adc()->Ch(3), apo->adc()->Ch(4), apo->adc()->Ch(5),
-            //apo->adc()->Ch(6), apo->adc()->Ch(7), apo->adc()->Ch(8));
         }
 
         void AP_Autopilot::callback3(void * data) {

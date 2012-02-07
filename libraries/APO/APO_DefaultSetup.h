@@ -38,7 +38,7 @@ void setup() {
 }
 
 void loop() {
-    autoPilot->update();
+    //autoPilot->update();
 }
 
 #endif //_APO_COMMON_H

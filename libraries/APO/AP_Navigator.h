@@ -19,6 +19,7 @@
 #ifndef AP_Navigator_H
 #define AP_Navigator_H
 
+#include "AP_Process.h"
 #include "constants.h"
 #include <inttypes.h>
 
@@ -27,7 +28,7 @@ namespace apo {
 class AP_Board;
 
 /// Navigator class
-class AP_Navigator {
+class AP_Navigator : public AP_Process {
 public:
     AP_Navigator(AP_Board * board);
 

@@ -7,15 +7,18 @@
 
 #include "AP_Navigator.h"
 #include "AP_MavlinkCommand.h"
+#include "AP_Process.h"
 
 namespace apo {
 
 AP_Navigator::AP_Navigator(AP_Board * board) :
+    AP_Process(1,1),
     _board(board), _timeStamp(0), _roll(0), _rollRate(0), _pitch(0),
     _pitchRate(0), _yaw(0), _yawRate(0), 
     _windSpeed(0), _windDirection(0),
     _vN(0), _vE(0), _vD(0), _lat_degInt(0),
     _lon_degInt(0), _alt_intM(0) {
+
 }
 float AP_Navigator::getPD() const {
     return AP_MavlinkCommand::home.getPD(getAlt_intM());

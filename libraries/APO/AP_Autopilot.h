@@ -36,7 +36,7 @@ class AP_CommLink;
  *
 
  */
-class AP_Autopilot: public Loop {
+class AP_Autopilot {
 public:
     /**
      * Default constructor
@@ -103,14 +103,14 @@ private:
      * - compass sensor fusion
      * @see callback
      */
-    static void callback1(void * data);
+    static void gpsFusion(void * data);
 
     /**
      * Loop 2 Callbacks
      * - slow messages
      * @see callback
      */
-    static void callback2(void * data);
+    static void slowMessages(void * data);
 
     /**
      * Loop 3 Callbacks

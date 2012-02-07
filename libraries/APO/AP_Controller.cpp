@@ -20,6 +20,7 @@ namespace apo {
 AP_Controller::AP_Controller(AP_Navigator * nav, AP_Guide * guide,
                              AP_Board * board, AP_ArmingMechanism * armingMechanism,
                              const uint8_t chMode, const uint16_t key, const prog_char_t * name) :
+    AP_Process(2,2),
     _nav(nav), _guide(guide), _board(board), _armingMechanism(armingMechanism),
     _group(key, name ? : PSTR("CNTRL_")),
     _chMode(chMode),

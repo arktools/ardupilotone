@@ -20,6 +20,7 @@
 #define AP_Controller_H
 
 // inclusions
+#include "AP_Process.h"
 #include <AP_Common.h>
 #include <inttypes.h>
 #include <math.h>
@@ -40,7 +41,7 @@ class AP_ArmingMechanism;
 // this class is responsible for sending commands to the 
 // motors. It is also responsible for monitoring manual
 // input.
-class AP_Controller {
+class AP_Controller: public AP_Process {
 public:
     ///
     // The controller constructor.
