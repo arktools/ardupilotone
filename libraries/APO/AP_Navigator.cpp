@@ -12,7 +12,7 @@
 namespace apo {
 
 AP_Navigator::AP_Navigator(AP_Board * board) :
-    AP_Process(1,1),
+    AP_Process(1,ms_to_ticks(2000)),
     _board(board), _timeStamp(0), _roll(0), _rollRate(0), _pitch(0),
     _pitchRate(0), _yaw(0), _yawRate(0), 
     _windSpeed(0), _windDirection(0),

@@ -8,6 +8,8 @@
 #ifndef AP_PROCESS_H_
 #define AP_PROCESS_H_
 
+//#include "AP_Autopilot.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -47,8 +49,8 @@ namespace apo {
     class AP_Process {
         public:
             struct Proc {
-                void (*func)();
-                AP_Autopilot * apo;
+                void (*func)(void *);
+                void * apo;
             };
 
             /**
@@ -79,7 +81,7 @@ namespace apo {
 
             //virtual void update();
 
-            void createProcess(void p(), AP_Autopilot * apo) {
+            void createProcess(void p(void *), void * apo) {
                 proc_def.func = p;
                 proc_def.apo = apo;
                 _proc = proc_new(processWrapper,&proc_def, KERN_MINSTACKSIZE*2,NULL);

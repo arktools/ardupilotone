@@ -3,9 +3,10 @@
 
 namespace apo{
 
-    void AP_Process::processWrapper(void* pstruct) {
-        struct Proc p = *((struct Proc*) pstruct);
-        p.func((void *) p.apo);
+    void AP_Process::processWrapper(void) {
+
+        struct Proc * p = (struct Proc *) proc_currentUserData();
+        p->func(p->apo);
     }
 
     void AP_Process::setupTimer() {

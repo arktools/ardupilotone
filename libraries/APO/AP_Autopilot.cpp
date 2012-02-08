@@ -34,6 +34,7 @@ namespace apo {
             board->getDebug()->printf_P(PSTR("initializing autopilot\n"));
             board->getDebug()->printf_P(PSTR("free ram: %d bytes\n"),freeMemory());
 
+//#if 0
             /*
              * Comm links
              */
@@ -51,8 +52,10 @@ namespace apo {
             board->getGcs()->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
             board->getGcs()->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
 
+            board->getDebug()->printf_P(PSTR("test!\n"));
             if (navigator) navigator->calibrate();
 
+            board->getDebug()->printf_P(PSTR("test!\n"));
             /*
              * Look for valid initial state
              */
@@ -111,13 +114,14 @@ namespace apo {
             guide->setCurrentIndex(0);
             controller->setMode(MAV_MODE_LOCKED);
             controller->setState(MAV_STATE_STANDBY);
-
+//#endif
             /*
              * Set up the processes.
              */
 
+            board->getDebug()->println_P(PSTR("starting processes...\n"));
             proc_forbid();
-            navigator->createProcess(navigationTask);
+            navigator->createProcess(navigationTask, this);
             proc_permit();
 
 
@@ -141,10 +145,14 @@ namespace apo {
         AP_Autopilot * apo = (AP_Autopilot *) data;
         AP_Navigator * nav = apo->getNavigator();
         //apo->getBoard()->getDebug()->println_P(PSTR("callback"));
+        //
+
+            apo->getBoard()->getDebug()->printf_P(PSTR("nav loop\n"));
 
         nav->setupTimer();
         while(1) {
 
+            apo->getBoard()->getDebug()->printf_P(PSTR("nav loop\n"));
             apo->callbackCalls++;
             // Get the navigator if it hasn't already been
             if(!nav) {
