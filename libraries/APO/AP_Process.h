@@ -46,12 +46,22 @@ namespace apo {
     
     class AP_Process {
         public:
+            struct Proc {
+                void (*func)();
+                AP_Autopilot * apo;
+            };
+
             /**
              * Default Constructor
              */
             AP_Process(int priority, float dt) :
                 _priority(priority), _proc_dt(dt) {
                 }
+
+            /*
+             * Static wrapper for the process declaration
+             */
+            static void processWrapper(void);
 
             /**
              * Accessors
@@ -67,10 +77,12 @@ namespace apo {
             void setupTimer();
             void waitOnTimer();
 
-             virtual void update();
+            //virtual void update();
 
-            void createProcess() {
-                _proc = proc_new(this->update, NULL, KERN_MINSTACKSIZE*2,NULL);
+            void createProcess(void p(), AP_Autopilot * apo) {
+                proc_def.func = p;
+                proc_def.apo = apo;
+                _proc = proc_new(processWrapper,&proc_def, KERN_MINSTACKSIZE*2,NULL);
                 proc_setPri(_proc,_priority);
             }
                
@@ -79,6 +91,7 @@ namespace apo {
             int _priority;
             float _proc_dt;
             struct Process * _proc;
+            struct Proc proc_def; 
             Timer _timer;
     };
 

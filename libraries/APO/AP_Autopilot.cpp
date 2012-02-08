@@ -117,7 +117,7 @@ namespace apo {
              */
 
             proc_forbid();
-//            navigator->createProcess(navigationTask, this);
+            navigator->createProcess(navigationTask);
             proc_permit();
 
 
