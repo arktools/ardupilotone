@@ -1,11 +1,15 @@
 
 #include "AP_Process.h"
+#include "AP_Autopilot.h"
 
 namespace apo{
 
-    void AP_Process::processWrapper(void) {
 
+
+    void AP_Process::processWrapper(void) {        
         struct Proc * p = (struct Proc *) proc_currentUserData();
+        AP_Autopilot * apo = (AP_Autopilot * ) p->apo;
+        apo->getBoard()->getDebug()->printf_P("wrapper\n");
         p->func(p->apo);
     }
 

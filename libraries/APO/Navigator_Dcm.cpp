@@ -58,7 +58,12 @@ Navigator_Dcm::Navigator_Dcm(AP_Board * board, const uint16_t key, const prog_ch
 }
 void Navigator_Dcm::calibrate() {
 
+    _board->getDebug()->printf_P(PSTR("SKIPPING NAVIGATOR CALIBRATION!\n"));
+    if(1)
+        return;
+
     AP_Navigator::calibrate();
+
 
     // TODO: handle cold/warm restart
     if (_board->getImu()) {

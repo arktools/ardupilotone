@@ -95,7 +95,7 @@ namespace apo {
                 }
                 delay(500);
             }
-
+/*
             AP_MavlinkCommand::home.setAlt(_navigator->getAlt());
             AP_MavlinkCommand::home.setLat(_navigator->getLat());
             AP_MavlinkCommand::home.setLon(_navigator->getLon());
@@ -106,11 +106,12 @@ namespace apo {
                     AP_MavlinkCommand::home.getLon()*rad2Deg,
                     AP_MavlinkCommand::home.getCommand());
             AP_MavlinkCommand::home.load();
-            board->getDebug()->printf_P(PSTR("\nhome after load lat: %f deg, lon: %f deg, cmd: %d\n"),
+            /*board->getDebug()->printf_P(PSTR("\nhome after load lat: %f deg, lon: %f deg, cmd: %d\n"),
                     AP_MavlinkCommand::home.getLat()*rad2Deg,
                     AP_MavlinkCommand::home.getLon()*rad2Deg,
-                    AP_MavlinkCommand::home.getCommand());
+                    AP_MavlinkCommand::home.getCommand());*/
 
+            board->getDebug()->println_P(PSTR("starting processes...\n"));
             guide->setCurrentIndex(0);
             controller->setMode(MAV_MODE_LOCKED);
             controller->setState(MAV_STATE_STANDBY);

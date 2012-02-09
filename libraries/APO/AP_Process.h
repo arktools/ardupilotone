@@ -45,6 +45,11 @@ void operator delete(void * ptr) {
  */
 
 namespace apo {
+
+    //Forward Definitions
+    class AP_Board;
+
+#define RTOS_TIMER_DELAY(x) timer_delay(x)
     
     class AP_Process {
         public:
