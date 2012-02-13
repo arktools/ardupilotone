@@ -16,6 +16,10 @@
 #include <APO.h>
 #include <AP_AnalogSource.h>
 #include <AP_InertialSensor.h>
+#include <DataFlash.h>
+#include <SPI.h>
+#include <Arduino_Mega_ISR_Registry.h>
+#include <AP_PeriodicProcess.h>
 
 // Vehicle Configuration
 #include "CarStampede.h"

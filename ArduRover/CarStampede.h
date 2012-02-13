@@ -13,8 +13,8 @@
 using namespace apo;
 static const AP_Board::options_t options = AP_Board::opt_gps | AP_Board::opt_baro | AP_Board::opt_compass;
 static const MAV_TYPE vehicle = UGV_GROUND_ROVER;
-//static const apo::AP_Board::mode_e boardMode = apo::AP_Board::MODE_HIL_CNTL;
-static const apo::AP_Board::mode_e boardMode = apo::AP_Board::MODE_LIVE;
+static const apo::AP_Board::mode_e boardMode = apo::AP_Board::MODE_HIL_CNTL;
+//static const apo::AP_Board::mode_e boardMode = apo::AP_Board::MODE_LIVE;
 static const uint8_t heartBeatTimeout = 3;
 
 // algorithm selection
