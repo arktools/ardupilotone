@@ -37,8 +37,8 @@ const float AP_InertialSensor_Oilpan::_gyro_gain_z = ToRad(0.41);
 
 /* ------ Public functions -------------------------------------------*/
 
-AP_InertialSensor_Oilpan::AP_InertialSensor_Oilpan( AP_ADC * adc, AP_PeriodicProcess * scheduler) :
-  AP_InertialSensor(scheduler), _adc(adc)
+AP_InertialSensor_Oilpan::AP_InertialSensor_Oilpan( AP_ADC * adc ) :
+  _adc(adc)
 {
   _gyro.x = 0;
   _gyro.y = 0;
@@ -46,6 +46,11 @@ AP_InertialSensor_Oilpan::AP_InertialSensor_Oilpan( AP_ADC * adc, AP_PeriodicPro
   _accel.x = 0;
   _accel.y = 0;
   _accel.z = 0;
+}
+
+void AP_InertialSensor_Oilpan::init( AP_PeriodicProcess * scheduler)
+{
+  _adc->Init(scheduler);
 }
 
 bool AP_InertialSensor_Oilpan::update()

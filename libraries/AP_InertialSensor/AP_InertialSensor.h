@@ -11,7 +11,9 @@
 class AP_InertialSensor
 {
   public:
-  AP_InertialSensor(AP_PeriodicProcess * scheduler) {}
+  AP_InertialSensor() {}
+
+  virtual void init( AP_PeriodicProcess * scheduler ) = 0;
 
   /* Update the sensor data, so that getters are nonblocking.
    * Returns a bool of whether data was updated or not.

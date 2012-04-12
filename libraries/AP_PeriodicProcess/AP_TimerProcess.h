@@ -13,7 +13,8 @@
 class AP_TimerProcess : public AP_PeriodicProcess
 {
     public:
-        AP_TimerProcess(Arduino_Mega_ISR_Registry * isr_reg, uint8_t period = TIMERPROCESS_PER_DEFAULT);
+        AP_TimerProcess(uint8_t period = TIMERPROCESS_PER_DEFAULT);
+        void init( Arduino_Mega_ISR_Registry * isr_reg );
         void register_process(ap_procedure proc);
         void set_failsafe(ap_procedure proc);
         static void run(void);

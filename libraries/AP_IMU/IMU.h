@@ -18,6 +18,11 @@ public:
 	/// Constructor
 	IMU();
 
+	enum Start_style {
+		COLD_START = 0,
+		WARM_START
+	};
+
 	/// Perform startup initialisation.
 	///
 	/// Called to initialise the state of the IMU.
@@ -31,15 +36,10 @@ public:
 	///
 	/// @param style	The initialisation startup style.
 	///
-	virtual void	init( void (*delay_cb)(unsigned long t),
+	virtual void	init( Start_style style,
+                          void (*delay_cb)(unsigned long t),
 						  void (*flash_leds_cb)(bool on),
                           AP_PeriodicProcess * scheduler );
-
-    /// Warm start initialization
-    virtual void warmStart() = 0;
-
-    /// Cold start initialization
-    virtual void coldStart() = 0;
 
 	/// Perform cold startup initialisation for just the accelerometers.
 	///

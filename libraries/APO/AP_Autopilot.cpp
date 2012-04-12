@@ -24,32 +24,15 @@ class AP_Board;
 AP_Autopilot::AP_Autopilot(AP_Navigator * navigator, AP_Guide * guide,
                            AP_Controller * controller, AP_Board * board) :
     Loop(board->getParameters().loopRate, callback, this), _navigator(navigator), _guide(guide),
-    _controller(controller), _board(board),
-    callbackCalls(0) {
-
-    // allow hardware to call autopilot public routines
-    board->setAutopilot(this);
+    _controller(controller), _board(board), callbackCalls(0) {
 
     board->getDebug()->printf_P(PSTR("initializing autopilot\n"));
     board->getDebug()->printf_P(PSTR("free ram: %d bytes\n"),freeMemory());
 
     /*
-     * Comm links
-     */
-    board->setGcs(new MavlinkComm(board->getGcsPort(), navigator, guide, controller, board, 3));
-    if (board->getParameters().mode != AP_Board::MODE_LIVE) {
-        board->setHil(new MavlinkComm(board->getHilPort(), navigator, guide, controller, board, 3));
-    }
-    board->getGcs()->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
-    board->getGcs()->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
-
-    /*
      * Calibration
      */
     controller->setState(MAV_STATE_CALIBRATING);
-    board->getGcs()->sendMessage(MAVLINK_MSG_ID_HEARTBEAT);
-    board->getGcs()->sendMessage(MAVLINK_MSG_ID_SYS_STATUS);
-
     if (navigator) navigator->calibrate();
 
     /*
@@ -265,7 +248,7 @@ void AP_Autopilot::callback2(void * data) {
 }
 
 void AP_Autopilot::callback3(void * data) {
-    AP_Autopilot * apo = (AP_Autopilot *) data;
+    //AP_Autopilot * apo = (AP_Autopilot *) data;
     //apo->getBoard()->getDebug()->println_P(PSTR("callback 3"));
 }
 

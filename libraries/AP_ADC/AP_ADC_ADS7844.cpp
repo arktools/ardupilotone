@@ -126,9 +126,12 @@ void AP_ADC_ADS7844::read(uint32_t tnow)
 
 
 // Constructors ////////////////////////////////////////////////////////////////
-AP_ADC_ADS7844::AP_ADC_ADS7844(AP_PeriodicProcess * scheduler) :
-			_filter_index_accel(0),
-			filter_result(false)
+AP_ADC_ADS7844::AP_ADC_ADS7844()
+{
+}
+
+// Public Methods //////////////////////////////////////////////////////////////
+void AP_ADC_ADS7844::Init( AP_PeriodicProcess * scheduler )
 {
 	pinMode(ADC_CHIP_SELECT, OUTPUT);
 
@@ -157,9 +160,8 @@ AP_ADC_ADS7844::AP_ADC_ADS7844(AP_PeriodicProcess * scheduler) :
 	last_ch6_micros = micros();
 
     scheduler->register_process( AP_ADC_ADS7844::read );
-}
 
-// Public Methods //////////////////////////////////////////////////////////////
+}
 
 // Read one channel value
 float AP_ADC_ADS7844::Ch(uint8_t ch_num)

@@ -20,8 +20,9 @@
 
 class AP_ADC_ADS7844 : public AP_ADC
 {
-public:
-	AP_ADC_ADS7844(AP_PeriodicProcess * scheduler);  // Constructor
+	public:
+	AP_ADC_ADS7844();  // Constructor
+	void Init( AP_PeriodicProcess * scheduler );
 
 	// Read 1 sensor value
 	float Ch(unsigned char ch_num);
@@ -32,15 +33,7 @@ public:
     // check if Ch6 would block
 	bool new_data_available(const uint8_t *channel_numbers);
 
-<<<<<<< HEAD
 	private:
-=======
-private:
-	uint16_t 		_filter_accel[3][ADC_ACCEL_FILTER_SIZE];
-	uint16_t 		_prev_gyro[3];
-	uint16_t 		_prev_accel[3];
-	uint8_t			_filter_index_accel;
->>>>>>> 855e82a7f010266ec705e471f1847240f27d2615
 	static void read(uint32_t);
 
 };

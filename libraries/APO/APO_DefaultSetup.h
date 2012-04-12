@@ -10,7 +10,7 @@ FastSerialPort3(Serial3);
  * Required Global Declarations
  */
 
-static apo::AP_Autopilot * autoPilot;
+static apo::AP_Autopilot * autopilot;
 
 void setup() {
 
@@ -23,22 +23,29 @@ void setup() {
      * Select guidance, navigation, control algorithms
      */
     AP_Navigator * navigator = NULL;
+
     if (board->getParameters().mode == AP_Board::MODE_LIVE) {
         navigator = new NAVIGATOR_CLASS(board,k_nav);
     } else {
         navigator = new AP_Navigator(board);
     }
+
     AP_Guide * guide = new GUIDE_CLASS(navigator, board, velCmd, xt, xtLim);
     AP_Controller * controller = new CONTROLLER_CLASS(navigator,guide,board);
+
+    board->setGcs(new MavlinkComm(AP_Board::PORT_GCS,navigator,guide,controller,board)); 
+    if (board->getParameters().mode != AP_Board::MODE_LIVE) {
+        board->setHil(new MavlinkComm(AP_Board::PORT_HIL,navigator,guide,controller,board)); 
+    }
 
     /*
      * Start the autopilot
      */
-    autoPilot = new apo::AP_Autopilot(navigator, guide, controller, board);
+    autopilot = new apo::AP_Autopilot(navigator, guide, controller, board);
 }
 
 void loop() {
-    autoPilot->update();
+    autopilot->update();
 }
 
 #endif //_APO_COMMON_H

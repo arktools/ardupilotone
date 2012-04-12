@@ -17,7 +17,8 @@ const AP_Param::GroupInfo IMU::var_info[] PROGMEM = {
 IMU::IMU () {}
 
 
-void IMU::init( void (*delay_cb)(unsigned long t),
+void IMU::init( Start_style style,
+		void (*delay_cb)(unsigned long t),
 		void (*flash_leds_cb)(bool on),
 		AP_PeriodicProcess * scheduler )
 { }
