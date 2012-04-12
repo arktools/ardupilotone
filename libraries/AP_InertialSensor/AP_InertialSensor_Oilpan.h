@@ -1,3 +1,4 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #ifndef __AP_INERTIAL_SENSOR_OILPAN_H__
 #define __AP_INERTIAL_SENSOR_OILPAN_H__
@@ -13,10 +14,9 @@ class AP_InertialSensor_Oilpan : public AP_InertialSensor
 {
   public:
 
-  AP_InertialSensor_Oilpan( AP_ADC * adc );
+  AP_InertialSensor_Oilpan( AP_ADC * adc, AP_PeriodicProcess * scheduler);
 
   /* Concrete implementation of AP_InertialSensor functions: */
-  void init(AP_PeriodicProcess * scheduler);
   bool update();
   float gx();
   float gy();

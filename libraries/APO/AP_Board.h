@@ -10,11 +10,12 @@
 
 #include "../AP_Common/AP_Vector.h"
 #include "../GCS_MAVLink/GCS_MAVLink.h"
+#include <AP_Math.h>
 
 class AP_ADC;
 class IMU;
 class GPS;
-class APM_BMP085_Class;
+class AP_Baro;
 class Compass;
 class BetterStream;
 class RangeFinder;
@@ -31,13 +32,11 @@ namespace apo {
 class AP_RcChannel;
 class AP_CommLink;
 class AP_BatteryMonitor;
+class AP_Autopilot;
 
 class AP_Board {
 
 public:
-
-    typedef uint32_t options_t;
-    options_t _options;
 
     // enumerations
     enum mode_e {
@@ -45,7 +44,8 @@ public:
         /*MODE_HIL_NAV*/
     };
 
-
+    // parameters
+    typedef uint32_t options_t;
     enum options_e {
         opt_gps                 = 0<<1,
         opt_baro                = 1<<1,
@@ -59,78 +59,151 @@ public:
         opt_rangeFinderDown     = 9<<1,
     };
 
+    struct parameters_t {
+        // vehicle type
+        MAV_TYPE vehicle;
+
+        //mode
+        mode_e mode;
+
+        //options
+        options_t options;
+
+        // baud rates
+        uint32_t debugBaud;
+        uint32_t telemBaud;
+        uint32_t gpsBaud;
+        uint32_t hilBaud;
+
+        // battery sensor
+        uint8_t batteryPin;
+        float batteryVoltageDivRatio;
+        float batteryMinVolt;
+        float batteryMaxVolt;
+
+        // compass sensor
+        Matrix3f compassOrientation;
+
+        // loop rates
+        float loopRate;
+        float loop0Rate;
+        float loop1Rate;
+        float loop2Rate;
+        float loop3Rate;
+
+        // misc
+        uint8_t heartBeatTimeout;
+    };
+
     // default ctors on pointers called on pointers here, this
     // allows NULL to be used as a boolean for if the device was
     // initialized
-    AP_Board(mode_e mode, MAV_TYPE vehicle, options_t options): _mode(mode), _vehicle(vehicle), _options(options) {
+    AP_Board(const parameters_t &parameters): 
+        _parameters(parameters) {
     }
 
-    /**
-     * Sensors
-     */
-    AP_ADC * adc;
-    GPS * gps;
-    APM_BMP085_Class * baro;
-    Compass * compass;
-    Vector<RangeFinder *> rangeFinders;
-    AP_BatteryMonitor * batteryMonitor;
-    AP_IMU_INS * imu;
-    AP_InertialSensor * ins;
+    // get routines
+    AP_ADC * getAdc() { return _adc; }
+    GPS * getGps() { return _gps; }
+    AP_Baro * getBaro() { return _baro; }
+    Compass * getCompass() { return _compass; }
+    Vector<RangeFinder *> getRangeFinders() { return _rangeFinders; }
+    AP_BatteryMonitor * getBatteryMonitor() {  return _batteryMonitor; }
+    AP_IMU_INS * getImu() { return _imu; }
+    AP_InertialSensor * getIns() { return _ins; }
+    AP_TimerProcess * getScheduler() { return _scheduler; }
+    Arduino_Mega_ISR_Registry * getIsrRegistry() { return _isr_registry; }
+    APM_RC_Class * getRadio() { return _radio; } 
+    Vector<AP_RcChannel *> & getRadioChannels() { return _radioChannels; };
+    FastSerial * getDebug() { return _debug; }
+    FastSerial * getGcsPort() { return _gcsPort; }
+    FastSerial * getHilPort() { return _hilPort; }
+
+    // TODO move these to AP_Autopilot?
+    AP_CommLink * getGcs() { return _gcs; }
+    AP_CommLink * getHil() { return _hil; }
+
+    AP_Autopilot * getAutopilot() { return _autopilot; }
+    DataFlash_Class * getDataFlash() { return _dataFlash; }
+    uint8_t getLoad() { return _load; }
+    uint8_t getSlideSwitchPin() { return _slideSwitchPin; }
+    uint8_t getPushButtonPin() { return _pushButtonPin; }
+    uint8_t getALedPin() { return _aLedPin; }
+    uint8_t getBLedPin() { return _bLedPin; }
+    uint8_t getCLedPin() { return _cLedPin; }
+    uint16_t getEEPROMMaxAddr() { return _eepromMaxAddr; }
+    const parameters_t & getParameters() { return _parameters; }
+
+    // set routines
+    void setAutopilot(AP_Autopilot * autopilot) { _autopilot = autopilot; }
+    void setGcs(AP_CommLink * gcs) { _gcs = gcs; }
+    void setHil(AP_CommLink * hil) { _hil = hil; }
+    void setLoad(uint8_t load) { _load = load; }
 
     /**
-     * Scheduler
+     * delay while updating comms
      */
-    AP_TimerProcess * scheduler;
-    Arduino_Mega_ISR_Registry * isr_registry;
+    void delayWithCommUpdate(uint32_t t);
 
     /**
-     * Actuators
+     * called by gyro/accel init to flash LEDs so user
+     * has some mesmerising lights to watch while waiting
      */
-    APM_RC_Class * radio;
+    void flashLeds(bool on);
 
     /**
-     * Radio Channels
+     * check if usb is connected
      */
-    Vector<AP_RcChannel *> rc;
+    void checkUsbConnection();
 
-    /**
-     * Communication Channels
-     */
-    AP_CommLink * gcs;
-    AP_CommLink * hil;
-    FastSerial * debug;
-    FastSerial * gcsPort;
-    FastSerial * hilPort;
+protected:
 
-    /**
-     * data
-     */
-    DataFlash_Class * dataFlash;
-    uint8_t load;
+    // sensors
+    AP_ADC * _adc;
+    GPS * _gps;
+    AP_Baro * _baro;
+    Compass * _compass;
+    Vector<RangeFinder *> _rangeFinders;
+    AP_BatteryMonitor * _batteryMonitor;
+    AP_IMU_INS * _imu;
+    AP_InertialSensor * _ins;
 
-    /**
-     * settings
-     */
-    uint8_t slideSwitchPin;
-    uint8_t pushButtonPin;
-    uint8_t aLedPin;
-    uint8_t bLedPin;
-    uint8_t cLedPin;
-    uint16_t eepromMaxAddr;
+    // timing
+    AP_TimerProcess * _scheduler;
+    Arduino_Mega_ISR_Registry * _isr_registry;
 
-    // accessors
-    mode_e getMode() {
-        return _mode;
-    }
-    MAV_TYPE getVehicle() {
-        return _vehicle;
-    }
+    // radio
+    APM_RC_Class * _radio;
+    Vector<AP_RcChannel *> _radioChannels;
 
-private:
+    // communications
+    FastSerial * _debug;
+    FastSerial * _gcsPort;
+    FastSerial * _hilPort;
+    AP_CommLink * _gcs;
+    AP_CommLink * _hil;
 
-    // enumerations
-    mode_e _mode;
-    MAV_TYPE _vehicle;
+    // link to autopilot
+    AP_Autopilot * _autopilot;
+
+    // data flash
+    DataFlash_Class * _dataFlash;
+    uint8_t _load;
+
+    // settings
+    uint8_t _slideSwitchPin;
+    uint8_t _pushButtonPin;
+    uint8_t _aLedPin;
+    uint8_t _bLedPin;
+    uint8_t _cLedPin;
+    uint16_t _eepromMaxAddr;
+    uint8_t _usbMuxPin;
+
+    // parameters structure
+    const parameters_t _parameters;
+
+    bool _inDelayWithCommUpdate;
+    bool _usbConnected;
 };
 
 } // namespace apo

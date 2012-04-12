@@ -37,7 +37,7 @@ union NumericIntType
 };
 
 	// Constructors ////////////////////////////////////////////////////////////////
-AP_OpticalFlow_ADNS3080::AP_OpticalFlow_ADNS3080()
+AP_OpticalFlow_ADNS3080::AP_OpticalFlow_ADNS3080(int cs_pin, int reset_pin) : _cs_pin(cs_pin), _reset_pin(reset_pin)
 {
 	num_pixels = ADNS3080_PIXELS_X;
 	field_of_view = AP_OPTICALFLOW_ADNS3080_08_FOV;
@@ -56,10 +56,11 @@ AP_OpticalFlow_ADNS3080::init(bool initCommAPI)
 	pinMode(AP_SPI_DATAOUT,OUTPUT);
 	pinMode(AP_SPI_DATAIN,INPUT);
 	pinMode(AP_SPI_CLOCK,OUTPUT);
-	pinMode(ADNS3080_CHIP_SELECT,OUTPUT);
-	pinMode(ADNS3080_RESET,OUTPUT);
+	pinMode(_cs_pin,OUTPUT);
+	if( _reset_pin != 0)
+	    pinMode(ADNS3080_RESET,OUTPUT);
 
-	digitalWrite(ADNS3080_CHIP_SELECT,HIGH);                 // disable device (Chip select is active low)
+	digitalWrite(_cs_pin,HIGH);                 // disable device (Chip select is active low)
 
 	// reset the device
 	reset();
@@ -127,7 +128,7 @@ AP_OpticalFlow_ADNS3080::read_register(byte address)
     backup_spi_settings();
 
 	// take the chip select low to select the device
-    digitalWrite(ADNS3080_CHIP_SELECT, LOW);
+    digitalWrite(_cs_pin, LOW);
 
     // send the device the register you want to read:
     junk = SPI.transfer(address);
@@ -139,7 +140,7 @@ AP_OpticalFlow_ADNS3080::read_register(byte address)
     result = SPI.transfer(0x00);
 
     // take the chip select high to de-select:
-    digitalWrite(ADNS3080_CHIP_SELECT, HIGH);
+    digitalWrite(_cs_pin, HIGH);
 
 	restore_spi_settings();
 
@@ -155,7 +156,7 @@ AP_OpticalFlow_ADNS3080::write_register(byte address, byte value)
     backup_spi_settings();
 
 	// take the chip select low to select the device
-    digitalWrite(ADNS3080_CHIP_SELECT, LOW);
+    digitalWrite(_cs_pin, LOW);
 
 	// send register address
     junk = SPI.transfer(address | 0x80 );
@@ -167,7 +168,7 @@ AP_OpticalFlow_ADNS3080::write_register(byte address, byte value)
 	junk = SPI.transfer(value);
 
     // take the chip select high to de-select:
-    digitalWrite(ADNS3080_CHIP_SELECT, HIGH);
+    digitalWrite(_cs_pin, HIGH);
 
 	restore_spi_settings();
 }
@@ -176,14 +177,18 @@ AP_OpticalFlow_ADNS3080::write_register(byte address, byte value)
 void
 AP_OpticalFlow_ADNS3080::reset()
 {
-    digitalWrite(ADNS3080_RESET,HIGH);                 // reset sensor
+    // return immediately if the reset pin is not defined
+    if( _reset_pin == 0)
+	    return;
+
+    digitalWrite(_reset_pin,HIGH);                 // reset sensor
 	delayMicroseconds(10);
-	digitalWrite(ADNS3080_RESET,LOW);                  // return sensor to normal
+	digitalWrite(_reset_pin,LOW);                  // return sensor to normal
 }
 
 // read latest values from sensor and fill in x,y and totals
-int
-AP_OpticalFlow_ADNS3080::read()
+bool
+AP_OpticalFlow_ADNS3080::update()
 {
     surface_quality = (unsigned int)read_register(ADNS3080_SQUAL);
 	delayMicroseconds(50);  // small delay
@@ -202,8 +207,17 @@ AP_OpticalFlow_ADNS3080::read()
 	last_update = millis();
 
 	apply_orientation_matrix();
+	
+	return true;
+}
 
-	return OPTICALFLOW_SUCCESS;
+void
+AP_OpticalFlow_ADNS3080::disable_serial_pullup()
+{
+    byte regVal = read_register(ADNS3080_EXTENDED_CONFIG);
+	regVal = (regVal | ADNS3080_SERIALNPU_OFF);
+	delayMicroseconds(50);  // small delay
+	write_register(ADNS3080_EXTENDED_CONFIG, regVal);
 }
 
 // get_led_always_on - returns true if LED is always on, false if only on when required
@@ -223,17 +237,17 @@ AP_OpticalFlow_ADNS3080::set_led_always_on( bool alwaysOn )
 	write_register(ADNS3080_CONFIGURATION_BITS, regVal);
 }
 
-// returns resolution (either 400 or 1200 counts per inch)
+// returns resolution (either 400 or 1600 counts per inch)
 int
 AP_OpticalFlow_ADNS3080::get_resolution()
 {
     if( (read_register(ADNS3080_CONFIGURATION_BITS) & 0x10) == 0 )
 	    return 400;
 	else
-	    return 1200;
+	    return 1600;
 }
 
-// set parameter to 400 or 1200 counts per inch
+// set parameter to 400 or 1600 counts per inch
 void
 AP_OpticalFlow_ADNS3080::set_resolution(int resolution)
 {
@@ -241,12 +255,17 @@ AP_OpticalFlow_ADNS3080::set_resolution(int resolution)
 
     if( resolution == ADNS3080_RESOLUTION_400 )	{
 	    regVal &= ~0x10;
-	}else if( resolution == ADNS3080_RESOLUTION_1200) {
+		scaler = AP_OPTICALFLOW_ADNS3080_SCALER;
+	}else if( resolution == ADNS3080_RESOLUTION_1600) {
 	    regVal |= 0x10;
+		scaler = AP_OPTICALFLOW_ADNS3080_SCALER * 4;
 	}
 
 	delayMicroseconds(50);  // small delay
 	write_register(ADNS3080_CONFIGURATION_BITS, regVal);
+
+	// this will affect conversion factors so update them
+	update_conversion_factors();
 }
 
 // get_frame_rate_auto - return whether frame rate is set to "auto" or manual

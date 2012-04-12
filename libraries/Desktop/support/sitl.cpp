@@ -25,7 +25,6 @@
 #include <wiring.h>
 #include <AP_PeriodicProcess.h>
 #include <AP_TimerProcess.h>
-#include <AP_TimerAperiodicProcess.h>
 #include "sitl_adc.h"
 #include "sitl_rc.h"
 #include "desktop.h"
@@ -136,7 +135,7 @@ static void sitl_fdm_input(void)
 
 		count++;
 		if (millis() - last_report > 1000) {
-			printf("SIM %u FPS\n", count);
+			//printf("SIM %u FPS\n", count);
 			count = 0;
 			last_report = millis();
 		}

@@ -59,6 +59,9 @@ namespace ArdupilotMega.GCSViews
         CurveItem list9curve;
         CurveItem list10curve;
 
+        internal static GMapOverlay kmlpolygons;
+        internal static GMapOverlay geofence;
+
         bool huddropout = false;
         bool huddropoutresize = false;
 
@@ -77,6 +80,7 @@ namespace ArdupilotMega.GCSViews
 
         protected override void Dispose(bool disposing)
         {
+            threadrun = 0;
             MainV2.config["FlightSplitter"] = MainH.SplitterDistance.ToString();
             base.Dispose(disposing);
         }
@@ -88,8 +92,6 @@ namespace ArdupilotMega.GCSViews
             mymap = gMapControl1;
             myhud = hud1;
             MainHcopy = MainH;
-
-            Control.CheckForIllegalCrossThreadCalls = false; // so can update display from another thread
 
             // setup default tuning graph
             if (MainV2.config["Tuning_Graph_Selected"] != null)
@@ -153,6 +155,15 @@ namespace ArdupilotMega.GCSViews
             gMapControl1.OnMapZoomChanged += new MapZoomChanged(gMapControl1_OnMapZoomChanged);
 
             gMapControl1.Zoom = 3;
+
+            gMapControl1.RoutesEnabled = true;
+            gMapControl1.PolygonsEnabled = true;
+
+            kmlpolygons = new GMapOverlay(gMapControl1, "kmlpolygons");
+            gMapControl1.Overlays.Add(kmlpolygons);
+
+            geofence = new GMapOverlay(gMapControl1, "geofence");
+            gMapControl1.Overlays.Add(geofence);
 
             polygons = new GMapOverlay(gMapControl1, "polygons");
             gMapControl1.Overlays.Add(polygons);
@@ -245,7 +256,7 @@ namespace ArdupilotMega.GCSViews
                 // re-request servo data
                 if (!(lastdata.AddSeconds(8) > DateTime.Now) && comPort.BaseStream.IsOpen)
                 {
-                    Console.WriteLine("REQ streams - flightdata");
+                    //Console.WriteLine("REQ streams - flightdata");
                     try
                     {
                         //System.Threading.Thread.Sleep(1000);
@@ -284,7 +295,14 @@ namespace ArdupilotMega.GCSViews
 
                 if (MainV2.comPort.logreadmode && MainV2.comPort.logplaybackfile != null)
                 {
-                    BUT_playlog.Text = "Pause";
+                    this.Invoke((System.Windows.Forms.MethodInvoker)delegate()
+{
+    try
+    {
+        BUT_playlog.Text = "Pause";
+    }
+    catch { }
+});
 
                     if (comPort.BaseStream.IsOpen)
                         MainV2.comPort.logreadmode = false;
@@ -303,12 +321,12 @@ namespace ArdupilotMega.GCSViews
                     if (act > 9999 || act < 0)
                         act = 1;
 
-                    int ts = 1;
+                    int ts = 0;
                     try
                     {
                         ts = (int)(act / (double)NUM_playbackspeed.Value);
                     }
-                    catch { } // cross thread
+                    catch { }
                     if (ts > 0)
                         System.Threading.Thread.Sleep(ts);
 
@@ -328,7 +346,15 @@ namespace ArdupilotMega.GCSViews
                 }
                 else
                 {
-                    BUT_playlog.Text = "Play";
+                    if (threadrun == 0) { return; }
+                    try
+                    {
+                        this.Invoke((System.Windows.Forms.MethodInvoker)delegate()
+    {
+        BUT_playlog.Text = "Play";
+    });
+                    }
+                    catch { }
                 }
 
                 try
@@ -406,7 +432,7 @@ namespace ArdupilotMega.GCSViews
                                 {
                                     if (plla == null || plla.Lng == 0 || plla.Lat == 0)
                                         break;
-                                    addpolygonmarker(plla.Tag, plla.Lng, plla.Lat, (int)plla.Alt);
+                                    addpolygonmarker(plla.Tag, plla.Lng, plla.Lat, (int)plla.Alt,plla.color);
                                 }
 
                                 RegeneratePolygon();
@@ -499,7 +525,7 @@ namespace ArdupilotMega.GCSViews
             });
         }
 
-        private void addpolygonmarker(string tag, double lng, double lat, int alt)
+        private void addpolygonmarker(string tag, double lng, double lat, int alt, Color? color)
         {
             try
             {
@@ -511,13 +537,18 @@ namespace ArdupilotMega.GCSViews
 
                 GMapMarkerRect mBorders = new GMapMarkerRect(point);
                 {
-                    mBorders.InnerMarker = m;
-                    mBorders.MainMap = gMapControl1;
-                    try
-                    {
-                        mBorders.wprad = (int)float.Parse(ArdupilotMega.MainV2.config["TXT_WPRad"].ToString());
-                    }
-                    catch { }
+                    
+                        mBorders.InnerMarker = m;
+                        try
+                        {
+                            mBorders.wprad = (int)float.Parse(ArdupilotMega.MainV2.config["TXT_WPRad"].ToString());
+                        }
+                        catch { }
+                        mBorders.MainMap = gMapControl1;
+                        if (color.HasValue)
+                        {
+                            mBorders.Color = color.Value;
+                        }
                 }
 
                 polygons.Markers.Add(m);
@@ -656,7 +687,11 @@ namespace ArdupilotMega.GCSViews
             }
             catch { }
             // Force a redraw
-            zg1.Invalidate();
+            try
+            {
+                zg1.Invalidate();
+            }
+            catch { }
 
         }
 
@@ -1066,6 +1101,11 @@ namespace ArdupilotMega.GCSViews
 
         private void BUT_log2kml_Click(object sender, EventArgs e)
         {
+            if (DialogResult.Cancel == Common.MessageShowAgain("Tlog to KML Firmware Version", "When converting logs, ensure your Firmware version is set correctly.\n(Near your com port selection.)"))
+            {
+                return;
+            }
+
             Form frm = new MavlinkLog();
             MainV2.fixtheme(frm);
             frm.ShowDialog();

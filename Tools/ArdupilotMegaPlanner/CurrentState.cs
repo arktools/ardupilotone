@@ -20,6 +20,11 @@ namespace ArdupilotMega
         public float groundcourse { get { return _groundcourse; } set { if (value < 0) { _groundcourse = value + 360; } else { _groundcourse = value; } } }
         private float _groundcourse = 0;
 
+        /// <summary>
+        /// time over target in seconds
+        /// </summary>
+        public int tot { get { if (groundspeed <= 0) return 0; return (int)(wp_dist / groundspeed); } }
+
         // speeds
         public float airspeed { get { return _airspeed * multiplierspeed; } set { _airspeed = value; } }
         public float groundspeed { get { return _groundspeed * multiplierspeed; } set { _groundspeed = value; } }
@@ -63,6 +68,10 @@ namespace ArdupilotMega
         public  float gx { get; set; }
         public  float gy { get; set; }
         public  float gz { get; set; }
+        // mag
+        public float mx { get; set; }
+        public float my { get; set; }
+        public float mz { get; set; }
 
         // calced turn rate
         public float turnrate { get { if (groundspeed <= 1) return 0; return (roll * 9.8f) / groundspeed; } }
@@ -129,7 +138,7 @@ namespace ArdupilotMega
         //battery
         public float battery_voltage { get { return _battery_voltage; } set { _battery_voltage = value / 1000; } }
         private float _battery_voltage;
-        public float battery_remaining { get { return _battery_remaining; } set { _battery_remaining = value / 1000; } }
+        public float battery_remaining { get { return _battery_remaining; } set { _battery_remaining = value / 1000; if (_battery_remaining < 0 || _battery_remaining > 100) _battery_remaining = 0; } }
         private float _battery_remaining;
 
         // HIL
@@ -352,6 +361,9 @@ namespace ArdupilotMega
                                 case (byte)(Common.ac2modes.CIRCLE):
                                     mode = "Circle";
                                     break;
+                                        case (byte)(Common.ac2modes.LAND):
+                            mode = "Land";
+                            break;
                                 default:
                                     mode = "Unknown";
                                     break;
@@ -383,7 +395,7 @@ namespace ArdupilotMega
 
                     //MAVLink.packets[ArdupilotMega.MAVLink.MAVLINK_MSG_ID_SYS_STATUS] = null;
                 }
-				#else
+#else
 
                 if (mavinterface.packets[ArdupilotMega.MAVLink.MAVLINK_MSG_ID_SYS_STATUS] != null)
                 {
@@ -431,6 +443,12 @@ namespace ArdupilotMega
                         case (byte)(100 + Common.ac2modes.CIRCLE):
                             mode = "Circle";
                             break;
+                        case (byte)(100 + Common.ac2modes.LAND):
+                            mode = "Land";
+                            break;
+                        case (byte)(100 + Common.ac2modes.POSITION):
+                            mode = "Position";
+                            break;
                         case (byte)ArdupilotMega.MAVLink.MAV_MODE.MAV_MODE_MANUAL:
                             mode = "Manual";
                             break;
@@ -456,7 +474,7 @@ namespace ArdupilotMega
                             }
                             break;
                         case (byte)ArdupilotMega.MAVLink.MAV_MODE.MAV_MODE_TEST3:
-                            mode = "FBW B";
+                            mode = "Circle";
                             break;
                         case (byte)ArdupilotMega.MAVLink.MAV_MODE.MAV_MODE_AUTO:
                             switch (sysstatus.nav_mode)
@@ -717,6 +735,10 @@ namespace ArdupilotMega
                     ax = imu.xacc;
                     ay = imu.yacc;
                     az = imu.zacc;
+
+                    mx = imu.xmag;
+                    my = imu.ymag;
+                    mz = imu.zmag;
 
                     //MAVLink.packets[MAVLink.MAVLINK_MSG_ID_RAW_IMU] = null;
                 }

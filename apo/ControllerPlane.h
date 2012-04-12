@@ -44,22 +44,22 @@ public:
                   pidAltThrLim, pidAltThrDFCut),
         requireRadio(false), _aileron(0), _elevator(0), _rudder(0), _throttle(0) {
 
-        _board->debug->println_P(PSTR("initializing plane controller"));
+        _board->getDebug()->println_P(PSTR("initializing plane controller"));
 
-        _board->rc.push_back(
-            new AP_RcChannel(k_chMode, PSTR("mode_"), board->radio, 5, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chMode, PSTR("mode_"), board->getRadio(), 5, 1100,
                              1500, 1900, RC_MODE_IN, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chRoll, PSTR("roll_"), board->radio, 0, 1200,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chRoll, PSTR("roll_"), board->getRadio(), 0, 1200,
                              1500, 1800, RC_MODE_INOUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chPitch, PSTR("pitch_"), board->radio, 1, 1200,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chPitch, PSTR("pitch_"), board->getRadio(), 1, 1200,
                              1500, 1800, RC_MODE_INOUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chThr, PSTR("thr_"), board->radio, 2, 1100, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chThr, PSTR("thr_"), board->getRadio(), 2, 1100, 1100,
                              1900, RC_MODE_INOUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chYaw, PSTR("yaw_"), board->radio, 3, 1200, 1500,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chYaw, PSTR("yaw_"), board->getRadio(), 3, 1200, 1500,
                              1800, RC_MODE_INOUT, false));
     }
 
@@ -87,10 +87,10 @@ private:
         if (_needsTrim) {
             // need to subtract current controller deflections so control
             // surfaces are actually at the same position as manual flight
-            _ailTrim = _board->rc[ch_roll]->getRadioPosition() - _aileron;
-            _elvTrim = _board->rc[ch_pitch]->getRadioPosition() - _elevator;
-            _rdrTrim = _board->rc[ch_yaw]->getRadioPosition() - _rudder;
-            _thrTrim = _board->rc[ch_thrust]->getRadioPosition() - _throttle;
+            _ailTrim = _board->getRadioChannels()[ch_roll]->getRadioPosition() - _aileron;
+            _elvTrim = _board->getRadioChannels()[ch_pitch]->getRadioPosition() - _elevator;
+            _rdrTrim = _board->getRadioChannels()[ch_yaw]->getRadioPosition() - _rudder;
+            _thrTrim = _board->getRadioChannels()[ch_thrust]->getRadioPosition() - _throttle;
             _needsTrim = false;
         }
 
@@ -102,13 +102,13 @@ private:
     }
     void setMotors() {
         // turn all motors off if below 0.1 throttle
-        if (fabs(_board->rc[ch_thrust]->getRadioPosition()) < 0.1) {
+        if (fabs(_board->getRadioChannels()[ch_thrust]->getRadioPosition()) < 0.1) {
             setAllRadioChannelsToNeutral();
         } else {
-            _board->rc[ch_roll]->setPosition(_aileron);
-            _board->rc[ch_yaw]->setPosition(_rudder);
-            _board->rc[ch_pitch]->setPosition(_elevator);
-            _board->rc[ch_thrust]->setPosition(_throttle);
+            _board->getRadioChannels()[ch_roll]->setPosition(_aileron);
+            _board->getRadioChannels()[ch_yaw]->setPosition(_rudder);
+            _board->getRadioChannels()[ch_pitch]->setPosition(_elevator);
+            _board->getRadioChannels()[ch_thrust]->setPosition(_throttle);
         }
     }
     void handleFailsafe() {

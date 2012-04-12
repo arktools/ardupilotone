@@ -39,39 +39,39 @@ public:
               PID_POS_Z_I, PID_POS_Z_D, PID_POS_Z_AWU, PID_POS_Z_LIM),
         _thrustMix(0), _pitchMix(0), _rollMix(0), _yawMix(0),
         _cmdRoll(0), _cmdPitch(0), _cmdYawRate(0) {
-        _board->debug->println_P(PSTR("initializing quad controller"));
+        _board->getDebug()->println_P(PSTR("initializing quad controller"));
 
         /*
          * allocate radio channels
          * the order of the channels has to match the enumeration above
          */
-        _board->rc.push_back(
-            new AP_RcChannel(k_chMode, PSTR("MODE_"), board->radio, 5, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chMode, PSTR("MODE_"), board->getRadio(), 5, 1100,
                              1500, 1900, RC_MODE_IN, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chRight, PSTR("RIGHT_"), board->radio, 0, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chRight, PSTR("RIGHT_"), board->getRadio(), 0, 1100,
                              1100, 1900, RC_MODE_OUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chLeft, PSTR("LEFT_"), board->radio, 1, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chLeft, PSTR("LEFT_"), board->getRadio(), 1, 1100,
                              1100, 1900, RC_MODE_OUT, false));
 
-        _board->rc.push_back(
-            new AP_RcChannel(k_chFront, PSTR("FRONT_"), board->radio, 2, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chFront, PSTR("FRONT_"), board->getRadio(), 2, 1100,
                              1100, 1900, RC_MODE_OUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chBack, PSTR("BACK_"), board->radio, 3, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chBack, PSTR("BACK_"), board->getRadio(), 3, 1100,
                              1100, 1900, RC_MODE_OUT, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chRoll, PSTR("ROLL_"), board->radio, 0, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chRoll, PSTR("ROLL_"), board->getRadio(), 0, 1100,
                              1500, 1900, RC_MODE_IN, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chPitch, PSTR("PITCH_"), board->radio, 1, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chPitch, PSTR("PITCH_"), board->getRadio(), 1, 1100,
                              1500, 1900, RC_MODE_IN, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chThr, PSTR("THRUST_"), board->radio, 2, 1100,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chThr, PSTR("THRUST_"), board->getRadio(), 2, 1100,
                              1100, 1900, RC_MODE_IN, false));
-        _board->rc.push_back(
-            new AP_RcChannel(k_chYaw, PSTR("YAW_"), board->radio, 3, 1100, 1500,
+        _board->getRadioChannels().push_back(
+            new AP_RcChannel(k_chYaw, PSTR("YAW_"), board->getRadio(), 3, 1100, 1500,
                              1900, RC_MODE_IN, false));
     }
 
@@ -79,10 +79,10 @@ private:
     // methods
     void manualLoop(const float dt) {
         setAllRadioChannelsManually();
-        _cmdRoll = -0.5 * _board->rc[ch_roll]->getPosition();
-        _cmdPitch = -0.5 * _board->rc[ch_pitch]->getPosition();
-        _cmdYawRate = -1 * _board->rc[ch_yaw]->getPosition();
-        _thrustMix = _board->rc[ch_thrust]->getPosition();
+        _cmdRoll = -0.5 * _board->getRadioChannels()[ch_roll]->getPosition();
+        _cmdPitch = -0.5 * _board->getRadioChannels()[ch_pitch]->getPosition();
+        _cmdYawRate = -1 * _board->getRadioChannels()[ch_yaw]->getPosition();
+        _thrustMix = _board->getRadioChannels()[ch_thrust]->getPosition();
         autoAttitudeLoop(dt);
     }
     void autoLoop(const float dt) {
@@ -113,7 +113,7 @@ private:
         else _thrustMix /= cos(_cmdPitch);
 
         // debug for position loop
-        //_board->debug->printf_P(PSTR("cmd: tilt(%f), down(%f), pitch(%f), roll(%f)\n"),cmdTilt,cmdDown,_cmdPitch,_cmdRoll);
+        //_board->getDebug()->printf_P(PSTR("cmd: tilt(%f), down(%f), pitch(%f), roll(%f)\n"),cmdTilt,cmdDown,_cmdPitch,_cmdRoll);
     }
     void autoAttitudeLoop(float dt) {
         _rollMix = pidRoll.update(_cmdRoll - _nav->getRoll(),
@@ -124,13 +124,13 @@ private:
     }
     void setMotors() {
         // turn all motors off if below 0.1 throttle
-        if (fabs(_board->rc[ch_thrust]->getRadioPosition()) < 0.1) {
+        if (fabs(_board->getRadioChannels()[ch_thrust]->getRadioPosition()) < 0.1) {
             setAllRadioChannelsToNeutral();
         } else {
-            _board->rc[ch_right]->setPosition(_thrustMix - _rollMix + _yawMix);
-            _board->rc[ch_left]->setPosition(_thrustMix + _rollMix + _yawMix);
-            _board->rc[ch_front]->setPosition(_thrustMix + _pitchMix - _yawMix);
-            _board->rc[ch_back]->setPosition(_thrustMix - _pitchMix - _yawMix);
+            _board->getRadioChannels()[ch_right]->setPosition(_thrustMix - _rollMix + _yawMix);
+            _board->getRadioChannels()[ch_left]->setPosition(_thrustMix + _rollMix + _yawMix);
+            _board->getRadioChannels()[ch_front]->setPosition(_thrustMix + _pitchMix - _yawMix);
+            _board->getRadioChannels()[ch_back]->setPosition(_thrustMix - _pitchMix - _yawMix);
         }
     }
 

@@ -1,3 +1,4 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 /*
 	AP_ADC_ADS7844.cpp - ADC ADS7844 Library for Ardupilot Mega
 	Code by Jordi Mu�oz and Jose Julio. DIYDrones.com
@@ -83,7 +84,7 @@ static inline unsigned char ADC_SPI_transfer(unsigned char data)
 }
 
 
-void AP_ADC_ADS7844::read(void)
+void AP_ADC_ADS7844::read(uint32_t tnow)
 {
 	uint8_t ch;
 
@@ -111,7 +112,7 @@ void AP_ADC_ADS7844::read(void)
 			// reader below could get a division by zero
 			_sum[ch] = 0;
 			_count[ch] = 1;
-			last_ch6_micros = micros();
+			last_ch6_micros = tnow;
 		}
 		_sum[ch] += (v >> 3);
 	}
@@ -122,14 +123,9 @@ void AP_ADC_ADS7844::read(void)
 
 
 // Constructors ////////////////////////////////////////////////////////////////
-AP_ADC_ADS7844::AP_ADC_ADS7844() :
+AP_ADC_ADS7844::AP_ADC_ADS7844(AP_PeriodicProcess * scheduler) :
 			_filter_index_accel(0),
 			filter_result(false)
-{
-}
-
-// Public Methods //////////////////////////////////////////////////////////////
-void AP_ADC_ADS7844::Init( AP_PeriodicProcess * scheduler )
 {
 	pinMode(ADC_CHIP_SELECT, OUTPUT);
 
@@ -158,11 +154,12 @@ void AP_ADC_ADS7844::Init( AP_PeriodicProcess * scheduler )
 	last_ch6_micros = micros();
 
     scheduler->register_process( AP_ADC_ADS7844::read );
-
 }
 
+// Public Methods //////////////////////////////////////////////////////////////
+
 // Read one channel value
-uint16_t AP_ADC_ADS7844::Ch(uint8_t ch_num)
+float AP_ADC_ADS7844::Ch(uint8_t ch_num)
 {
 	uint16_t count;
 	uint32_t sum;
@@ -178,7 +175,7 @@ uint16_t AP_ADC_ADS7844::Ch(uint8_t ch_num)
 	_sum[ch_num]   = 0;
 	sei();
 
-	return sum/count;
+	return ((float)sum)/count;
 }
 
 // Read 6 channel values

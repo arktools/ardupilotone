@@ -41,6 +41,7 @@ namespace ArdupilotMega
             public Model model;
             public string[] ntun;
             public string[] ctun;
+            public int datetime;
         }
 
         enum serialstatus
@@ -56,8 +57,6 @@ namespace ArdupilotMega
         public Log()
         {
             InitializeComponent();
-
-            Control.CheckForIllegalCrossThreadCalls = false; // so can update display from another thread
         }
 
         private void Log_Load(object sender, EventArgs e)
@@ -70,9 +69,7 @@ namespace ArdupilotMega
             //comPort.ReadBufferSize = 1024 * 1024;
             try
             {
-                comPort.DtrEnable = false;
-                System.Threading.Thread.Sleep(100);
-                comPort.DtrEnable = true;
+                comPort.toggleDTR();
                 //comPort.Open();
             }
             catch (Exception)
@@ -85,6 +82,14 @@ namespace ArdupilotMega
                 DateTime start = DateTime.Now;
 
                 threadrun = true;
+
+                System.Threading.Thread.Sleep(2000);
+
+                try
+                {
+                    comPort.Write("\n\n\n\n");
+                }
+                catch {  }
 
                 while (threadrun)
                 {
@@ -116,10 +121,11 @@ namespace ArdupilotMega
         {
             MethodInvoker m = delegate()
             {
-                CHK_logs.Items.Clear();
-                for (int a = 1; a <= logcount; a++)
+                //CHK_logs.Items.Clear();
+                //for (int a = 1; a <= logcount; a++)
+                if (!CHK_logs.Items.Contains(logcount))
                 {
-                    CHK_logs.Items.Add(a);
+                    CHK_logs.Items.Add(logcount);
                 }
             };
             try
@@ -135,7 +141,14 @@ namespace ArdupilotMega
         {
             if (start.Second != DateTime.Now.Second)
             {
-                TXT_status.Text = status.ToString() + " " + receivedbytes + " " + comPort.BytesToRead;
+                this.BeginInvoke((System.Windows.Forms.MethodInvoker)delegate()
+{
+    try
+    {
+        TXT_status.Text = status.ToString() + " " + receivedbytes + " " + comPort.BytesToRead;
+    }
+    catch { }
+});
                 start = DateTime.Now;
             }
         }
@@ -174,26 +187,11 @@ namespace ArdupilotMega
                     {
                         case serialstatus.Connecting:
 
-                            if (line.Contains("reset to FLY") || line.Contains("interactive setup") || line.Contains("CLI:"))
+                            if (line.Contains("reset to FLY") || line.Contains("interactive setup") || line.Contains("CLI:") || line.Contains("Ardu"))
                             {
                                 comPort.Write("logs\r");
-                            }
-                            if (line.Contains("logs"))
-                            {
-                                Regex regex2 = new Regex(@"^([0-9]+)", RegexOptions.IgnoreCase);
-                                if (regex2.IsMatch(line))
-                                {
-                                    MatchCollection matchs = regex2.Matches(line);
-                                    logcount = int.Parse(matchs[0].Groups[0].Value);
-                                    genchkcombo(logcount);
-                                    status = serialstatus.Done;
-                                }
-                            }
-                            if (line.Contains("No logs"))
-                            {
                                 status = serialstatus.Done;
                             }
-
                             break;
                         case serialstatus.Closefile:
                             sw.Close();
@@ -201,7 +199,10 @@ namespace ArdupilotMega
 
                             MainV2.cs.firmware = MainV2.Firmwares.ArduPlane;
 
-                            TXT_seriallog.AppendText("Createing KML for " + logfile);
+                            this.Invoke((System.Windows.Forms.MethodInvoker)delegate()
+{
+    TXT_seriallog.AppendText("Createing KML for " + logfile);
+});
 
                             while (tr.Peek() != -1)
                             {
@@ -225,7 +226,10 @@ namespace ArdupilotMega
                             status = serialstatus.Waiting;
                             lock (thisLock)
                             {
-                                TXT_seriallog.Clear();
+                                this.Invoke((System.Windows.Forms.MethodInvoker)delegate()
+{
+    TXT_seriallog.Clear();
+});
                             }
                             //if (line.Contains("Dumping Log"))
                             {
@@ -234,6 +238,21 @@ namespace ArdupilotMega
                             break;
                         case serialstatus.Done:
                             // 
+                            if (line.Contains("start") && line.Contains("end"))
+                            {
+                                Regex regex2 = new Regex(@"^Log ([0-9]+),", RegexOptions.IgnoreCase);
+                                if (regex2.IsMatch(line))
+                                {
+                                    MatchCollection matchs = regex2.Matches(line);
+                                    logcount = int.Parse(matchs[0].Groups[1].Value);
+                                    genchkcombo(logcount);
+                                    //status = serialstatus.Done;
+                                }
+                            }
+                            if (line.Contains("No logs"))
+                            {
+                                status = serialstatus.Done;
+                            }
                             break;
                         case serialstatus.Reading:
                             if (line.Contains("packets read") || line.Contains("Done") || line.Contains("logs enabled"))
@@ -252,7 +271,7 @@ namespace ArdupilotMega
                     }
                     lock (thisLock)
                     {
-                        this.BeginInvoke((System.Threading.ThreadStart)delegate()
+                        this.BeginInvoke((MethodInvoker)delegate()
                         {
 
                             Console.Write(line);
@@ -328,6 +347,8 @@ namespace ArdupilotMega
 
                     if (items.Length == 11 && items[6] == "0.0000")
                         alt = double.Parse(items[7], new System.Globalization.CultureInfo("en-US"));
+                    if (items.Length == 11 && items[6] == "0")
+                        alt = double.Parse(items[7], new System.Globalization.CultureInfo("en-US"));
 
 
                     position[positionindex].Add(new Point3D(double.Parse(items[5], new System.Globalization.CultureInfo("en-US")), double.Parse(items[4], new System.Globalization.CultureInfo("en-US")), alt));
@@ -364,15 +385,23 @@ namespace ArdupilotMega
                 {
                     try
                     {
-                        if (lastpos.X != 0 && oldlastpos != lastpos)
+                        if (lastpos.X != 0 && oldlastpos.X != lastpos.X && oldlastpos.Y != lastpos.Y)
                         {
                             Data dat = new Data();
+
+                            try
+                            {
+                                dat.datetime = int.Parse(lastline.Split(',', ':')[1]);
+                            }
+                            catch { }
 
                             runmodel = new Model();
 
                             runmodel.Location.longitude = lastpos.X;
                             runmodel.Location.latitude = lastpos.Y;
                             runmodel.Location.altitude = lastpos.Z;
+
+                            oldlastpos = lastpos;
 
                             runmodel.Orientation.roll = double.Parse(items[1], new System.Globalization.CultureInfo("en-US")) / -100;
                             runmodel.Orientation.tilt = double.Parse(items[2], new System.Globalization.CultureInfo("en-US")) / -100;
@@ -398,9 +427,51 @@ namespace ArdupilotMega
         List<Core.Geometry.Point3D>[] position = new List<Core.Geometry.Point3D>[200];
         int positionindex = 0;
 
+        private void writeGPX(string filename)
+        {
+            System.Xml.XmlTextWriter xw = new System.Xml.XmlTextWriter(Path.GetDirectoryName(filename) + Path.DirectorySeparatorChar + Path.GetFileNameWithoutExtension(filename) + ".gpx",Encoding.ASCII);
+
+            xw.WriteStartElement("gpx");
+
+            xw.WriteStartElement("trk");
+
+            xw.WriteStartElement("trkseg");
+
+            DateTime start = new DateTime(DateTime.Now.Year,DateTime.Now.Month,DateTime.Now.Day,0,0,0);
+
+            foreach (Data mod in flightdata)
+            {
+                xw.WriteStartElement("trkpt");
+                xw.WriteAttributeString("lat",mod.model.Location.latitude.ToString());
+                xw.WriteAttributeString("lon", mod.model.Location.longitude.ToString());
+
+                xw.WriteElementString("ele", mod.model.Location.altitude.ToString());
+                xw.WriteElementString("time", start.AddMilliseconds(mod.datetime).ToString("yyyy-MM-ddTHH:mm:sszzzzzz"));
+                xw.WriteElementString("course", (mod.model.Orientation.heading).ToString());
+
+                xw.WriteElementString("roll", mod.model.Orientation.roll.ToString());
+                xw.WriteElementString("pitch", mod.model.Orientation.tilt.ToString());
+                //xw.WriteElementString("speed", mod.model.Orientation.);
+                //xw.WriteElementString("fix", mod.model.Location.altitude);
+
+                xw.WriteEndElement();
+            }
+
+            xw.WriteEndElement();
+            xw.WriteEndElement();
+            xw.WriteEndElement();
+
+            xw.Close();
+        }
 
         private void writeKML(string filename)
         {
+            try
+            {
+                writeGPX(filename);
+            }
+            catch { }
+
             Color[] colours = { Color.Red, Color.Orange, Color.Yellow, Color.Green, Color.Blue, Color.Indigo, Color.Violet, Color.Pink };
 
             AltitudeMode altmode = AltitudeMode.absolute;
@@ -706,6 +777,7 @@ namespace ArdupilotMega
             System.Threading.Thread.Sleep(100);
             TXT_seriallog.AppendText("!!Allow 30 seconds for erase\n");
             status = serialstatus.Done;
+            CHK_logs.Items.Clear();
         }
 
         private void BUT_redokml_Click(object sender, EventArgs e)
@@ -904,7 +976,7 @@ namespace ArdupilotMega
             byte[] buffer = new byte[4096];
             using (FileStream streamReader = File.OpenRead(filename))
             {
-                StreamUtils.Copy(streamReader, zipStream, buffer);
+               StreamUtils.Copy(streamReader, zipStream, buffer);
             }
             zipStream.CloseEntry();
 

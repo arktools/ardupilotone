@@ -8,8 +8,8 @@
 #ifndef AP_MAVLINKCOMMAND_H_
 #define AP_MAVLINKCOMMAND_H_
 
-#include "../GCS_MAVLink/GCS_MAVLink.h"
-#include "../AP_Common/AP_Common.h"
+#include <GCS_MAVLink.h>
+#include <AP_Common.h>
 #include "AP_Var_keys.h"
 #include "constants.h"
 

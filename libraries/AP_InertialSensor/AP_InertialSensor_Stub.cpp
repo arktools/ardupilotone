@@ -1,7 +1,6 @@
+/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 #include "AP_InertialSensor_Stub.h"
-
-void AP_InertialSensor_Stub::init( AP_PeriodicProcess * scheduler ) {}
 
 /*================ AP_INERTIALSENSOR PUBLIC INTERFACE ==================== */
 

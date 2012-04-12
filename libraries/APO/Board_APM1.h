@@ -14,7 +14,7 @@ namespace apo {
 
 class Board_APM1 : public AP_Board {
 public:
-    Board_APM1(mode_e mode, MAV_TYPE vehicle, options_t options);
+    Board_APM1(const parameters_t & parameters);
 private:
 };
 

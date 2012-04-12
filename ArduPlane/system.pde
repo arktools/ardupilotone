@@ -46,6 +46,9 @@ MENU(main_menu, THISFIRMWARE, main_menu_commands);
 // the user wants the CLI. It never exits
 static void run_cli(void)
 {
+    // disable the failsafe code in the CLI
+    timer_scheduler.set_failsafe(NULL);
+
     while (1) {
         main_menu.run();
     }
@@ -101,17 +104,16 @@ static void init_ardupilot()
                     memcheck_available_memory());
 
 	//
-	// Initialize the ISR registry.
+	// Initialize Wire and SPI libraries
 	//
-    isr_registry.init();
-
-    //
-	// Initialize the timer scheduler to use the ISR registry.
-	//
-
-#if HIL_MODE != HIL_MODE_ATTITUDE
-    timer_scheduler.init( & isr_registry );
+#ifndef DESKTOP_BUILD
+    I2c.begin();
+    I2c.timeOut(5);
+    // initially set a fast I2c speed, and drop it on first failures
+    I2c.setSpeed(true);
 #endif
+    SPI.begin();
+    SPI.setClockDivider(SPI_CLOCK_DIV16); // 1MHZ SPI rate
 
 	//
 	// Check the EEPROM format version before loading any parameters from EEPROM.
@@ -124,12 +126,6 @@ static void init_ardupilot()
 		Serial.printf_P(PSTR("Firmware change: erasing EEPROM...\n"));
 		delay(100); // wait for serial send
 		AP_Var::erase_all();
-		
-		// erase DataFlash on format version change
-		#if LOGGING_ENABLED == ENABLED
-		DataFlash.Init(); 
-		erase_logs(NULL, NULL);
-		#endif
 		
 		// save the current format version
 		g.format_version.set_and_save(Parameters::k_format_version);
@@ -166,16 +162,23 @@ static void init_ardupilot()
 
 	mavlink_system.sysid = g.sysid_this_mav;
 
+#if LOGGING_ENABLED == ENABLED
+	DataFlash.Init(); 	// DataFlash log initialization
+    if (!DataFlash.CardInserted()) {
+        gcs_send_text_P(SEVERITY_LOW, PSTR("No dataflash card inserted"));
+        g.log_bitmask.set(0);
+    } else if (DataFlash.NeedErase()) {
+        gcs_send_text_P(SEVERITY_LOW, PSTR("ERASING LOGS"));
+		do_erase_logs();
+    }
+	if (g.log_bitmask != 0) {
+		DataFlash.start_new_log();
+	}
+#endif
 
 #if HIL_MODE != HIL_MODE_ATTITUDE
 
-    adc.Init(&timer_scheduler);      // APM ADC library initialization
-
-#if CONFIG_APM_HARDWARE == APM_HARDWARE_APM2
-	barometer.Init(1, true);
-#else
-	barometer.Init(1, false);
-#endif
+	barometer.init(&timer_scheduler);
 
 	if (g.compass_enabled==true) {
         compass.set_orientation(MAG_ORIENTATION);							// set compass's orientation on aircraft
@@ -185,12 +188,9 @@ static void init_ardupilot()
         } else {
             dcm.set_compass(&compass);
             compass.get_offsets();						// load offsets to account for airframe magnetic interference
+            compass.null_offsets_enable();
         }
 	}
-#endif
-
-#if LOGGING_ENABLED == ENABLED
-	DataFlash.Init(); 	// DataFlash log initialization
 #endif
 
 	// Do GPS init
@@ -220,6 +220,19 @@ static void init_ardupilot()
 #if CONFIG_RELAY == ENABLED
 	DDRL |= B00000100;					// Set Port L, pin 2 to output for the relay
 #endif
+
+#if FENCE_TRIGGERED_PIN > 0
+    pinMode(FENCE_TRIGGERED_PIN, OUTPUT);
+    digitalWrite(FENCE_TRIGGERED_PIN, LOW);
+#endif
+
+    /*
+      setup the 'main loop is dead' check. Note that this relies on
+      the RC library being initialised.
+     */
+    timer_scheduler.set_failsafe(failsafe_check);
+
+
 	// If the switch is in 'menu' mode, run the main menu.
 	//
 	// Since we can't be sure that the setup or test mode won't leave
@@ -242,10 +255,6 @@ static void init_ardupilot()
     Serial.printf_P(PSTR("\nPress ENTER 3 times to start interactive setup\n\n"));
 #endif // CLI_ENABLED
 
-	if(g.log_bitmask != 0){
-		start_new_log();
-	}
-
 	// read in the flight switches
 	update_servo_switches();
 
@@ -257,7 +266,7 @@ static void init_ardupilot()
 		//----------------
 		//read_EEPROM_airstart_critical();
 #if HIL_MODE != HIL_MODE_ATTITUDE
-		imu.init(IMU::WARM_START, mavlink_delay, &timer_scheduler);
+        imu.warmStart();
 		dcm.set_centripetal(1);
 #endif
 
@@ -402,16 +411,13 @@ static void check_long_failsafe()
 	// -------------------
 	if(failsafe != FAILSAFE_LONG  && failsafe != FAILSAFE_GCS){
 		if(rc_override_active && millis() - rc_override_fs_timer > FAILSAFE_LONG_TIME) {
-			failsafe = FAILSAFE_LONG;
-			failsafe_long_on_event();
+			failsafe_long_on_event(FAILSAFE_LONG);
 		}
 		if(! rc_override_active && failsafe == FAILSAFE_SHORT && millis() - ch3_failsafe_timer > FAILSAFE_LONG_TIME) {
-			failsafe = FAILSAFE_LONG;
-			failsafe_long_on_event();
+			failsafe_long_on_event(FAILSAFE_LONG);
 		}
 		if(g.gcs_heartbeat_fs_enabled && millis() - rc_override_fs_timer > FAILSAFE_LONG_TIME) {
-			failsafe = FAILSAFE_GCS;
-			failsafe_long_on_event();
+			failsafe_long_on_event(FAILSAFE_GCS);
 		}
 	} else {
 		// We do not change state but allow for user to change mode
@@ -427,7 +433,7 @@ static void check_short_failsafe()
 	// -------------------
 	if(failsafe == FAILSAFE_NONE){
 		if(ch3_failsafe) {					// The condition is checked and the flag ch3_failsafe is set in radio.pde
-			failsafe_short_on_event();
+			failsafe_short_on_event(FAILSAFE_SHORT);
 		}
 	}
 
@@ -451,8 +457,10 @@ static void startup_IMU_ground(void)
     gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning IMU calibration; do not move plane"));
 	mavlink_delay(1000);
 
-	imu.init(IMU::COLD_START, mavlink_delay, &timer_scheduler);
+    imu.coldStart();
+	imu.init_accel();
 	dcm.set_centripetal(1);
+    dcm.matrix_reset();
 
 	// read Baro pressure at ground
 	//-----------------------------
@@ -551,3 +559,14 @@ static void check_usb_mux(void)
     }
 }
 #endif
+
+
+/*
+  called by gyro/accel init to flash LEDs so user
+  has some mesmerising lights to watch while waiting
+ */
+void flash_leds(bool on)
+{
+    digitalWrite(A_LED_PIN, on?LED_OFF:LED_ON);
+    digitalWrite(C_LED_PIN, on?LED_ON:LED_OFF);
+}

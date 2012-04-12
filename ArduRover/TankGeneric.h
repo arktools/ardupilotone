@@ -10,12 +10,7 @@
 #ifndef TANKGENERIC_H_
 #define TANKGENERIC_H_
 
-// vehicle options
-static const AP_Board::options_t options = AP_Board::opt_gps | AP_Board::opt_baro | AP_Board::opt_compass;
-static const MAV_TYPE vehicle = UGV_GROUND_ROVER;
-//static const apo::AP_Board::mode_e = apo::AP_Board::MODE_HIL_CNTL;
-static const apo::AP_Board::mode_e = apo::AP_Board::MODE_LIVE;
-static const uint8_t heartBeatTimeout = 0;
+using namespace apo;
 
 // algorithm selection
 #define CONTROLLER_CLASS ControllerTank
@@ -27,12 +22,49 @@ static const uint8_t heartBeatTimeout = 0;
 //#define BOARD_TYPE Board_APM1_2560
 #define BOARD_TYPE Board_APM2
 
-// loop rates
-static const float loopRate = 150; // attitude nav
-static const float loop0Rate = 50; // controller
-static const float loop1Rate = 5; 	// pos nav/ gcs fast
-static const float loop2Rate = 1; 	// gcs slow
-static const float loop3Rate = 0.1;
+static const struct AP_Board::parameters_t parameters = 
+{
+    // vehicle type
+    UGV_GROUND_ROVER,
+
+    // mode
+    AP_Board::MODE_LIVE,
+    //AP_Board::MODE_HIL_CNTRL,
+
+    // options
+    AP_Board::opt_gps | 
+    AP_Board::opt_baro | 
+    AP_Board::opt_compass |
+    AP_Board::opt_batteryMonitor |
+    //AP_Board::opt_rangeFinderFront |
+    //AP_Board::opt_rangeFinderBack |
+    //AP_Board::opt_rangeFinderLeft |
+    AP_Board::opt_rangeFinderRight |
+    0, // note: 0 here to allow | on last option
+
+    // baud rates
+    57600,  // debug baud rate
+    57600,  // telem baud rate
+    38400,  // gps baud rate
+    57600,  // hil baud rate
+
+    // battery sensor
+    0,      // battery  pin
+    6,      // battery voltage div ratio
+    10.0,   // battery min volt
+    12.4,   // battery max volt
+    AP_COMPASS_COMPONENTS_UP_PINS_FORWARD, // compass orientation
+
+    // loop rates
+    150,    // attitude nav
+    50,     // controller
+    10,     // pos nav/ gcs fast
+    1,      // gcs slow
+    0.1,     // very slow loop
+
+    // heartbeat timeout
+    3
+};
 
 // gains
 const float steeringP = 1.0;

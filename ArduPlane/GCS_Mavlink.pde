@@ -120,6 +120,14 @@ static NOINLINE void send_attitude(mavlink_channel_t chan)
         omega.z);
 }
 
+#if GEOFENCE_ENABLED == ENABLED
+static NOINLINE void send_fence_status(mavlink_channel_t chan)
+{
+    geofence_send_status(chan);
+}
+#endif
+
+
 static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t packet_drops)
 {
 #ifdef MAVLINK10
@@ -198,11 +206,11 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
     uint16_t battery_current = -1;
     uint8_t  battery_remaining = -1;
 
-    if (current_total != 0 && g.pack_capacity != 0) {
-        battery_remaining = (100.0 * (g.pack_capacity - current_total) / g.pack_capacity);
+    if (current_total1 != 0 && g.pack_capacity != 0) {
+        battery_remaining = (100.0 * (g.pack_capacity - current_total1) / g.pack_capacity);
     }
-    if (current_total != 0) {
-        battery_current = current_amps * 100;
+    if (current_total1 != 0) {
+        battery_current = current_amps1 * 100;
     }
 
     mavlink_msg_sys_status_send(
@@ -211,7 +219,7 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
         control_sensors_enabled,
         control_sensors_health,
         (uint16_t)(load * 1000),
-        battery_voltage * 1000, // mV
+        battery_voltage1 * 1000, // mV
         battery_current,        // in 10mA units
         battery_remaining,      // in %
         0, // comm drops %,
@@ -256,10 +264,13 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
             mode 		= MAV_MODE_UNINIT;
             nav_mode 	= MAV_NAV_GROUNDED;
             break;
+        case CIRCLE:
+            mode        = MAV_MODE_TEST3;
+            break;
         }
 
         uint8_t status 		= MAV_STATE_ACTIVE;
-        uint16_t battery_remaining = 1000.0 * (float)(g.pack_capacity - current_total)/(float)g.pack_capacity;	//Mavlink scaling 100% = 1000
+        uint16_t battery_remaining = 1000.0 * (float)(g.pack_capacity - current_total1)/(float)g.pack_capacity;	//Mavlink scaling 100% = 1000
 
         mavlink_msg_sys_status_send(
             chan,
@@ -267,7 +278,7 @@ static NOINLINE void send_extended_status1(mavlink_channel_t chan, uint16_t pack
             nav_mode,
             status,
             load * 1000,
-            battery_voltage * 1000,
+            battery_voltage1 * 1000,
             battery_remaining,
             packet_drops);
 #endif // MAVLINK10
@@ -436,12 +447,13 @@ static void NOINLINE send_raw_imu1(mavlink_channel_t chan)
 
 static void NOINLINE send_raw_imu2(mavlink_channel_t chan)
 {
+    int32_t pressure = barometer.get_pressure();
     mavlink_msg_scaled_pressure_send(
         chan,
         micros(),
-        (float)barometer.Press/100.0,
-        (float)(barometer.Press-g.ground_pressure)/100.0,
-        (int)(barometer.Temp*10));
+        pressure/100.0,
+        (pressure - g.ground_pressure)/100.0,
+        barometer.get_temperature());
 }
 
 static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
@@ -453,8 +465,8 @@ static void NOINLINE send_raw_imu3(mavlink_channel_t chan)
                                     mag_offsets.y,
                                     mag_offsets.z,
                                     compass.get_declination(),
-                                    barometer.RawPress,
-                                    barometer.RawTemp,
+                                    barometer.get_raw_pressure(),
+                                    barometer.get_raw_temp(),
                                     imu.gx(), imu.gy(), imu.gz(),
                                     imu.ax(), imu.ay(), imu.az());
 }
@@ -611,6 +623,13 @@ static bool mavlink_try_send_message(mavlink_channel_t chan, enum ap_message id,
         send_statustext(chan);
         break;
 
+#if GEOFENCE_ENABLED == ENABLED
+    case MSG_FENCE_STATUS:
+        CHECK_PAYLOAD_SIZE(FENCE_STATUS);
+        send_fence_status(chan);
+        break;
+#endif
+
     case MSG_RETRY_DEFERRED:
         break; // just here to prevent a warning
 	}
@@ -750,7 +769,7 @@ GCS_MAVLINK::update(void)
 #if CLI_ENABLED == ENABLED
         /* allow CLI to be started by hitting enter 3 times, if no
            heartbeat packets have been received */
-        if (mavlink_active == 0) {
+        if (mavlink_active == 0 && millis() < 20000) {
             if (c == '\n' || c == '\r') {
                 crlf_count++;
             } else {
@@ -786,6 +805,7 @@ GCS_MAVLINK::update(void)
     if (waypoint_receiving &&
         waypoint_request_i <= (unsigned)g.command_total &&
         tnow > waypoint_timelast_request + 500) {
+        waypoint_timelast_request = tnow;
         send_message(MSG_NEXT_WAYPOINT);
     }
 
@@ -818,6 +838,7 @@ GCS_MAVLINK::data_stream_send(uint16_t freqMin, uint16_t freqMax)
 			send_message(MSG_CURRENT_WAYPOINT);
 			send_message(MSG_GPS_RAW);            // TODO - remove this message after location message is working
 			send_message(MSG_NAV_CONTROLLER_OUTPUT);
+			send_message(MSG_FENCE_STATUS);
 		}
 
 		if (freqLoopMatch(streamRatePosition, freqMin, freqMax)) {
@@ -1628,6 +1649,43 @@ void GCS_MAVLINK::handleMessage(mavlink_message_t* msg)
                 result);
             break;
         }
+
+#if GEOFENCE_ENABLED == ENABLED
+	// receive a fence point from GCS and store in EEPROM
+    case MAVLINK_MSG_ID_FENCE_POINT: {
+        mavlink_fence_point_t packet;
+        mavlink_msg_fence_point_decode(msg, &packet);
+        if (mavlink_check_target(packet.target_system, packet.target_component))
+            break;
+        if (g.fence_action != FENCE_ACTION_NONE) {
+            send_text(SEVERITY_LOW,PSTR("fencing must be disabled"));
+        } else if (packet.count != g.fence_total) {
+            send_text(SEVERITY_LOW,PSTR("bad fence point"));
+        } else {
+            Vector2l point;
+            point.x = packet.lat*1.0e7;
+            point.y = packet.lng*1.0e7;
+            set_fence_point_with_index(point, packet.idx);
+        }
+        break;
+    }
+
+	// send a fence point to GCS
+    case MAVLINK_MSG_ID_FENCE_FETCH_POINT: {
+        mavlink_fence_fetch_point_t packet;
+        mavlink_msg_fence_fetch_point_decode(msg, &packet);
+        if (mavlink_check_target(packet.target_system, packet.target_component))
+            break;
+        if (packet.idx >= g.fence_total) {
+            send_text(SEVERITY_LOW,PSTR("bad fence point"));
+        } else {
+            Vector2l point = get_fence_point_with_index(packet.idx);
+            mavlink_msg_fence_point_send(chan, 0, 0, packet.idx, g.fence_total,
+                                         point.x*1.0e-7, point.y*1.0e-7);
+        }
+        break;
+    }
+#endif // GEOFENCE_ENABLED
 
     case MAVLINK_MSG_ID_PARAM_SET:
         {

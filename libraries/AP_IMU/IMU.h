@@ -18,11 +18,6 @@ public:
 	/// Constructor
 	IMU();
 
-	enum Start_style {
-		COLD_START = 0,
-		WARM_START
-	};
-
 	/// Perform startup initialisation.
 	///
 	/// Called to initialise the state of the IMU.
@@ -36,23 +31,29 @@ public:
 	///
 	/// @param style	The initialisation startup style.
 	///
-	virtual void	init( Start_style style,
-                          void (*delay_cb)(unsigned long t),
+	virtual void	init( void (*delay_cb)(unsigned long t),
+						  void (*flash_leds_cb)(bool on),
                           AP_PeriodicProcess * scheduler );
+
+    /// Warm start initialization
+    virtual void warmStart() = 0;
+
+    /// Cold start initialization
+    virtual void coldStart() = 0;
 
 	/// Perform cold startup initialisation for just the accelerometers.
 	///
 	/// @note This should not be called unless ::init has previously
 	///       been called, as ::init may perform other work.
 	///
-	virtual void	init_accel(void (*callback)(unsigned long t));
+	virtual void	init_accel(void (*callback)(unsigned long t), void (*flash_leds_cb)(bool on));
 
 	/// Perform cold-start initialisation for just the gyros.
 	///
 	/// @note This should not be called unless ::init has previously
 	///       been called, as ::init may perform other work
 	///
-	virtual void	init_gyro(void (*callback)(unsigned long t));
+	virtual void	init_gyro(void (*callback)(unsigned long t), void (*flash_leds_cb)(bool on));
 
 	/// Give the IMU some cycles to perform/fetch an update from its
 	/// sensors.

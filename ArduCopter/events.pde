@@ -11,17 +11,25 @@ static void failsafe_on_event()
 	{
 		case AUTO:
 			if (g.throttle_fs_action == 1) {
+				// do_rtl sets the altitude to the current altitude by default
 				set_mode(RTL);
+				// We add an additional 10m to the current altitude
+				//next_WP.alt += 1000;
+				set_new_altitude(target_altitude + 1000);
 			}
 			// 2 = Stay in AUTO and ignore failsafe
 
 		default:
 			if(home_is_set == true){
-				if ((get_distance(&current_loc, &home) > 15) && (current_loc.alt > 400)){
-					set_mode(RTL);
-					// override safety
-					motor_auto_armed = true;
-				}
+				// same as above ^
+				// do_rtl sets the altitude to the current altitude by default
+				set_mode(RTL);
+				// We add an additional 10m to the current altitude
+				//next_WP.alt += 1000;
+				set_new_altitude(target_altitude + 1000);
+			}else{
+				// We have no GPS so we must land
+				set_mode(LAND);
 			}
 			break;
 	}

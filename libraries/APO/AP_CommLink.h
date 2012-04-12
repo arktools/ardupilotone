@@ -20,9 +20,9 @@
 #define AP_CommLink_H
 
 #include <inttypes.h>
-#include "../AP_Common/AP_Common.h"
+#include <AP_Common.h>
 #include "../AP_Common/AP_Vector.h"
-#include "../GCS_MAVLink/GCS_MAVLink.h"
+#include <GCS_MAVLink.h>
 
 class FastSerial;
 
@@ -55,6 +55,7 @@ public:
     virtual void acknowledge(uint8_t id, uint8_t sum1, uint8_t sum2) = 0;
     virtual void sendParameters() = 0;
     virtual void requestCmds() = 0;
+    virtual void setLink(FastSerial * link) { _link = link; }
 
     /// check if heartbeat is lost
     bool heartBeatLost() {
@@ -79,12 +80,13 @@ public:
     MavlinkComm(FastSerial * link, AP_Navigator * nav, AP_Guide * guide,
                 AP_Controller * controller, AP_Board * board, uint16_t heartBeatTimeout);
 
-    virtual void send();
+    void send();
     void sendMessage(uint8_t id, uint32_t param = 0);
-    virtual void receive();
+    void receive();
     void sendText(uint8_t severity, const char *str);
     void sendText(uint8_t severity, const prog_char_t *str);
     void acknowledge(uint8_t id, uint8_t sum1, uint8_t sum2);
+    void setLink(FastSerial * link);
 
     /**
      * sends parameters one at a time

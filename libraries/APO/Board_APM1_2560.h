@@ -14,8 +14,9 @@ namespace apo {
 
 class Board_APM1_2560 : public Board_APM1 {
 public:
-    Board_APM1_2560(AP_Board::mode_e mode, MAV_TYPE vehicle, options_t options) : Board_APM1(mode,vehicle,options) {
-        eepromMaxAddr = 1024;
+    Board_APM1_2560(const parameters_t parameters) : 
+        Board_APM1(parameters) {
+        _eepromMaxAddr = 2048;
     }
 private:
 };

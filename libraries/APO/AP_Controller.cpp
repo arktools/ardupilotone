@@ -5,12 +5,12 @@
  *      Author: jgoppert
  */
 
-#include "../FastSerial/FastSerial.h"
+#include <FastSerial.h>
+#include <GCS_MAVLink.h>
 #include "AP_ArmingMechanism.h"
 #include "AP_BatteryMonitor.h"
 #include "AP_Board.h"
 #include "AP_RcChannel.h"
-#include "../GCS_MAVLink/include/mavlink_types.h"
 #include "constants.h"
 #include "AP_CommLink.h"
 #include "AP_Controller.h"
@@ -28,16 +28,16 @@ AP_Controller::AP_Controller(AP_Navigator * nav, AP_Guide * guide,
 }
 
 void AP_Controller::setAllRadioChannelsToNeutral() {
-    for (uint8_t i = 0; i < _board->rc.getSize(); i++) {
-        _board->rc[i]->setPosition(0.0);
+    for (uint8_t i = 0; i < _board->getRadioChannels().getSize(); i++) {
+        _board->getRadioChannels()[i]->setPosition(0.0);
     }
 }
 
 void AP_Controller::setAllRadioChannelsManually() {
-    //_board->debug->printf_P(PSTR("\tsize: %d\n"),_board->rc.getSize());
-    for (uint8_t i = 0; i < _board->rc.getSize(); i++) {
-        _board->rc[i]->setUsingRadio();
-        //_board->debug->printf_P(PSTR("\trc %d: %f\n"),i,_board->rc[i]->getPosition());
+    //_board->debug->printf_P(PSTR("\tsize: %d\n"),_board->getRadioChannels().getSize());
+    for (uint8_t i = 0; i < _board->getRadioChannels().getSize(); i++) {
+        _board->getRadioChannels()[i]->setUsingRadio();
+        //_board->debug->printf_P(PSTR("\trc %d: %f\n"),i,_board->getRadioChannels()[i]->getPosition());
     }
 }
 
@@ -50,7 +50,7 @@ void AP_Controller::update(const float dt) {
         // if state is not stanby then set it to standby and alert gcs
         if (getState()!=MAV_STATE_STANDBY) {
             setState(MAV_STATE_STANDBY);
-            _board->gcs->sendText(SEVERITY_HIGH, PSTR("disarmed"));
+            _board->getGcs()->sendText(SEVERITY_HIGH, PSTR("disarmed"));
         }
     }
     // if not locked
@@ -59,24 +59,24 @@ void AP_Controller::update(const float dt) {
         // if state is not active, set it to active and alert gcs
         if (getState()!=MAV_STATE_ACTIVE) {
             setState(MAV_STATE_ACTIVE);
-            _board->gcs->sendText(SEVERITY_HIGH, PSTR("armed"));
+            _board->getGcs()->sendText(SEVERITY_HIGH, PSTR("armed"));
         }
 
         // handle emergencies
         //
         // check for heartbeat from gcs, if not found go to failsafe
-        if (_board->gcs->heartBeatLost()) {
+        if (_board->getGcs()->heartBeatLost()) {
             setMode(MAV_MODE_FAILSAFE);
-            _board->gcs->sendText(SEVERITY_HIGH, PSTR("configure gcs to send heartbeat"));
+            _board->getGcs()->sendText(SEVERITY_HIGH, PSTR("configure gcs to send heartbeat"));
             
         // if battery less than 5%, go to failsafe
-        } else if (_board->batteryMonitor && _board->batteryMonitor->getPercentage() < 5) {
+        } else if (_board->getBatteryMonitor() && _board->getBatteryMonitor()->getPercentage() < 5) {
             setMode(MAV_MODE_FAILSAFE);
-            _board->gcs->sendText(SEVERITY_HIGH, PSTR("recharge battery"));
+            _board->getGcs()->sendText(SEVERITY_HIGH, PSTR("recharge battery"));
         }
 
         // if in auto mode and manual switch set, change to manual
-        if (_board->rc[_chMode]->getRadioPosition() > 0) setMode(MAV_MODE_MANUAL);
+        if (_board->getRadioChannels()[_chMode]->getRadioPosition() > 0) setMode(MAV_MODE_MANUAL);
         else setMode(MAV_MODE_AUTO);
 
         // handle all possible modes
@@ -87,17 +87,17 @@ void AP_Controller::update(const float dt) {
         } else if (getMode()==MAV_MODE_FAILSAFE) {
             handleFailsafe();
         } else {
-            _board->gcs->sendText(SEVERITY_HIGH, PSTR("unknown mode"));
+            _board->getGcs()->sendText(SEVERITY_HIGH, PSTR("unknown mode"));
             setMode(MAV_MODE_FAILSAFE);
         }
     }
 
     // this sends commands to motors
     if(getState()==MAV_STATE_ACTIVE) {
-        digitalWrite(_board->aLedPin, HIGH);
+        digitalWrite(_board->getALedPin(), HIGH);
         setMotors();
     } else {
-        digitalWrite(_board->aLedPin, LOW);
+        digitalWrite(_board->getALedPin(), LOW);
         setAllRadioChannelsToNeutral();
     }
 }

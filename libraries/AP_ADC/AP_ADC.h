@@ -23,11 +23,10 @@
 class AP_ADC
 {
   public:
-	AP_ADC() {};  // Constructor
-	virtual void Init(AP_PeriodicProcess * scheduler = NULL) = 0;
+	AP_ADC(AP_PeriodicProcess * scheduler = NULL) {};  // Constructor
 
 	/* read one channel value */
-	virtual uint16_t Ch(uint8_t ch_num) = 0;
+	virtual float Ch(uint8_t ch_num) = 0;
 
 	/* read 6 channels values as a set, used by IMU for 3 gyros
 	   and 3 accelerometeres.
