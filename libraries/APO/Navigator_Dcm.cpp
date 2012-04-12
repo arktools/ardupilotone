@@ -98,7 +98,7 @@ void Navigator_Dcm::calibrate() {
             }
             flashcount++;
         }
-        
+
         _groundPressure.save();
         _groundTemperature.save();
 
@@ -131,11 +131,11 @@ void Navigator_Dcm::updateFast(float dt) {
          * pressure input is in pascals
          * temp input is in deg C *10
          */
-        _board->getBaro()->read();		// Get new data from absolute pressure sensor
-        float reference = 44330 * (1.0 - (pow(_groundPressure.get()/101325.0,0.190295)));
-        setAlt(_baroLowPass.update((44330 * (1.0 - (pow((_board->getBaro()->get_pressure()/101325.0),0.190295)))) - reference,dt));
-        //_board->getDebug->printf_P(PSTR("Ground Pressure %f\tAltitude = %f\tGround Temperature = %f\tPress = %ld\tTemp = %d\n"),_groundPressure.get(),getAlt(),_groundTemperature.get(),_board->baro->Press,_board->baro->Temp);
-        
+        _board->baro->Read();		// Get new data from absolute pressure sensor
+        float reference = 44330.0 * (1.0 - (pow(_groundPressure.get()/101325.0,0.190295)));
+        setAlt(_baroLowPass.update((44330.0 * (1.0 - (pow((_board->baro->Press/101325.0),0.190295)))) - reference,dt));
+        //_board->debug->printf_P(PSTR("Ground Pressure %f\tAltitude = %f\tGround Temperature = %f\tPress = %ld\tTemp = %d\n"),_groundPressure.get(),getAlt(),_groundTemperature.get(),_board->baro->Press,_board->baro->Temp);
+
     // last resort, use gps altitude
     } else if (_board->getGps() && _board->getGps()->fix) {
         setAlt_intM(_board->getGps()->altitude * 10); // gps in cm, intM in mm

@@ -13,7 +13,11 @@
 
 #include "AP_GPS_MTK16.h"
 #include <stdint.h>
-#include <wiring.h>
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include <wiring.h>
+#endif
 
 // Constructors ////////////////////////////////////////////////////////////////
 AP_GPS_MTK16::AP_GPS_MTK16(Stream *s) : GPS(s)
@@ -30,8 +34,8 @@ AP_GPS_MTK16::init(void)
     // XXX should assume binary, let GPS_AUTO handle dynamic config?
     _port->print(MTK_SET_BINARY);
 
-    // set 10Hz update rate
-    _port->print(MTK_OUTPUT_10HZ);
+    // set 4Hz update rate
+    _port->print(MTK_OUTPUT_4HZ);
 
     // set initial epoch code
     _epoch = TIME_OF_DAY;

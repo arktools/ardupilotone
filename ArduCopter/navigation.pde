@@ -5,15 +5,13 @@
 //****************************************************************
 static byte navigate()
 {
-	// waypoint distance from plane in meters
+	// waypoint distance from plane in cm
 	// ---------------------------------------
-	wp_distance = get_distance(&current_loc, &next_WP);
-	home_distance = get_distance(&current_loc, &home);
+	wp_distance 	= get_distance(&current_loc, &next_WP);
+	home_distance 	= get_distance(&current_loc, &home);
 
 	if (wp_distance < 0){
-		//gcs_send_text_P(SEVERITY_HIGH,PSTR("<navigate> WP error - distance < 0"));
-		//Serial.println(wp_distance,DEC);
-		//print_current_waypoints();
+		// something went very wrong
 		return 0;
 	}
 
@@ -34,7 +32,7 @@ static bool check_missed_wp()
 	int32_t temp;
 	temp = target_bearing - original_target_bearing;
 	temp = wrap_180(temp);
-	return (abs(temp) > 10000);	//we pased the waypoint by 10 °
+	return (abs(temp) > 10000);	// we passed the waypoint by 100 degrees
 }
 
 // ------------------------------
@@ -46,32 +44,43 @@ static void calc_XY_velocity(){
 	static int32_t last_longitude = 0;
 	static int32_t last_latitude  = 0;
 
-	//static int16_t x_speed_old = 0;
-	//static int16_t y_speed_old = 0;
+	static int16_t x_speed_old = 0;
+	static int16_t y_speed_old = 0;
 
 	// y_GPS_speed positve = Up
 	// x_GPS_speed positve = Right
+
+	// initialise last_longitude and last_latitude
+	if( last_longitude == 0 && last_latitude == 0 ) {
+		last_longitude = g_gps->longitude;
+		last_latitude = g_gps->latitude;
+	}
 
 	// this speed is ~ in cm because we are using 10^7 numbers from GPS
 	float tmp = 1.0/dTnav;
 
 	// straightforward approach:
 	///*
-	int16_t	x_estimate	= (float)(g_gps->longitude - last_longitude) * tmp;
-	int16_t	y_estimate	= (float)(g_gps->latitude  - last_latitude)  * tmp;
 
-	// slight averaging filter
-	x_GPS_speed = (x_GPS_speed  + x_estimate) >> 1;
-	y_GPS_speed = (y_GPS_speed  + y_estimate) >> 1;
-	//*/
+	x_actual_speed 	= (float)(g_gps->longitude - last_longitude)  * scaleLongDown * tmp;
+	y_actual_speed	= (float)(g_gps->latitude  - last_latitude)  * tmp;
+
+	x_actual_speed	= (x_actual_speed + x_speed_old * 3) / 4;
+	y_actual_speed	= (y_actual_speed + y_speed_old * 3) / 4;
+
+	//x_actual_speed	= x_actual_speed >> 1;
+	//y_actual_speed	= y_actual_speed >> 1;
+
+	x_speed_old 	= x_actual_speed;
+	y_speed_old 	= y_actual_speed;
 
 	/*
 	// Ryan Beall's forward estimator:
-	int16_t	x_speed_new = (float)(g_gps->longitude - last_longitude) * tmp;
+	int16_t	x_speed_new = (float)(g_gps->longitude - last_longitude) * scaleLongDown* tmp;
 	int16_t	y_speed_new = (float)(g_gps->latitude  - last_latitude)  * tmp;
 
-	x_GPS_speed 	= x_speed_new + (x_speed_new - x_speed_old);
-	y_GPS_speed 	= y_speed_new + (y_speed_new - y_speed_old);
+	x_actual_speed 	= x_speed_new + (x_speed_new - x_speed_old);
+	y_actual_speed 	= y_speed_new + (y_speed_new - y_speed_old);
 
 	x_speed_old 	= x_speed_new;
 	y_speed_old 	= y_speed_new;
@@ -83,6 +92,12 @@ static void calc_XY_velocity(){
 
 static void calc_location_error(struct Location *next_loc)
 {
+	static int16_t last_lon_error = 0;
+	static int16_t last_lat_error  = 0;
+
+	static int16_t last_lon_d = 0;
+	static int16_t last_lat_d = 0;
+
 	/*
 	Becuase we are using lat and lon to do our distance errors here's a quick chart:
 	100 	= 1m
@@ -97,90 +112,123 @@ static void calc_location_error(struct Location *next_loc)
 
 	// Y Error
 	lat_error	= next_loc->lat - current_loc.lat;							// 500 - 0 = 500 Go North
+
+	int16_t tmp;
+
+	// -------------------------------------
+	tmp	= (long_error - last_lon_error);
+	if(abs(abs(tmp) -last_lon_d) > 20){
+		tmp = x_rate_d;
+	}/*
+	if(long_error > 0){
+		if(tmp < 0) tmp = 0;
+	}else{
+		if(tmp > 0) tmp = 0;
+	}*/
+	x_rate_d	= lon_rate_d_filter.apply(tmp);
+	x_rate_d	= constrain(x_rate_d, -800, 800);
+	last_lon_d 	= abs(tmp);
+
+	// -------------------------------------
+	tmp	= (lat_error - last_lat_error);
+	if(abs(abs(tmp) -last_lat_d) > 20)
+		tmp = y_rate_d;
+	/*if(lat_error > 0){
+		if(tmp < 0) tmp = 0;
+	}else{
+		if(tmp > 0) tmp = 0;
+	}*/
+	y_rate_d	= lat_rate_d_filter.apply(tmp);
+	y_rate_d	= constrain(y_rate_d, -800, 800);
+	last_lat_d 	= abs(tmp);
+
+	// debug
+	//int16_t t22 = x_rate_d * (g.pid_loiter_rate_lon.kD() / dTnav);
+	//if(control_mode	== LOITER)
+	//	Serial.printf("XX, %d, %d, %d \n", long_error, t22, (int16_t)g.pid_loiter_rate_lon.get_integrator());
+
+	last_lon_error 	= long_error;
+	last_lat_error 	= lat_error;
 }
 
-/*
-//static void calc_loiter3(int x_error, int y_error)
-{
-	static int32_t	gps_lat_I = 0;
-	static int32_t	gps_lon_I = 0;
-
-	// If close to goal <1m reset the I term
-	if (abs(x_error) < 50)
-		gps_lon_I = 0;
-	if (abs(y_error) < 50)
-		gps_lat_I = 0;
-
-	gps_lon_I += x_error;
-	gps_lat_I += y_error;
-
-	gps_lon_I = constrain(gps_lon_I,-3000,3000);
-	gps_lat_I = constrain(gps_lat_I,-3000,3000);
-
-	int16_t lon_P = 1.2 	* (float)x_error;
-	int16_t lon_I = 0.1 	* (float)gps_lon_I;  //.1
-	int16_t lon_D = 3 		* x_GPS_speed ; // this controls the small bumps
-
-	int16_t lat_P = 1.2 	* (float)y_error;
-	int16_t lat_I = 0.1 	* (float)gps_lat_I;
-	int16_t lat_D = 3 		* y_GPS_speed ;
-
-	//limit of terms
-	lon_I = constrain(lon_I,-3000,3000);
-	lat_I = constrain(lat_I,-3000,3000);
-	lon_D = constrain(lon_D,-500,500);  //this controls the long distance dampimg
-	lat_D = constrain(lat_D,-500,500);  //this controls the long distance dampimg
-
-	nav_lon 	= lon_P  + lon_I - lon_D;
-	nav_lat 	= lat_P  + lat_I - lat_D;
-
-	Serial.printf("%d, %d, %d, %d, %d, %d\n",
-				lon_P, lat_P,
-				lon_I, lat_I,
-				lon_D, lat_D);
-
-}
-*/
-
-#define NAV_ERR_MAX 800
+#define NAV_ERR_MAX 600
 static void calc_loiter(int x_error, int y_error)
 {
-	int16_t lon_PI 	= g.pi_loiter_lon.get_pi(x_error, dTnav);
-	int16_t lon_D 	= 3 * x_actual_speed ; // this controls the small bumps
+	int32_t p,i,d;						// used to capture pid values for logging
+	int32_t output;
+	int32_t x_target_speed, y_target_speed;
 
-	int16_t lat_PI 	= g.pi_loiter_lat.get_pi(y_error, dTnav);
-	int16_t lat_D 	= 3 * y_actual_speed ;
+	// East / West
+	x_target_speed 	= g.pi_loiter_lon.get_p(x_error);			// calculate desired speed from lon error
 
-	//limit of terms
-	lon_D = constrain(lon_D,-500,500);
-	lat_D = constrain(lat_D,-500,500);
+#if LOGGING_ENABLED == ENABLED
+	// log output if PID logging is on and we are tuning the yaw
+	if( g.log_bitmask & MASK_LOG_PID && (g.radio_tuning == CH6_LOITER_KP || g.radio_tuning == CH6_LOITER_KI) ) {
+		Log_Write_PID(CH6_LOITER_KP, x_error, x_target_speed, 0, 0, x_target_speed, tuning_value);
+	}
+#endif
 
-	nav_lon		= constrain(lon_PI - lon_D, -2500, 2500);
-	nav_lat		= constrain(lat_PI - lat_D, -2500, 2500);
-}
+	x_rate_error	= x_target_speed - x_actual_speed;			// calc the speed error
+	p				= g.pid_loiter_rate_lon.get_p(x_rate_error);
+	i				= g.pid_loiter_rate_lon.get_i(x_rate_error, dTnav);
+	d				= g.pid_loiter_rate_lon.get_d(x_rate_error, dTnav);
 
+	//nav_lon			+= x_rate_d * (g.pid_loiter_rate_lon.kD() / dTnav);
 
-static void calc_loiter1(int x_error, int y_error)
-{
-	// East/West
-	x_error 				= constrain(x_error, -NAV_ERR_MAX, NAV_ERR_MAX);	//800
-	int16_t x_target_speed 	= g.pi_loiter_lon.get_p(x_error);
-	int16_t x_iterm 		= g.pi_loiter_lon.get_i(x_error, dTnav);
-	x_rate_error 			= x_target_speed - x_actual_speed;
-	nav_lon_p		 		= g.pi_nav_lon.get_p(x_rate_error);
-	nav_lon_p				= constrain(nav_lon_p, -1200, 1200);
-	nav_lon					= nav_lon_p + x_iterm;
-	nav_lon					= constrain(nav_lon, -2500, 2500);
+	output			= p + i + d;
+	nav_lon			= constrain(output, -3000, 3000); 			// 30°
 
-	// North/South
-	y_error 				= constrain(y_error, -NAV_ERR_MAX, NAV_ERR_MAX);
-	int16_t y_target_speed 	= g.pi_loiter_lat.get_p(y_error);
-	int16_t y_iterm 		= g.pi_loiter_lat.get_i(y_error, dTnav);
-	y_rate_error 			= y_target_speed - y_actual_speed;
-	nav_lat_p	 			= g.pi_nav_lat.get_p(y_rate_error);
-	nav_lat_p				= constrain(nav_lat_p, -1200, 1200);
-	nav_lat					= nav_lat_p + y_iterm;
-	nav_lat					= constrain(nav_lat, -2500, 2500);
+#if LOGGING_ENABLED == ENABLED
+	// log output if PID logging is on and we are tuning the yaw
+	if( g.log_bitmask & MASK_LOG_PID && (g.radio_tuning == CH6_LOITER_RATE_KP || g.radio_tuning == CH6_LOITER_RATE_KI || g.radio_tuning == CH6_LOITER_RATE_KD) ) {
+		Log_Write_PID(CH6_LOITER_RATE_KP, x_rate_error, p, i, d, nav_lon, tuning_value);
+	}
+#endif
+
+	// North / South
+	y_target_speed 	= g.pi_loiter_lat.get_p(y_error);			// calculate desired speed from lat error
+
+#if LOGGING_ENABLED == ENABLED
+	// log output if PID logging is on and we are tuning the yaw
+	if( g.log_bitmask & MASK_LOG_PID && (g.radio_tuning == CH6_LOITER_KP || g.radio_tuning == CH6_LOITER_KI) ) {
+		Log_Write_PID(CH6_LOITER_KP+100, y_error, y_target_speed, 0, 0, y_target_speed, tuning_value);
+	}
+#endif
+
+	y_rate_error	= y_target_speed - y_actual_speed;
+	p				= g.pid_loiter_rate_lat.get_p(y_rate_error);
+	i				= g.pid_loiter_rate_lat.get_i(y_rate_error, dTnav);
+	d				= g.pid_loiter_rate_lat.get_d(y_rate_error, dTnav);
+
+	//nav_lat			+= y_rate_d * (g.pid_loiter_rate_lat.kD() / dTnav);
+
+	output			= p + i + d;
+	nav_lat			= constrain(output, -3000, 3000); // 30°
+
+#if LOGGING_ENABLED == ENABLED
+	// log output if PID logging is on and we are tuning the yaw
+	if( g.log_bitmask & MASK_LOG_PID && (g.radio_tuning == CH6_LOITER_RATE_KP || g.radio_tuning == CH6_LOITER_RATE_KI || g.radio_tuning == CH6_LOITER_RATE_KD) ) {
+		Log_Write_PID(CH6_LOITER_RATE_KP+100, y_rate_error, p, i, d, nav_lat, tuning_value);
+	}
+#endif
+
+	// copy over I term to Nav_Rate
+	g.pid_nav_lon.set_integrator(g.pid_loiter_rate_lon.get_integrator());
+	g.pid_nav_lat.set_integrator(g.pid_loiter_rate_lat.get_integrator());
+
+	//Serial.printf("XX, %d, %d, %d\n", long_error, x_actual_speed, (int16_t)g.pid_loiter_rate_lon.get_integrator());
+
+	// Wind I term based on location error,
+	// limit windup
+	/*
+	int16_t x_iterm, y_iterm;
+	x_error 		= constrain(x_error, -NAV_ERR_MAX, NAV_ERR_MAX);
+	y_error 		= constrain(y_error, -NAV_ERR_MAX, NAV_ERR_MAX);
+	x_iterm 		= g.pi_loiter_lon.get_i(x_error, dTnav);
+	y_iterm 		= g.pi_loiter_lat.get_i(y_error, dTnav);
+	nav_lat			= nav_lat + y_iterm;
+	nav_lon			= nav_lon + x_iterm;
+	*/
 
 	/*
 	int8_t ttt = 1.0/dTnav;
@@ -202,7 +250,7 @@ static void calc_loiter1(int x_error, int y_error)
 	//*/
 
 	/*
-	int16_t t1 = g.pi_nav_lon.get_integrator(); // X
+	int16_t t1 = g.pid_nav_lon.get_integrator(); // X
 	Serial.printf("%d, %1.4f, %d, %d, %d, %d, %d, %d, %d, %d\n",
 					wp_distance, 	//1
 					dTnav,			//2
@@ -217,101 +265,37 @@ static void calc_loiter1(int x_error, int y_error)
 	//*/
 }
 
-//wp_distance,ttt, y_error, y_GPS_speed, y_actual_speed, y_target_speed, y_rate_error, nav_lat, y_iterm, t2
-
-
-#define ERR_GAIN .01
-// called at 50hz
-static void estimate_velocity()
-{
-	// we need to extimate velocity when below GPS threshold of 1.5m/s
-	//if(g_gps->ground_speed < 120){
-		// some smoothing to prevent bumpy rides
-		x_actual_speed = (x_actual_speed * 15 + x_GPS_speed) / 16;
-		y_actual_speed = (y_actual_speed * 15 + y_GPS_speed) / 16;
-
-		// integration of nav_p angle
-		//x_actual_speed += (nav_lon_p >>2);
-		//y_actual_speed += (nav_lat_p >>2);
-
-		// this is just what worked best in SIM
-		//x_actual_speed = (x_actual_speed * 2 + x_GPS_speed * 1) / 4;
-		//y_actual_speed = (y_actual_speed * 2 + y_GPS_speed * 1) / 4;
-
-	//}else{
-		// less smoothing needed since the GPS already filters
-	//	x_actual_speed = (x_actual_speed * 3 + x_GPS_speed) / 4;
-	//	y_actual_speed = (y_actual_speed * 3 + y_GPS_speed) / 4;
-	//}
-}
-
-// this calculation rotates our World frame of reference to the copter's frame of reference
-// We use the DCM's matrix to precalculate these trig values at 50hz
-static void calc_loiter_pitch_roll()
-{
-	//Serial.printf("ys %ld, cx %1.4f, _cx %1.4f | sy %1.4f, _sy %1.4f\n", dcm.yaw_sensor, cos_yaw_x, _cos_yaw_x, sin_yaw_y, _sin_yaw_y);
-	// rotate the vector
-	nav_roll 	= (float)nav_lon * sin_yaw_y - (float)nav_lat * cos_yaw_x;
-	nav_pitch 	= (float)nav_lon * cos_yaw_x + (float)nav_lat * sin_yaw_y;
-
-	// flip pitch because forward is negative
-	nav_pitch = -nav_pitch;
-}
-
-static int16_t calc_desired_speed(int16_t max_speed)
-{
-	/*
-			   |< WP Radius
-	0  1   2   3   4   5   6   7   8m
-	...|...|...|...|...|...|...|...|
-		  100  |  200	  300	  400cm/s
-	           |  		 		            +|+
-	           |< we should slow to 1.5 m/s as we hit the target
-	*/
-
-	// max_speed is default 600 or 6m/s
-	// (wp_distance * 50) = 1/2 of the distance converted to speed
-	// wp_distance is always in m/s and not cm/s - I know it's stupid that way
-	// for example 4m from target = 200cm/s speed
-	// we choose the lowest speed based on disance
-	max_speed 		= min(max_speed, (wp_distance * 50));
-
-	// limit the ramp up of the speed
-	// waypoint_speed_gov is reset to 0 at each new WP command
-	if(waypoint_speed_gov < max_speed){
-		waypoint_speed_gov += (int)(50.0 * dTnav); // increase at .5/ms
-
-		// go at least 50cm/s
-		max_speed 		= max(50, waypoint_speed_gov);
-		// limit with governer
-		max_speed 		= min(max_speed, waypoint_speed_gov);
-	}
-
-	return max_speed;
-}
-
 static void calc_nav_rate(int max_speed)
 {
 	// push us towards the original track
 	update_crosstrack();
 
 	// nav_bearing includes crosstrack
-	float temp 		= (9000 - nav_bearing) * RADX100;
+	float temp 		= (9000l - nav_bearing) * RADX100;
 
-	x_rate_error 		= (cos(temp) * max_speed) - x_actual_speed; // 413
-	x_rate_error 		= constrain(x_rate_error, -1000, 1000);
-	int16_t x_iterm 	= g.pi_loiter_lon.get_i(x_rate_error, dTnav);
-	nav_lon_p		 	= g.pi_nav_lon.get_p(x_rate_error);
-	nav_lon				= nav_lon_p + x_iterm;
-	nav_lon				= constrain(nav_lon, -3000, 3000);
+	// East / West
+	x_rate_error 	= (cos(temp) * max_speed) - x_actual_speed; // 413
+	x_rate_error 	= constrain(x_rate_error, -1000, 1000);
+	nav_lon			= g.pid_nav_lon.get_pid(x_rate_error, dTnav);
+	nav_lon			= constrain(nav_lon, -3000, 3000);
+
+	// North / South
+	y_rate_error 	= (sin(temp) * max_speed) - y_actual_speed; // 413
+	y_rate_error 	= constrain(y_rate_error, -1000, 1000);	// added a rate error limit to keep pitching down to a minimum
+	nav_lat			= g.pid_nav_lat.get_pid(y_rate_error, dTnav);
+	nav_lat			= constrain(nav_lat, -3000, 3000);
+
+	// copy over I term to Loiter_Rate
+	g.pid_loiter_rate_lon.set_integrator(g.pid_nav_lon.get_integrator());
+	g.pid_loiter_rate_lat.set_integrator(g.pid_nav_lat.get_integrator());
+
+	//int16_t x_iterm 	= g.pi_loiter_lon.get_i(x_rate_error, dTnav);
+	//int16_t y_iterm 	= g.pi_loiter_lat.get_i(y_rate_error, dTnav);
+
+	//nav_lon				= nav_lon + x_iterm;
+	//nav_lat				= nav_lat + y_iterm;
 
 
-	y_rate_error 		= (sin(temp) * max_speed) - y_actual_speed; // 413
-	y_rate_error 		= constrain(y_rate_error, -1000, 1000);	// added a rate error limit to keep pitching down to a minimum
-	int16_t y_iterm 	= g.pi_loiter_lat.get_i(y_rate_error, dTnav);
-	nav_lat_p		 	= g.pi_nav_lat.get_p(y_rate_error);
-	nav_lat				= nav_lat_p + y_iterm;
-	nav_lat				= constrain(nav_lat, -3000, 3000);
 
 	/*
 	Serial.printf("max_sp %d,\t x_sp %d, y_sp %d,\t x_re: %d, y_re: %d, \tnav_lon: %d, nav_lat: %d, Xi:%d, Yi:%d, \t XE %d \n",
@@ -327,7 +311,6 @@ static void calc_nav_rate(int max_speed)
 					crosstrack_error);
 	//*/
 
-
 	// nav_lat and nav_lon will be rotated to the angle of the quad in calc_nav_pitch_roll()
 
 	/*Serial.printf("max_speed: %d, xspeed: %d, yspeed: %d, x_re: %d, y_re: %d, nav_lon: %ld, nav_lat: %ld  ",
@@ -338,6 +321,86 @@ static void calc_nav_rate(int max_speed)
 					y_rate_error,
 					nav_lon,
 					nav_lat);*/
+}
+
+
+/*static void calc_nav_lon(int rate)
+{
+	nav_lon		= g.pid_nav_lon.get_pid(rate, dTnav);
+	nav_lon		= constrain(nav_lon, -3000, 3000);
+}
+
+static void calc_nav_lat(int rate)
+{
+	nav_lat		= g.pid_nav_lat.get_pid(rate, dTnav);
+	nav_lat		= constrain(nav_lat, -3000, 3000);
+}
+*/
+
+//static int16_t get_corrected_angle(int16_t desired_rate, int16_t rate_out)
+/*{
+	int16_t tt = desired_rate;
+	// scale down the desired rate and square it
+	desired_rate = desired_rate / 20;
+	desired_rate = desired_rate * desired_rate;
+	int16_t tmp = 0;
+
+	if (tt > 0){
+		tmp = rate_out + (rate_out - desired_rate);
+		tmp = max(tmp, rate_out);
+	}else if (tt < 0){
+		tmp = rate_out + (rate_out + desired_rate);
+		tmp = min(tmp, rate_out);
+	}
+	//Serial.printf("rate:%d, norm:%d, out:%d \n", tt, rate_out, tmp);
+	return tmp;
+}*/
+
+//wp_distance,ttt, y_error, y_GPS_speed, y_actual_speed, y_target_speed, y_rate_error, nav_lat, y_iterm, t2
+
+
+
+// this calculation rotates our World frame of reference to the copter's frame of reference
+// We use the DCM's matrix to precalculate these trig values at 50hz
+static void calc_loiter_pitch_roll()
+{
+	//Serial.printf("ys %ld, cx %1.4f, _cx %1.4f | sy %1.4f, _sy %1.4f\n", dcm.yaw_sensor, cos_yaw_x, _cos_yaw_x, sin_yaw_y, _sin_yaw_y);
+	// rotate the vector
+	auto_roll 	= (float)nav_lon * sin_yaw_y - (float)nav_lat * cos_yaw_x;
+	auto_pitch 	= (float)nav_lon * cos_yaw_x + (float)nav_lat * sin_yaw_y;
+
+	// flip pitch because forward is negative
+	auto_pitch = -auto_pitch;
+}
+
+static int16_t calc_desired_speed(int16_t max_speed, bool _slow)
+{
+	/*
+	|< WP Radius
+	0  1   2   3   4   5   6   7   8m
+	...|...|...|...|...|...|...|...|
+		  100  |  200	  300	  400cm/s
+	           |  		 		            +|+
+	           |< we should slow to 1.5 m/s as we hit the target
+	*/
+
+	// max_speed is default 600 or 6m/s
+	if(_slow){
+		max_speed 		= min(max_speed, wp_distance / 2);
+		max_speed 		= max(max_speed, 0);
+	}else{
+		max_speed 		= min(max_speed, wp_distance);
+		max_speed 		= max(max_speed, WAYPOINT_SPEED_MIN);	// go at least 100cm/s
+	}
+
+	// limit the ramp up of the speed
+	// waypoint_speed_gov is reset to 0 at each new WP command
+	if(max_speed > waypoint_speed_gov){
+		waypoint_speed_gov += (int)(100.0 * dTnav); // increase at .5/ms
+		max_speed = waypoint_speed_gov;
+	}
+
+	return max_speed;
 }
 
 
@@ -368,9 +431,21 @@ static void clear_new_altitude()
 	alt_change_flag = REACHED_ALT;
 }
 
+static void force_new_altitude(int32_t _new_alt)
+{
+	next_WP.alt 	= _new_alt;
+	target_altitude = _new_alt;
+	alt_change_flag = REACHED_ALT;
+}
+
 static void set_new_altitude(int32_t _new_alt)
 {
-	// just to be clear
+	if(_new_alt == current_loc.alt){
+		force_new_altitude(_new_alt);
+		return;
+	}
+
+	// We start at the current location altitude and gradually change alt
 	next_WP.alt = current_loc.alt;
 
 	// for calculating the delta time
@@ -389,17 +464,16 @@ static void set_new_altitude(int32_t _new_alt)
 	if(target_altitude > original_altitude){
 		// we are below, going up
 		alt_change_flag = ASCENDING;
-		Serial.printf("go up\n");
+		//Serial.printf("go up\n");
 	}else if(target_altitude < original_altitude){
 		// we are above, going down
 		alt_change_flag = DESCENDING;
-		Serial.printf("go down\n");
+		//Serial.printf("go down\n");
 	}else{
 		// No Change
 		alt_change_flag = REACHED_ALT;
-		Serial.printf("reached alt\n");
+		//Serial.printf("reached alt\n");
 	}
-
 	//Serial.printf("new alt: %d Org alt: %d\n", target_altitude, original_altitude);
 }
 
@@ -434,25 +508,30 @@ static int32_t get_new_altitude()
 	}
 
 	int32_t diff 	= abs(next_WP.alt - target_altitude);
-	int8_t			_scale 	= 3;
+	// scale is how we generate a desired rate from the elapsed time
+	// a smaller scale means faster rates
+	int8_t			_scale 	= 4;
 
 	if (next_WP.alt < target_altitude){
 		// we are below the target alt
 		if(diff < 200){
-			_scale = 5;
-		} else {
 			_scale = 4;
+		} else {
+			_scale = 3;
 		}
 	}else {
 		// we are above the target, going down
-		if(diff < 600){
-			_scale = 4;
-		}
-		if(diff < 300){
+		if(diff < 400){
 			_scale = 5;
+		}
+		if(diff < 100){
+			_scale = 6;
 		}
 	}
 
+	// we use the elapsed time as our altitude offset
+	// 1000 = 1 sec
+	// 1000 >> 4 = 64cm/s descent by default
 	int32_t change = (millis() - alt_change_timer) >> _scale;
 
 	if(alt_change_flag == ASCENDING){
@@ -491,16 +570,14 @@ static int32_t wrap_180(int32_t error)
 	return current_loc.alt - home.alt;
 }
 */
-// distance is returned in meters
+
+// distance is returned in cm
 static int32_t get_distance(struct Location *loc1, struct Location *loc2)
 {
-	//if(loc1->lat == 0 || loc1->lng == 0)
-	//	return -1;
-	//if(loc2->lat == 0 || loc2->lng == 0)
-	//	return -1;
 	float dlat 		= (float)(loc2->lat - loc1->lat);
 	float dlong		= ((float)(loc2->lng - loc1->lng)) * scaleLongDown;
-	return sqrt(sq(dlat) + sq(dlong)) * .01113195;
+	dlong			= sqrt(sq(dlat) + sq(dlong)) * 1.113195;
+	return			dlong;
 }
 /*
 //static int32_t get_alt_distance(struct Location *loc1, struct Location *loc2)

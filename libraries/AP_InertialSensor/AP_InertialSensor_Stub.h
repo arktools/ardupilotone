@@ -17,6 +17,7 @@ class AP_InertialSensor_Stub : public AP_InertialSensor
 
   /* Concrete implementation of AP_InertialSensor functions: */
   bool update();
+  bool new_data_available();
   float gx();
   float gy();
   float gz();
@@ -29,6 +30,11 @@ class AP_InertialSensor_Stub : public AP_InertialSensor
   float temperature();
   uint32_t sample_time();
   void reset_sample_time();
+<<<<<<< HEAD
+  float get_gyro_drift_rate();
+  };
+=======
 };
+>>>>>>> 855e82a7f010266ec705e471f1847240f27d2615
 
 #endif // __AP_INERTIAL_SENSOR_STUB_H__

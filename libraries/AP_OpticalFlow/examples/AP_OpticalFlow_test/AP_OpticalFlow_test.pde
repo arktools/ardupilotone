@@ -7,7 +7,6 @@
 #include <AP_Common.h>
 #include <AP_Math.h>		// ArduPilot Mega Vector/Matrix math Library
 #include <SPI.h>      		// Arduino SPI library
-#include <AP_DCM.h>			// ArduCopter DCM Library
 #include "AP_OpticalFlow.h" // ArduCopter OpticalFlow Library
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -21,7 +20,7 @@
 FastSerialPort0(Serial);        // FTDI/console
 
 AP_OpticalFlow_ADNS3080 flowSensor;
-//AP_OpticalFlow_ADNS3080 flowSensor(A6);  // override chip select pin to use A6 if using APM2
+//AP_OpticalFlow_ADNS3080 flowSensor(A3);  // override chip select pin to use A3 if using APM2
 
 void setup()
 {  
@@ -110,7 +109,6 @@ void display_config()
 void set_frame_rate()
 {
     int value;
-	byte extConfig;
 	
 	// frame rate
 	Serial.print("frame rate:     ");
@@ -196,7 +194,6 @@ void display_image_continuously()
 void set_resolution()
 {
     int value;
-	byte reg;
     int resolution = flowSensor.get_resolution();
     Serial.print("resolution: ");
 	Serial.println(resolution);
@@ -231,7 +228,6 @@ void set_resolution()
 void set_shutter_speed()
 {
     int value;
-	byte extConfig;
 	
 	// shutter speed
 	Serial.print("shutter speed:     ");
@@ -300,7 +296,6 @@ void set_shutter_speed()
 //
 void display_motion()
 {
-    int value;
     boolean first_time = true;
     Serial.flush();
 	
@@ -312,21 +307,23 @@ void display_motion()
 	    flowSensor.update();
 		flowSensor.update_position(0,0,0,1,100);
 
+		// check for errors
+		if( flowSensor._overflow )
+		    Serial.println("overflow!!");
+
 		// x,y,squal
-		//if( flowSensor.motion() || first_time ) {
-			Serial.print("x/dx: ");
-			Serial.print(flowSensor.x,DEC);
-			Serial.print("/");
-			Serial.print(flowSensor.dx,DEC);
-			Serial.print("\ty/dy: ");
-			Serial.print(flowSensor.y,DEC);
-			Serial.print("/");
-			Serial.print(flowSensor.dy,DEC);
-			Serial.print("\tsqual:");
-			Serial.print(flowSensor.surface_quality,DEC);		
-			Serial.println();
-			first_time = false;
-		//}
+		Serial.print("x/dx: ");
+		Serial.print(flowSensor.x,DEC);
+		Serial.print("/");
+		Serial.print(flowSensor.dx,DEC);
+		Serial.print("\ty/dy: ");
+		Serial.print(flowSensor.y,DEC);
+		Serial.print("/");
+		Serial.print(flowSensor.dy,DEC);
+		Serial.print("\tsqual:");
+		Serial.print(flowSensor.surface_quality,DEC);
+		Serial.println();
+		first_time = false;
 		
 		// short delay
 		delay(100);

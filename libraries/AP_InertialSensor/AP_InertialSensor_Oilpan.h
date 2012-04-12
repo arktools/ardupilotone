@@ -18,6 +18,7 @@ class AP_InertialSensor_Oilpan : public AP_InertialSensor
 
   /* Concrete implementation of AP_InertialSensor functions: */
   bool update();
+  bool new_data_available();
   float gx();
   float gy();
   float gz();
@@ -30,6 +31,7 @@ class AP_InertialSensor_Oilpan : public AP_InertialSensor
   float temperature();
   uint32_t sample_time();
   void reset_sample_time();
+  float get_gyro_drift_rate();
 
   private:
 
@@ -53,8 +55,8 @@ class AP_InertialSensor_Oilpan : public AP_InertialSensor
 
   static const float _adc_constraint;
 
-  float _gyro_apply_std_offset( uint16_t adc_value );
-  float _accel_apply_std_offset( uint16_t adc_value );
+  float _gyro_apply_std_offset( float adc_value );
+  float _accel_apply_std_offset( float adc_value );
 };
 
 #endif // __AP_INERTIAL_SENSOR_OILPAN_H__

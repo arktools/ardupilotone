@@ -13,7 +13,7 @@ static void default_dead_zones()
 		g.rc_4.set_dead_zone(30);
 	#else
 	    g.rc_3.set_dead_zone(60);
-		g.rc_4.set_dead_zone(200);
+		g.rc_4.set_dead_zone(80);
 	#endif
 }
 
@@ -22,9 +22,11 @@ static void init_rc_in()
 	// set rc channel ranges
 	g.rc_1.set_angle(4500);
 	g.rc_2.set_angle(4500);
-	g.rc_3.set_range(0, MAXIMUM_THROTTLE);
-    #if FRAME_CONFIG !=	HELI_FRAME
-	g.rc_3.scale_output = .9;
+	#if FRAME_CONFIG == HELI_FRAME
+		// we do not want to limit the movment of the heli's swash plate
+		g.rc_3.set_range(0, 1000);
+	#else
+		g.rc_3.set_range(MINIMUM_THROTTLE, MAXIMUM_THROTTLE);
 	#endif
 	g.rc_4.set_angle(4500);
 
@@ -34,13 +36,6 @@ static void init_rc_in()
 	g.rc_1.set_type(RC_CHANNEL_ANGLE_RAW);
 	g.rc_2.set_type(RC_CHANNEL_ANGLE_RAW);
 	g.rc_4.set_type(RC_CHANNEL_ANGLE_RAW);
-
-	// set rc dead zones
-	/*g.rc_1.dead_zone = 60;
-	g.rc_2.dead_zone = 60;
-	g.rc_3.dead_zone = 60;
-	g.rc_4.dead_zone = 300;
-	*/
 
 	//set auxiliary ranges
 	g.rc_5.set_range(0,1000);
@@ -52,7 +47,15 @@ static void init_rc_in()
 static void init_rc_out()
 {
 	APM_RC.Init( &isr_registry );		// APM Radio initialization
-	init_motors_out();
+	#if INSTANT_PWM == 1
+	motors.set_update_rate(AP_MOTORS_SPEED_INSTANT_PWM);
+	#else
+	motors.set_update_rate(g.rc_speed);
+	#endif
+	motors.set_frame_orientation(g.frame_orientation);
+	motors.Init();						// motor initialisation
+	motors.set_min_throttle(MINIMUM_THROTTLE);
+	motors.set_max_throttle(MAXIMUM_THROTTLE);
 
 	// this is the camera pitch5 and roll6
 	APM_RC.OutputCh(CH_CAM_PITCH, 1500);
@@ -69,12 +72,12 @@ static void init_rc_out()
     }
 
 	// we are full throttle
-	if(g.rc_3.control_in == 800){
+	if(g.rc_3.control_in >= (MAXIMUM_THROTTLE - 50)){
 		if(g.esc_calibrate == 0){
 			// we will enter esc_calibrate mode on next reboot
 			g.esc_calibrate.set_and_save(1);
 			// send miinimum throttle out to ESC
-			output_min();
+			motors.output_min();
 			// block until we restart
 			while(1){
 				//Serial.println("esc");
@@ -100,23 +103,8 @@ static void init_rc_out()
 
 void output_min()
 {
-    #if FRAME_CONFIG ==	HELI_FRAME
-        heli_move_servos_to_mid();
-	#else
-	    APM_RC.OutputCh(MOT_1, 	g.rc_3.radio_min);					// Initialization of servo outputs
-	    APM_RC.OutputCh(MOT_2, 	g.rc_3.radio_min);
-	    APM_RC.OutputCh(MOT_3, 	g.rc_3.radio_min);
-	    APM_RC.OutputCh(MOT_4, 	g.rc_3.radio_min);
-	#endif
-
-	APM_RC.OutputCh(MOT_5,   g.rc_3.radio_min);
-  APM_RC.OutputCh(MOT_6,   g.rc_3.radio_min);
-
-	#if FRAME_CONFIG ==	OCTA_FRAME
-	APM_RC.OutputCh(MOT_7,   g.rc_3.radio_min);
-  APM_RC.OutputCh(MOT_8,   g.rc_3.radio_min);
-	#endif
-
+	motors.enable();
+	motors.output_min();
 }
 static void read_radio()
 {
@@ -133,13 +121,13 @@ static void read_radio()
 
 		#if FRAME_CONFIG != HELI_FRAME
 			// limit our input to 800 so we can still pitch and roll
-			g.rc_3.control_in = min(g.rc_3.control_in, 800);
+			g.rc_3.control_in = min(g.rc_3.control_in, MAXIMUM_THROTTLE);
 		#endif
 
 		throttle_failsafe(g.rc_3.radio_in);
 	}
 }
-
+#define FS_COUNTER 3
 static void throttle_failsafe(uint16_t pwm)
 {
 	// Don't enter Failsafe if not enabled by user
@@ -152,19 +140,19 @@ static void throttle_failsafe(uint16_t pwm)
 		// we detect a failsafe from radio
 		// throttle has dropped below the mark
 		failsafeCounter++;
-		if (failsafeCounter == 9){
+		if (failsafeCounter == FS_COUNTER-1){
 			//
-		}else if(failsafeCounter == 10) {
+		}else if(failsafeCounter == FS_COUNTER) {
 			// Don't enter Failsafe if we are not armed
 			// home distance is in meters
 			// This is to prevent accidental RTL
-			if((motor_armed == true) && (home_distance > 10) && (current_loc.alt > 400)){
+			if(motors.armed() && (home_distance > 1000)){
 				SendDebug("MSG FS ON ");
 				SendDebugln(pwm, DEC);
 				set_failsafe(true);
 			}
-		}else if (failsafeCounter > 10){
-			failsafeCounter = 11;
+		}else if (failsafeCounter > FS_COUNTER){
+			failsafeCounter = FS_COUNTER+1;
 		}
 
 	}else if(failsafeCounter > 0){

@@ -18,6 +18,7 @@ using System.Resources;
 using System.Reflection;
 using System.ComponentModel;
 using System.Threading;
+using log4net;
 using SharpKml.Base;
 using SharpKml.Dom;
 
@@ -27,20 +28,20 @@ namespace ArdupilotMega.GCSViews
 {
     partial class FlightPlanner : MyUserControl
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         int selectedrow = 0;
         bool quickadd = false;
         bool isonline = true;
         bool sethome = false;
         bool polygongridmode = false;
         Hashtable param = new Hashtable();
-        public static Hashtable hashdefines = new Hashtable();
+
         public static List<PointLatLngAlt> pointlist = new List<PointLatLngAlt>(); // used to calc distance
         static public Object thisLock = new Object();
         private TextBox textBox1;
         private ComponentResourceManager rm = new ComponentResourceManager(typeof(FlightPlanner));
 
         private Dictionary<string, string[]> cmdParamNames = new Dictionary<string, string[]>();
-
 
         /// <summary>
         /// Reads defines.h for all valid commands and eeprom positions
@@ -85,7 +86,7 @@ namespace ArdupilotMega.GCSViews
                             System.Diagnostics.Debug.WriteLine(matchs[i].Groups[1].Value.ToString() + " = " + matchs[i].Groups[2].Value.ToString() + " = " + num.ToString());
                             try
                             {
-                                hashdefines.Add(matchs[i].Groups[1].Value.ToString(), num);
+                             //   hashdefines.Add(matchs[i].Groups[1].Value.ToString(), num);
                             }
                             catch (Exception) { }
                         }
@@ -95,15 +96,15 @@ namespace ArdupilotMega.GCSViews
                 sr.Close();
 
 
-                if (!hashdefines.ContainsKey("WP_START_BYTE"))
+               // if (!hashdefines.ContainsKey("WP_START_BYTE"))
                 {
-                    MessageBox.Show("Your Ardupilot Mega project defines.h is Invalid");
-                    return false;
+                    CustomMessageBox.Show("Your Ardupilot Mega project defines.h is Invalid");
+                    //return false;
                 }
             }
             catch (Exception)
             {
-                MessageBox.Show("Can't open file!");
+                CustomMessageBox.Show("Can't open file!");
                 return false;
             }
             return true;
@@ -179,7 +180,7 @@ namespace ArdupilotMega.GCSViews
                         }
                         if (wp_count == byte.MaxValue)
                         {
-                            MessageBox.Show("To many Waypoints!!!");
+                            CustomMessageBox.Show("To many Waypoints!!!");
                             break;
                         }
                     }
@@ -199,7 +200,7 @@ namespace ArdupilotMega.GCSViews
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Can't open file! " + ex.ToString());
+                CustomMessageBox.Show("Can't open file! " + ex.ToString());
                 return false;
             }
             return true;
@@ -259,7 +260,7 @@ namespace ArdupilotMega.GCSViews
         {
             if (selectedrow > Commands.RowCount)
             {
-                MessageBox.Show("Invalid coord, How did you do this?");
+                CustomMessageBox.Show("Invalid coord, How did you do this?");
                 return;
             }
             DataGridViewTextBoxCell cell;
@@ -279,26 +280,44 @@ namespace ArdupilotMega.GCSViews
             {
                 cell = Commands.Rows[selectedrow].Cells[Alt.Index] as DataGridViewTextBoxCell;
 
-                cell.Value = TXT_DefaultAlt.Text;
-
-                float result;
-                float.TryParse(TXT_homealt.Text, out result);
-
-                if (result == 0)
                 {
-                    MessageBox.Show("You must have a home altitude");
+                    float result;
+                    bool pass = float.TryParse(TXT_homealt.Text, out result);
+
+                    if (result == 0 || pass == false)
+                    {
+                        CustomMessageBox.Show("You must have a home altitude");
+                        return;
+                    }
+                    int results1;
+                    if (!int.TryParse(TXT_DefaultAlt.Text, out results1))
+                    {
+                        CustomMessageBox.Show("Your default alt is not valid");
+                        return;
+                    }
                 }
 
+                cell.Value = TXT_DefaultAlt.Text;
+
                 float ans;
-                if (float.TryParse(TXT_homealt.Text, out result) && float.TryParse(cell.Value.ToString(), out ans))
+                if (float.TryParse(cell.Value.ToString(), out ans))
                 {
                     ans = (int)ans;
-                    if (alt != 0)
+                    if (alt != 0) // use passed in value;
                         cell.Value = alt.ToString();
+                    if (ans == 0)
+                        cell.Value = 50;
                     //   online          verify height
                     if (isonline && CHK_geheight.Checked)
                     {
-                        cell.Value = ((int)getGEAlt(lat, lng) + int.Parse(TXT_DefaultAlt.Text)).ToString();
+                        if (CHK_altmode.Checked)
+                        {
+                            cell.Value = ((int)getGEAlt(lat, lng) + int.Parse(TXT_DefaultAlt.Text)).ToString();
+                        }
+                        else
+                        {
+                            cell.Value = ((int)getGEAlt(lat, lng) + int.Parse(TXT_DefaultAlt.Text) - float.Parse(TXT_homealt.Text)).ToString();
+                        }
                     }
                     else
                     {
@@ -307,13 +326,13 @@ namespace ArdupilotMega.GCSViews
                         {
                             cell.Value = (float.Parse(TXT_homealt.Text) + int.Parse(TXT_DefaultAlt.Text)).ToString();
                         } // is relative and check height
-                        else if (float.TryParse(TXT_homealt.Text, out result) && isonline && CHK_geheight.Checked)
+                        else if (isonline && CHK_geheight.Checked)
                         {
                             alt = (int)getGEAlt(lat, lng);
 
                             if (float.Parse(TXT_homealt.Text) + int.Parse(TXT_DefaultAlt.Text) < alt) // calced height is less that GE ground height
                             {
-                                MessageBox.Show("Altitude appears to be low!! (you will fly into a hill)\nGoogle Ground height: " + alt + " Meters\nYour height: " + ((float.Parse(TXT_homealt.Text) + int.Parse(TXT_DefaultAlt.Text))) + " Meters");
+                                CustomMessageBox.Show("Altitude appears to be low!! (you will fly into a hill)\nGoogle Ground height: " + alt + " Meters\nYour height: " + ((float.Parse(TXT_homealt.Text) + int.Parse(TXT_DefaultAlt.Text))) + " Meters");
                                 cell.Style.BackColor = Color.Red;
                             }
                             else
@@ -327,7 +346,7 @@ namespace ArdupilotMega.GCSViews
                 }
                 else
                 {
-                    MessageBox.Show("Invalid Home or wp Alt");
+                    CustomMessageBox.Show("Invalid Home or wp Alt");
                     cell.Style.BackColor = Color.Red;
                 }
 
@@ -475,7 +494,7 @@ namespace ArdupilotMega.GCSViews
 
             // map center
             center = new GMapMarkerCross(MainMap.Position);
-            //top.Markers.Add(center);
+            top.Markers.Add(center);
 
             MainMap.Zoom = 3;
 
@@ -503,12 +522,6 @@ namespace ArdupilotMega.GCSViews
 
             Up.Image = global::ArdupilotMega.Properties.Resources.up;
             Down.Image = global::ArdupilotMega.Properties.Resources.down;
-
-            hashdefines.Clear();
-            if (File.Exists(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + "defines.h"))
-            {
-                readdefines(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + "defines.h");
-            }
         }
 
         void updateCMDParams()
@@ -587,7 +600,7 @@ namespace ArdupilotMega.GCSViews
 
         void Commands_DataError(object sender, DataGridViewDataErrorEventArgs e)
         {
-            Console.WriteLine(e.Exception.ToString() + " " + e.Context + " col " + e.ColumnIndex);
+            log.Info(e.Exception.ToString() + " " + e.Context + " col " + e.ColumnIndex);
             e.Cancel = false;
             e.ThrowException = false;
             //throw new NotImplementedException();
@@ -633,13 +646,13 @@ namespace ArdupilotMega.GCSViews
 
             config(false);
 
-            if (MainV2.HomeLocation.Lat != 0 && MainV2.HomeLocation.Lng != 0)
+            if (MainV2.cs.HomeLocation.Lat != 0 && MainV2.cs.HomeLocation.Lng != 0)
             {
-                TXT_homelat.Text = MainV2.HomeLocation.Lat.ToString();
+                TXT_homelat.Text = MainV2.cs.HomeLocation.Lat.ToString();
 
-                TXT_homelng.Text = MainV2.HomeLocation.Lng.ToString();
+                TXT_homelng.Text = MainV2.cs.HomeLocation.Lng.ToString();
 
-                TXT_homealt.Text = MainV2.HomeLocation.Alt.ToString();
+                TXT_homealt.Text = MainV2.cs.HomeLocation.Alt.ToString();
             }
 
 
@@ -689,7 +702,7 @@ namespace ArdupilotMega.GCSViews
         {
             try
             {
-                Console.WriteLine(Element.ToString() + " " + Element.Parent);
+                log.Info(Element.ToString() + " " + Element.Parent);
             }
             catch { }
 
@@ -759,7 +772,7 @@ namespace ArdupilotMega.GCSViews
                     for (int i = 1; i <= 7; i++)
                         Commands.Columns[i].HeaderText = "setme";
             }
-            catch (Exception ex) { MessageBox.Show(ex.ToString()); }
+            catch (Exception ex) { CustomMessageBox.Show(ex.ToString()); }
         }
 
         /// <summary>
@@ -781,10 +794,10 @@ namespace ArdupilotMega.GCSViews
                     cmd = Commands[Command.Index, selectedrow].Value.ToString();
                 }
                 catch { cmd = option; }
-                Console.WriteLine("editformat " + option + " value " + cmd);
+                //Console.WriteLine("editformat " + option + " value " + cmd);
                 ChangeColumnHeader(cmd);
             }
-            catch (Exception ex) { MessageBox.Show(ex.ToString()); }
+            catch (Exception ex) { CustomMessageBox.Show(ex.ToString()); }
         }
 
         private void Commands_RowsAdded(object sender, DataGridViewRowsAddedEventArgs e)
@@ -857,24 +870,6 @@ namespace ArdupilotMega.GCSViews
                     }
                 }
             }
-
-            DataGridViewTextBoxCell cell1;
-            cell1 = Commands.Rows[selectedrow].Cells[1] as DataGridViewTextBoxCell;
-
-            byte res;
-            if (byte.TryParse(cell1.Value.ToString(), out res))
-            {
-
-            }
-            else
-            {
-                try
-                {
-                    cell1.Value = (byte)(int)hashdefines[cell1.Value.ToString().ToUpper().Trim()];
-                }
-                catch { }
-            }
-
         }
 
         /// <summary>
@@ -931,7 +926,7 @@ namespace ArdupilotMega.GCSViews
                 drawnpolygons.Markers.Add(m);
                 drawnpolygons.Markers.Add(mBorders);
             }
-            catch (Exception) { }
+            catch (Exception ex) { log.Info(ex.ToString()); }
         }
 
         /// <summary>
@@ -939,9 +934,11 @@ namespace ArdupilotMega.GCSViews
         /// </summary>
         private void writeKML()
         {
+            // quickadd is for when loading wps from eeprom or file, to prevent slow, loading times
             if (quickadd)
                 return;
 
+            // this is to share the current mission with the data tab
             pointlist = new List<PointLatLngAlt>();
 
             System.Diagnostics.Debug.WriteLine(DateTime.Now);
@@ -952,6 +949,7 @@ namespace ArdupilotMega.GCSViews
                     objects.Markers.Clear();
                 }
 
+                // process and add home to the list
                 string home;
                 if (TXT_homealt.Text != "" && TXT_homelat.Text != "" && TXT_homelng.Text != "")
                 {
@@ -967,6 +965,7 @@ namespace ArdupilotMega.GCSViews
                     home = "";
                 }
 
+                // setup for centerpoint calc etc.
                 double avglat = 0;
                 double avglong = 0;
                 double maxlat = -180;
@@ -986,6 +985,7 @@ namespace ArdupilotMega.GCSViews
 
                 int usable = 0;
 
+                // number rows 
                 System.Threading.Thread t1 = new System.Threading.Thread(delegate()
                 {
                     // thread for updateing row numbers
@@ -1012,7 +1012,6 @@ namespace ArdupilotMega.GCSViews
                 t1.Name = "Row number updater";
                 t1.IsBackground = true;
                 t1.Start();
-                MainV2.threads.Add(t1);
 
                 long temp = System.Diagnostics.Stopwatch.GetTimestamp();
 
@@ -1054,7 +1053,7 @@ namespace ArdupilotMega.GCSViews
                             System.Diagnostics.Debug.WriteLine(temp - System.Diagnostics.Stopwatch.GetTimestamp());
                         }
                     }
-                    catch (Exception e) { Console.WriteLine("writekml - bad wp data " + e.ToString()); }
+                    catch (Exception e) { log.Info("writekml - bad wp data " + e.ToString()); }
                 }
 
                 if (usable > 0)
@@ -1096,11 +1095,16 @@ namespace ArdupilotMega.GCSViews
                 else if (home.Length > 5 && usable == 0)
                 {
                     lookat = "<LookAt>     <longitude>" + TXT_homelng.Text.ToString(new System.Globalization.CultureInfo("en-US")) + "</longitude>     <latitude>" + TXT_homelat.Text.ToString(new System.Globalization.CultureInfo("en-US")) + "</latitude> <range>4000</range> </LookAt>";
-                    MainMap.HoldInvalidation = true;
-                    MainMap.ZoomAndCenterMarkers("objects");
-                    MainMap.Zoom -= 2;
+
+                    RectLatLng? rect = MainMap.GetRectOfAllMarkers("objects");
+                    if (rect.HasValue)
+                    {
+                        MainMap.Position = rect.Value.LocationMiddle;
+                    }
+
+                    MainMap.Zoom = 17;
+
                     MainMap_OnMapZoomChanged();
-                    MainMap.HoldInvalidation = false;
                 }
 
                 RegeneratePolygon();
@@ -1125,7 +1129,7 @@ namespace ArdupilotMega.GCSViews
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.ToString());
+                log.Info(ex.ToString());
             }
 
             System.Diagnostics.Debug.WriteLine(DateTime.Now);
@@ -1160,7 +1164,7 @@ namespace ArdupilotMega.GCSViews
 
                         sw.Write((a + 1)); // seq
                         sw.Write("\t" + 0); // current
-                        sw.Write("\t" + (CHK_altmode.Checked == true ? (byte)MAVLink.MAV_FRAME.MAV_FRAME_GLOBAL : (byte)MAVLink.MAV_FRAME.MAV_FRAME_GLOBAL_RELATIVE_ALT)); //frame 
+                        sw.Write("\t" + (CHK_altmode.Checked == true ? (byte)MAVLink.MAV_FRAME.GLOBAL : (byte)MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT)); //frame 
                         sw.Write("\t" + mode);
                         sw.Write("\t" + double.Parse(Commands.Rows[a].Cells[Param1.Index].Value.ToString()).ToString("0.000000", new System.Globalization.CultureInfo("en-US")));
                         sw.Write("\t" + double.Parse(Commands.Rows[a].Cells[Param2.Index].Value.ToString()).ToString("0.000000", new System.Globalization.CultureInfo("en-US")));
@@ -1174,7 +1178,7 @@ namespace ArdupilotMega.GCSViews
                     }
                     sw.Close();
                 }
-                catch (Exception) { MessageBox.Show("Error writing file"); }
+                catch (Exception) { CustomMessageBox.Show("Error writing file"); }
             }
         }
 
@@ -1191,68 +1195,81 @@ namespace ArdupilotMega.GCSViews
         /// <param name="e"></param>
         internal void BUT_read_Click(object sender, EventArgs e)
         {
+            Controls.ProgressReporterDialogue frmProgressReporter = new Controls.ProgressReporterDialogue
+            {
+                StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen,
+                Text = "Receiving WP's"
+            };
+
+            frmProgressReporter.DoWork += getWPs;
+            frmProgressReporter.UpdateProgressAndStatus(-1, "Receiving WP's");
+
+            ThemeManager.ApplyThemeTo(frmProgressReporter);
+
+            frmProgressReporter.RunBackgroundOperationAsync();
+        }
+
+        void getWPs(object sender, Controls.ProgressWorkerEventArgs e)
+        {
 
             List<Locationwp> cmds = new List<Locationwp>();
             int error = 0;
 
-            System.Threading.Thread t12 = new System.Threading.Thread(delegate()
+            try
             {
-                try
+                MAVLink port = MainV2.comPort;
+
+                if (!port.BaseStream.IsOpen)
                 {
-                    MAVLink port = MainV2.comPort;
-
-                    if (!port.BaseStream.IsOpen)
-                    {
-                        throw new Exception("Please Connect First!");
-                    }
-
-                    MainV2.givecomport = true;
-
-                    param = port.param;
-
-                    Console.WriteLine("Getting WP #");
-                    int cmdcount = port.getWPCount();
-
-                    for (ushort a = 0; a < cmdcount; a++)
-                    {
-                        Console.WriteLine("Getting WP" + a);
-                        cmds.Add(port.getWP(a));
-                    }
-
-                    port.setWPACK();
-
-                    Console.WriteLine("Done");
+                    throw new Exception("Please Connect First!");
                 }
-                catch (Exception ex) { error = 1; MessageBox.Show("Error : " + ex.ToString()); }
-                try
+
+                MainV2.giveComport = true;
+
+                param = port.param;
+
+                log.Info("Getting WP #");
+
+                ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(0, "Getting WP count");
+
+                int cmdcount = port.getWPCount();
+
+                for (ushort a = 0; a < cmdcount; a++)
                 {
-                    this.BeginInvoke((System.Threading.ThreadStart)delegate()
+                    log.Info("Getting WP" + a);
+                    ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(a * 100 / cmdcount, "Getting WP " + a);
+                    cmds.Add(port.getWP(a));
+                }
+
+                port.setWPACK();
+
+                ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(100, "Done");
+
+                log.Info("Done");
+            }
+            catch (Exception ex) { error = 1; CustomMessageBox.Show("Error : " + ex.ToString()); }
+            try
+            {
+                this.BeginInvoke((MethodInvoker)delegate()
+                {
+                    if (error == 0)
                     {
-                        if (error == 0)
+                        try
                         {
-                            try
-                            {
-                                processToScreen(cmds);
-                            }
-                            catch (Exception exx) { Console.WriteLine(exx.ToString()); }
+                            processToScreen(cmds);
                         }
+                        catch (Exception exx) { log.Info(exx.ToString()); }
+                    }
 
-                        MainV2.givecomport = false;
+                    MainV2.giveComport = false;
 
-                        BUT_read.Enabled = true;
+                    BUT_read.Enabled = true;
 
-                        writeKML();
+                    writeKML();
 
-                    });
-                }
-                catch (Exception exx) { Console.WriteLine(exx.ToString()); }
-            });
-            t12.IsBackground = true;
-            t12.Name = "Read wps";
-            t12.Start();
-            MainV2.threads.Add(t12);
-
-            BUT_read.Enabled = false;
+                });
+            }
+            catch (Exception exx) { log.Info(exx.ToString()); }
         }
 
         /// <summary>
@@ -1264,7 +1281,7 @@ namespace ArdupilotMega.GCSViews
         {
             if (CHK_altmode.Checked)
             {
-                if (DialogResult.No == MessageBox.Show("Absolute Alt is ticked are you sure?", "Alt Mode", MessageBoxButtons.YesNo))
+                if (DialogResult.No == CustomMessageBox.Show("Absolute Alt is ticked are you sure?", "Alt Mode", MessageBoxButtons.YesNo))
                 {
                     CHK_altmode.Checked = false;
                 }
@@ -1280,118 +1297,125 @@ namespace ArdupilotMega.GCSViews
                     {
                         if (!double.TryParse(Commands[b, a].Value.ToString(), out answer))
                         {
-                            MessageBox.Show("There are errors in your mission");
+                            CustomMessageBox.Show("There are errors in your mission");
                             return;
                         }
                     }
                 }
             }
 
-            System.Threading.Thread t12 = new System.Threading.Thread(delegate()
+            Controls.ProgressReporterDialogue frmProgressReporter = new Controls.ProgressReporterDialogue
             {
-                try
-                {
-                    MAVLink port = MainV2.comPort;
+                StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen,
+                Text = "Sending WP's"
+            };
 
-                    if (!port.BaseStream.IsOpen)
-                    {
-                        throw new Exception("Please Connect First!");
-                    }
+            frmProgressReporter.DoWork += saveWPs;
+            frmProgressReporter.UpdateProgressAndStatus(-1, "Sending WP's");
 
-                    MainV2.givecomport = true;
+            ThemeManager.ApplyThemeTo(frmProgressReporter);
 
-                    Locationwp home = new Locationwp();
+            frmProgressReporter.RunBackgroundOperationAsync();
 
-                    try
-                    {
-                        home.id = (byte)MAVLink.MAV_CMD.WAYPOINT;
-                        home.lat = (float.Parse(TXT_homelat.Text));
-                        home.lng = (float.Parse(TXT_homelng.Text));
-                        home.alt = (float.Parse(TXT_homealt.Text) / MainV2.cs.multiplierdist); // use saved home
-                    }
-                    catch { throw new Exception("Your home location is invalid"); }
-
-                    port.setWPTotal((ushort)(Commands.Rows.Count + 1)); // + home
-
-                    port.setWP(home, (ushort)0, MAVLink.MAV_FRAME.MAV_FRAME_GLOBAL, 0);
-
-                    MAVLink.MAV_FRAME frame = MAVLink.MAV_FRAME.MAV_FRAME_GLOBAL_RELATIVE_ALT;
-
-                    // process grid to memory eeprom
-                    for (int a = 0; a < Commands.Rows.Count - 0; a++)
-                    {
-                        Locationwp temp = new Locationwp();
-                        temp.id = (byte)(int)Enum.Parse(typeof(MAVLink.MAV_CMD), Commands.Rows[a].Cells[Command.Index].Value.ToString(), false);
-                        temp.p1 = float.Parse(Commands.Rows[a].Cells[Param1.Index].Value.ToString());
-                        if (temp.id < (byte)MAVLink.MAV_CMD.LAST || temp.id == (byte)MAVLink.MAV_CMD.DO_SET_HOME)
-                        {
-                            if (CHK_altmode.Checked)
-                            {
-                                frame = MAVLink.MAV_FRAME.MAV_FRAME_GLOBAL;
-                            }
-                            else
-                            {
-                                frame = MAVLink.MAV_FRAME.MAV_FRAME_GLOBAL_RELATIVE_ALT;
-                            }
-                        }
-
-                        temp.alt = (float)(double.Parse(Commands.Rows[a].Cells[Alt.Index].Value.ToString()) / MainV2.cs.multiplierdist);
-                        temp.lat = (float)(double.Parse(Commands.Rows[a].Cells[Lat.Index].Value.ToString()));
-                        temp.lng = (float)(double.Parse(Commands.Rows[a].Cells[Lon.Index].Value.ToString()));
-
-                        temp.p2 = (float)(double.Parse(Commands.Rows[a].Cells[Param2.Index].Value.ToString()));
-                        temp.p3 = (float)(double.Parse(Commands.Rows[a].Cells[Param3.Index].Value.ToString()));
-                        temp.p4 = (float)(double.Parse(Commands.Rows[a].Cells[Param4.Index].Value.ToString()));
-
-                        port.setWP(temp, (ushort)(a + 1), frame, 0);
-                    }
-
-                    port.setWPACK();
-
-
-                    if (CHK_holdalt.Checked)
-                    {
-                        port.setParam("ALT_HOLD_RTL", int.Parse(TXT_DefaultAlt.Text) / MainV2.cs.multiplierdist);
-                    }
-                    else
-                    {
-                        port.setParam("ALT_HOLD_RTL", -1);
-                    }
-
-                    port.setParam("WP_RADIUS", (byte)int.Parse(TXT_WPRad.Text) / MainV2.cs.multiplierdist);
-
-                    try
-                    {
-                        port.setParam("WP_LOITER_RAD", (byte)(int.Parse(TXT_loiterrad.Text) / MainV2.cs.multiplierdist));
-                    }
-                    catch
-                    {
-                        port.setParam("LOITER_RAD", (byte)int.Parse(TXT_loiterrad.Text) / MainV2.cs.multiplierdist);
-                    }
-
-                }
-                catch (Exception ex) { MessageBox.Show("Error : " + ex.ToString()); }
-
-                MainV2.givecomport = false;
-
-                try
-                {
-                    this.BeginInvoke((System.Threading.ThreadStart)delegate()
-                    {
-                        BUT_write.Enabled = true;
-                    });
-                }
-                catch { }
-
-            });
-            t12.IsBackground = true;
-            t12.Name = "Write wps";
-            t12.Start();
-            MainV2.threads.Add(t12);
 
             MainMap.Focus();
 
-            BUT_write.Enabled = false;
+        }
+
+        void saveWPs(object sender, Controls.ProgressWorkerEventArgs e)
+        {
+            try
+            {
+                MAVLink port = MainV2.comPort;
+
+                if (!port.BaseStream.IsOpen)
+                {
+                    throw new Exception("Please Connect First!");
+                }
+
+                MainV2.giveComport = true;
+
+                Locationwp home = new Locationwp();
+
+                try
+                {
+                    home.id = (byte)MAVLink.MAV_CMD.WAYPOINT;
+                    home.lat = (float.Parse(TXT_homelat.Text));
+                    home.lng = (float.Parse(TXT_homelng.Text));
+                    home.alt = (float.Parse(TXT_homealt.Text) / MainV2.cs.multiplierdist); // use saved home
+                }
+                catch { throw new Exception("Your home location is invalid"); }
+
+                ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(0, "Set Total WPs ");
+
+                port.setWPTotal((ushort)(Commands.Rows.Count + 1)); // + home
+
+                ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(0, "Set Home");
+
+                port.setWP(home, (ushort)0, MAVLink.MAV_FRAME.GLOBAL, 0);
+
+                MAVLink.MAV_FRAME frame = MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT;
+
+                // process grid to memory eeprom
+                for (int a = 0; a < Commands.Rows.Count - 0; a++)
+                {
+                    ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(a * 100 / Commands.Rows.Count, "Setting WP " + a);
+
+                    Locationwp temp = new Locationwp();
+                    temp.id = (byte)(int)Enum.Parse(typeof(MAVLink.MAV_CMD), Commands.Rows[a].Cells[Command.Index].Value.ToString(), false);
+                    temp.p1 = float.Parse(Commands.Rows[a].Cells[Param1.Index].Value.ToString());
+                    if (temp.id < (byte)MAVLink.MAV_CMD.LAST || temp.id == (byte)MAVLink.MAV_CMD.DO_SET_HOME)
+                    {
+                        if (CHK_altmode.Checked)
+                        {
+                            frame = MAVLink.MAV_FRAME.GLOBAL;
+                        }
+                        else
+                        {
+                            frame = MAVLink.MAV_FRAME.GLOBAL_RELATIVE_ALT;
+                        }
+                    }
+
+                    temp.alt = (float)(double.Parse(Commands.Rows[a].Cells[Alt.Index].Value.ToString()) / MainV2.cs.multiplierdist);
+                    temp.lat = (float)(double.Parse(Commands.Rows[a].Cells[Lat.Index].Value.ToString()));
+                    temp.lng = (float)(double.Parse(Commands.Rows[a].Cells[Lon.Index].Value.ToString()));
+
+                    temp.p2 = (float)(double.Parse(Commands.Rows[a].Cells[Param2.Index].Value.ToString()));
+                    temp.p3 = (float)(double.Parse(Commands.Rows[a].Cells[Param3.Index].Value.ToString()));
+                    temp.p4 = (float)(double.Parse(Commands.Rows[a].Cells[Param4.Index].Value.ToString()));
+
+                    port.setWP(temp, (ushort)(a + 1), frame, 0);
+                }
+
+                port.setWPACK();
+
+                ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(95, "Setting Params");
+
+                if (CHK_holdalt.Checked)
+                {
+                    port.setParam("ALT_HOLD_RTL", int.Parse(TXT_DefaultAlt.Text) / MainV2.cs.multiplierdist);
+                }
+                else
+                {
+                    port.setParam("ALT_HOLD_RTL", -1);
+                }
+
+                port.setParam("WP_RADIUS", (byte)int.Parse(TXT_WPRad.Text) / MainV2.cs.multiplierdist);
+
+                try
+                {
+                    port.setParam("WP_LOITER_RAD", (byte)(int.Parse(TXT_loiterrad.Text) / MainV2.cs.multiplierdist));
+                }
+                catch
+                {
+                    port.setParam("LOITER_RAD", (byte)int.Parse(TXT_loiterrad.Text) / MainV2.cs.multiplierdist);
+                }
+
+                ((Controls.ProgressReporterDialogue)sender).UpdateProgressAndStatus(100, "Done.");
+            }
+            catch (Exception ex) { MainV2.giveComport = false; throw ex; }
+
+            MainV2.giveComport = false;
         }
 
         /// <summary>
@@ -1401,6 +1425,12 @@ namespace ArdupilotMega.GCSViews
         {
             quickadd = true;
             Commands.Rows.Clear();
+
+            if (cmds.Count == 0)
+            {
+                quickadd = false;
+                return;
+            }
 
             int i = -1;
             foreach (Locationwp temp in cmds)
@@ -1470,7 +1500,7 @@ namespace ArdupilotMega.GCSViews
                 {
                     if (cellhome.Value.ToString() != TXT_homelat.Text && cellhome.Value.ToString() != "0")
                     {
-                        DialogResult dr = MessageBox.Show("Reset Home to loaded coords", "Reset Home Coords", MessageBoxButtons.YesNo);
+                        DialogResult dr = CustomMessageBox.Show("Reset Home to loaded coords", "Reset Home Coords", MessageBoxButtons.YesNo);
 
                         if (dr == DialogResult.Yes)
                         {
@@ -1483,29 +1513,44 @@ namespace ArdupilotMega.GCSViews
                     }
                 }
 
-                string hold_alt = ((float)param["ALT_HOLD_RTL"] * MainV2.cs.multiplierdist).ToString("0");
+                log.Info("Setting wp params");
 
-                if (hold_alt != "-1")
+                string hold_alt = ((int)((float)param["ALT_HOLD_RTL"] * MainV2.cs.multiplierdist)).ToString();
+
+                log.Info("param ALT_HOLD_RTL " + hold_alt);
+
+                if (!hold_alt.Equals("-1"))
                 {
                     TXT_DefaultAlt.Text = hold_alt;
                 }
 
-                TXT_WPRad.Text = ((float)param["WP_RADIUS"] * MainV2.cs.multiplierdist).ToString("0");
+                TXT_WPRad.Text = ((int)((float)param["WP_RADIUS"] * MainV2.cs.multiplierdist)).ToString();
+
+                log.Info("param WP_RADIUS " + TXT_WPRad.Text);
+
                 try
                 {
-                    TXT_loiterrad.Text = ((float)param["LOITER_RADIUS"] * MainV2.cs.multiplierdist).ToString("0");
+                    if (param["LOITER_RADIUS"] != null)
+                        TXT_loiterrad.Text = ((int)((float)param["LOITER_RADIUS"] * MainV2.cs.multiplierdist)).ToString();
+
+                    if (param["WP_LOITER_RAD"] != null)
+                        TXT_loiterrad.Text = ((int)((float)param["WP_LOITER_RAD"] * MainV2.cs.multiplierdist)).ToString();
+
+                    log.Info("param LOITER_RADIUS " + TXT_loiterrad.Text);
                 }
                 catch
                 {
-                    TXT_loiterrad.Text = ((float)param["WP_LOITER_RAD"] * MainV2.cs.multiplierdist).ToString("0");
+                    
                 }
                 CHK_holdalt.Checked = Convert.ToBoolean((float)param["ALT_HOLD_RTL"] > 0);
+                log.Info("param ALT_HOLD_RTL " + CHK_holdalt.Checked.ToString());
 
             }
-            catch (Exception) { } // if there is no valid home
+            catch (Exception ex) { log.Info(ex.ToString()); } // if there is no valid home
 
             if (Commands.RowCount > 0)
             {
+                log.Info("remove home from list");
                 Commands.Rows.Remove(Commands.Rows[0]); // remove home row
             }
 
@@ -1587,7 +1632,7 @@ namespace ArdupilotMega.GCSViews
             }
             if (isNumber > 127)
             {
-                MessageBox.Show("The value can only be between 0 and 127");
+                CustomMessageBox.Show("The value can only be between 0 and 127");
                 TXT_WPRad.Text = "127";
             }
             writeKML();
@@ -1610,7 +1655,7 @@ namespace ArdupilotMega.GCSViews
             }
             if (isNumber > 127)
             {
-                MessageBox.Show("The value can only be between 0 and 127");
+                CustomMessageBox.Show("The value can only be between 0 and 127");
                 TXT_loiterrad.Text = "127";
             }
         }
@@ -1666,7 +1711,7 @@ namespace ArdupilotMega.GCSViews
                     writeKML();
                 }
             }
-            catch (Exception) { MessageBox.Show("Row error"); }
+            catch (Exception) { CustomMessageBox.Show("Row error"); }
         }
 
         private void Commands_DefaultValuesNeeded(object sender, DataGridViewRowEventArgs e)
@@ -1681,7 +1726,7 @@ namespace ArdupilotMega.GCSViews
             sethome = false;
             try
             {
-                MainV2.HomeLocation.Lat = double.Parse(TXT_homelat.Text);
+                MainV2.cs.HomeLocation.Lat = double.Parse(TXT_homelat.Text);
             }
             catch { }
             writeKML();
@@ -1693,7 +1738,7 @@ namespace ArdupilotMega.GCSViews
             sethome = false;
             try
             {
-                MainV2.HomeLocation.Lng = double.Parse(TXT_homelng.Text);
+                MainV2.cs.HomeLocation.Lng = double.Parse(TXT_homelng.Text);
             }
             catch { }
             writeKML();
@@ -1704,7 +1749,7 @@ namespace ArdupilotMega.GCSViews
             sethome = false;
             try
             {
-                MainV2.HomeLocation.Alt = double.Parse(TXT_homealt.Text);
+                MainV2.cs.HomeLocation.Alt = double.Parse(TXT_homealt.Text);
             }
             catch { }
             writeKML();
@@ -1746,7 +1791,7 @@ namespace ArdupilotMega.GCSViews
                 string header = sr.ReadLine();
                 if (header == null || !header.Contains("QGC WPL 110"))
                 {
-                    MessageBox.Show("Invalid Waypoint file");
+                    CustomMessageBox.Show("Invalid Waypoint file");
                     return;
                 }
                 while (!error && !sr.EndOfStream)
@@ -1793,11 +1838,11 @@ namespace ArdupilotMega.GCSViews
                         wp_count++;
 
                     }
-                    catch { MessageBox.Show("Line invalid\n" + line); }
+                    catch { CustomMessageBox.Show("Line invalid\n" + line); }
 
                     if (wp_count == byte.MaxValue)
                     {
-                        MessageBox.Show("To many Waypoints!!!");
+                        CustomMessageBox.Show("To many Waypoints!!!");
                         break;
                     }
 
@@ -1813,7 +1858,7 @@ namespace ArdupilotMega.GCSViews
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Can't open file! " + ex.ToString());
+                CustomMessageBox.Show("Can't open file! " + ex.ToString());
             }
         }
 
@@ -1943,8 +1988,13 @@ namespace ArdupilotMega.GCSViews
                     {
                         if (CurentRectMarker.InnerMarker.Tag.ToString().Contains("grid"))
                         {
-                            drawnpolygon.Points[int.Parse(CurentRectMarker.InnerMarker.Tag.ToString().Replace("grid", "")) - 1] = new PointLatLng(end.Lat, end.Lng);
-                            MainMap.UpdatePolygonLocalPosition(drawnpolygon);
+                            try
+                            {
+                                drawnpolygon.Points[int.Parse(CurentRectMarker.InnerMarker.Tag.ToString().Replace("grid", "")) - 1] = new PointLatLng(end.Lat, end.Lng);
+                                MainMap.UpdatePolygonLocalPosition(drawnpolygon);
+                                MainMap.Invalidate();
+                            }
+                            catch { }
                         }
                         else
                         {
@@ -2012,6 +2062,7 @@ namespace ArdupilotMega.GCSViews
                         {
                             drawnpolygon.Points[int.Parse(CurentRectMarker.InnerMarker.Tag.ToString().Replace("grid", "")) - 1] = new PointLatLng(point.Lat, point.Lng);
                             MainMap.UpdatePolygonLocalPosition(drawnpolygon);
+                            MainMap.Invalidate();
                         }
                     }
                     catch { }
@@ -2051,7 +2102,11 @@ namespace ArdupilotMega.GCSViews
         {
             if (MainMap.Zoom > 0)
             {
-                trackBar1.Value = (int)(MainMap.Zoom);
+                try
+                {
+                    trackBar1.Value = (int)(MainMap.Zoom);
+                }
+                catch { }
                 //textBoxZoomCurrent.Text = MainMap.Zoom.ToString();
                 center.Position = MainMap.Position;
             }
@@ -2190,9 +2245,13 @@ namespace ArdupilotMega.GCSViews
 
         private void comboBoxMapType_SelectedValueChanged(object sender, EventArgs e)
         {
-            MainMap.MapType = (MapType)comboBoxMapType.SelectedItem;
-            FlightData.mymap.MapType = (MapType)comboBoxMapType.SelectedItem;
-            MainV2.config["MapType"] = comboBoxMapType.Text;
+            try
+            {
+                MainMap.MapType = (MapType)comboBoxMapType.SelectedItem;
+                FlightData.mymap.MapType = (MapType)comboBoxMapType.SelectedItem;
+                MainV2.config["MapType"] = comboBoxMapType.Text;
+            }
+            catch { CustomMessageBox.Show("Map change failed. try zomming out first."); }
         }
 
         private void Commands_EditingControlShowing(object sender, DataGridViewEditingControlShowingEventArgs e)
@@ -2264,7 +2323,7 @@ namespace ArdupilotMega.GCSViews
         private void TXT_homelat_Enter(object sender, EventArgs e)
         {
             sethome = true;
-            MessageBox.Show("Click on the Map to set Home ");
+            CustomMessageBox.Show("Click on the Map to set Home ");
         }
 
         private void Planner_Resize(object sender, EventArgs e)
@@ -2278,14 +2337,14 @@ namespace ArdupilotMega.GCSViews
             double homealt;
             double.TryParse(TXT_homealt.Text, out homealt);
             Form temp = new ElevationProfile(pointlist, homealt);
-            MainV2.fixtheme(temp);
+            ThemeManager.ApplyThemeTo(temp);
             temp.ShowDialog();
         }
 
         private void CHK_altmode_CheckedChanged(object sender, EventArgs e)
         {
             if (Commands.RowCount > 0 && !quickadd)
-                MessageBox.Show("You will need to change your altitudes");
+                CustomMessageBox.Show("You will need to change your altitudes");
         }
 
         protected override void OnPaint(PaintEventArgs pe)
@@ -2331,7 +2390,7 @@ namespace ArdupilotMega.GCSViews
             RectLatLng area = MainMap.SelectedArea;
             if (area.IsEmpty)
             {
-                DialogResult res = MessageBox.Show("No ripp area defined, ripp displayed on screen?", "Rip", MessageBoxButtons.YesNo);
+                DialogResult res = CustomMessageBox.Show("No ripp area defined, ripp displayed on screen?", "Rip", MessageBoxButtons.YesNo);
                 if (res == DialogResult.Yes)
                 {
                     area = MainMap.CurrentViewArea;
@@ -2340,7 +2399,7 @@ namespace ArdupilotMega.GCSViews
 
             if (!area.IsEmpty)
             {
-                DialogResult res = MessageBox.Show("Ready ripp at Zoom = " + (int)MainMap.Zoom + " ?", "GMap.NET", MessageBoxButtons.YesNo);
+                DialogResult res = CustomMessageBox.Show("Ready ripp at Zoom = " + (int)MainMap.Zoom + " ?", "GMap.NET", MessageBoxButtons.YesNo);
 
                 for (int i = 1; i <= MainMap.MaxZoom; i++)
                 {
@@ -2362,7 +2421,7 @@ namespace ArdupilotMega.GCSViews
             }
             else
             {
-                MessageBox.Show("Select map area holding ALT", "GMap.NET", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                CustomMessageBox.Show("Select map area holding ALT", "GMap.NET", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
             }
         }
 
@@ -2425,7 +2484,7 @@ namespace ArdupilotMega.GCSViews
 
             if (drawnpolygon == null || drawnpolygon.Points.Count == 0)
             {
-                MessageBox.Show("Right click the map to draw a polygon", "Area", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                CustomMessageBox.Show("Right click the map to draw a polygon", "Area", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 return;
             }
             GMapPolygon area = drawnpolygon;
@@ -2455,6 +2514,24 @@ namespace ArdupilotMega.GCSViews
 
                 string angle = (90).ToString("0");
                 Common.InputBox("Angle", "Enter the line direction (0-180)", ref angle);
+
+                double tryme = 0;
+
+                if (!double.TryParse(angle, out tryme))
+                {
+                    CustomMessageBox.Show("Invalid Angle");
+                    return;
+                }
+                if (!double.TryParse(alt, out tryme))
+                {
+                    CustomMessageBox.Show("Invalid Alt");
+                    return;
+                }
+                if (!double.TryParse(distance, out tryme))
+                {
+                    CustomMessageBox.Show("Invalid Distance");
+                    return;
+                }
 
 #if DEBUG
                 //Commands.Rows.Clear();
@@ -2488,7 +2565,7 @@ namespace ArdupilotMega.GCSViews
                 double x = bottomleft.Lat - Math.Abs(fulllatdiff);
                 double y = bottomleft.Lng - Math.Abs(fulllngdiff);
 
-                Console.WriteLine("{0} < {1} {2} < {3}", x, (topright.Lat), y, (topright.Lng));
+                log.InfoFormat("{0} < {1} {2} < {3}", x, (topright.Lat), y, (topright.Lng));
 
                 while (x < (topright.Lat + Math.Abs(fulllatdiff)) && y < (topright.Lng + Math.Abs(fulllngdiff)))
                 {
@@ -2613,7 +2690,7 @@ namespace ArdupilotMega.GCSViews
 
                     if (Commands.RowCount > 150)
                     {
-                        MessageBox.Show("Stopping at 150 WP's");
+                        CustomMessageBox.Show("Stopping at 150 WP's");
                         break;
                     }
                 }
@@ -2635,7 +2712,7 @@ namespace ArdupilotMega.GCSViews
             }
             else
             {
-                MessageBox.Show("If you're at the field, connect to your APM and wait for GPS lock. Then click 'Home Location' link to set home to your location");
+                CustomMessageBox.Show("If you're at the field, connect to your APM and wait for GPS lock. Then click 'Home Location' link to set home to your location");
             }
         }
 
@@ -2693,7 +2770,7 @@ namespace ArdupilotMega.GCSViews
 
                 polygons.Markers.Add(new GMapMarkerGoogleRed(start));
                 MainMap.Invalidate();
-                MessageBox.Show("Distance: " + FormatDistance(MainMap.Manager.GetDistance(startmeasure, start), true) + " AZ: " + (MainMap.Manager.GetBearing(startmeasure, start).ToString("0")));
+                CustomMessageBox.Show("Distance: " + FormatDistance(MainMap.Manager.GetDistance(startmeasure, start), true) + " AZ: " + (MainMap.Manager.GetBearing(startmeasure, start).ToString("0")));
                 polygons.Polygons.Remove(line);
                 polygons.Markers.Clear();
                 startmeasure = new PointLatLng();
@@ -2708,6 +2785,7 @@ namespace ArdupilotMega.GCSViews
             if (float.TryParse(heading, out ans))
             {
                 MainMap.Bearing = ans;
+                FlightData.mymap.Bearing = ans;
             }
         }
 
@@ -2715,7 +2793,7 @@ namespace ArdupilotMega.GCSViews
         {
             if (polygongridmode == false)
             {
-                MessageBox.Show("You will remain in polygon mode until you clear the polygon or create a grid/upload a fence");
+                CustomMessageBox.Show("You will remain in polygon mode until you clear the polygon or create a grid/upload a fence");
             }
 
             polygongridmode = true;
@@ -2813,20 +2891,25 @@ namespace ArdupilotMega.GCSViews
                 }
                 else if (int.TryParse(CurentRectMarker.InnerMarker.Tag.ToString().Replace("grid", ""), out no))
                 {
-                    drawnpolygon.Points.RemoveAt(no - 1);
-                    drawnpolygons.Markers.Clear();
-
-                    int a = 1;
-                    foreach (PointLatLng pnt in drawnpolygon.Points)
+                    try
                     {
-                        addpolygonmarkergrid(a.ToString(), pnt.Lng, pnt.Lat, 0);
-                        a++;
+                        drawnpolygon.Points.RemoveAt(no - 1);
+                        drawnpolygons.Markers.Clear();
+
+                        int a = 1;
+                        foreach (PointLatLng pnt in drawnpolygon.Points)
+                        {
+                            addpolygonmarkergrid(a.ToString(), pnt.Lng, pnt.Lat, 0);
+                            a++;
+                        }
+
+                        MainMap.UpdatePolygonLocalPosition(drawnpolygon);
+
+                        MainMap.Invalidate();
                     }
-
-                    MainMap.UpdatePolygonLocalPosition(drawnpolygon);
-
-                    MainMap.Invalidate();
-
+                    catch {
+                        CustomMessageBox.Show("Remove point Failed. Please try again.");
+                    }
                 }
             }
 
@@ -2874,7 +2957,7 @@ namespace ArdupilotMega.GCSViews
         private void BUT_Camera_Click(object sender, EventArgs e)
         {
             Camera form = new Camera();
-            MainV2.fixtheme(form);
+            ThemeManager.ApplyThemeTo(form);
             form.Show();
         }
 
@@ -2897,7 +2980,7 @@ namespace ArdupilotMega.GCSViews
                 GeoCoderStatusCode status = MainMap.SetCurrentPositionByKeywords(place);
                 if (status != GeoCoderStatusCode.G_GEO_SUCCESS)
                 {
-                    MessageBox.Show("Google Maps Geocoder can't find: '" + place + "', reason: " + status.ToString(), "GMap.NET", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+                    CustomMessageBox.Show("Google Maps Geocoder can't find: '" + place + "', reason: " + status.ToString(), "GMap.NET", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
                 }
                 else
                 {
@@ -2933,7 +3016,7 @@ namespace ArdupilotMega.GCSViews
                     parser.ElementAdded += parser_ElementAdded;
                     parser.ParseString(kml, true);
 
-                    if (DialogResult.Yes == MessageBox.Show("Do you want to load this into the flight data screen?", "Load data", MessageBoxButtons.YesNo))
+                    if (DialogResult.Yes == CustomMessageBox.Show("Do you want to load this into the flight data screen?", "Load data", MessageBoxButtons.YesNo))
                     {
                         foreach (var temp in kmlpolygons.Polygons)
                         {
@@ -2946,7 +3029,7 @@ namespace ArdupilotMega.GCSViews
                     }
 
                 }
-                catch (Exception ex) { MessageBox.Show("Bad KML File :" + ex.ToString()); }
+                catch (Exception ex) { CustomMessageBox.Show("Bad KML File :" + ex.ToString()); }
             }
 
         }
@@ -2964,7 +3047,7 @@ namespace ArdupilotMega.GCSViews
 
                 if (MainV2.cs.firmware == MainV2.Firmwares.ArduPlane)
                 {
-                    routes.Markers.Add(new GMapMarkerPlane(currentloc, MainV2.cs.yaw, MainV2.cs.groundcourse, MainV2.cs.nav_bearing, MainV2.cs.target_bearing));
+                    routes.Markers.Add(new GMapMarkerPlane(currentloc, MainV2.cs.yaw, MainV2.cs.groundcourse, MainV2.cs.nav_bearing, MainV2.cs.target_bearing) { ToolTipText = MainV2.cs.alt.ToString("0"), ToolTipMode = MarkerTooltipMode.Always });
                 }
                 else
                 {
@@ -2980,25 +3063,25 @@ namespace ArdupilotMega.GCSViews
             //FENCE_TOTAL
             if (MainV2.comPort.param["FENCE_ACTION"] == null)
             {
-                MessageBox.Show("Not Supported");
+                CustomMessageBox.Show("Not Supported");
                 return;
             }
 
             if (drawnpolygon == null)
             {
-                MessageBox.Show("No polygon to upload");
+                CustomMessageBox.Show("No polygon to upload");
                 return;
             }
 
             if (geofence.Markers.Count == 0)
             {
-                MessageBox.Show("No return location set");
+                CustomMessageBox.Show("No return location set");
                 return;
             }
 
             if (drawnpolygon.Points.Count == 0)
             {
-                MessageBox.Show("No polygon drawn");
+                CustomMessageBox.Show("No polygon drawn");
                 return;
             }
 
@@ -3009,7 +3092,7 @@ namespace ArdupilotMega.GCSViews
             // check it
             if (!pnpoly(plll.ToArray(), geofence.Markers[0].Position.Lat, geofence.Markers[0].Position.Lng))
             {
-                MessageBox.Show("Your return location is outside the polygon");
+                CustomMessageBox.Show("Your return location is outside the polygon");
                 return;
             }
 
@@ -3024,13 +3107,13 @@ namespace ArdupilotMega.GCSViews
 
             if (!int.TryParse(minalts, out minalt))
             {
-                MessageBox.Show("Bad Min Alt");
+                CustomMessageBox.Show("Bad Min Alt");
                 return;
             }
 
             if (!int.TryParse(maxalts, out maxalt))
             {
-                MessageBox.Show("Bad Max Alt");
+                CustomMessageBox.Show("Bad Max Alt");
                 return;
             }
 
@@ -3041,7 +3124,7 @@ namespace ArdupilotMega.GCSViews
             }
             catch
             {
-                MessageBox.Show("Failed to set min/max fence alt");
+                CustomMessageBox.Show("Failed to set min/max fence alt");
                 return;
             }
 
@@ -3052,7 +3135,7 @@ namespace ArdupilotMega.GCSViews
             }
             catch
             {
-                MessageBox.Show("Failed to set FENCE_ACTION");
+                CustomMessageBox.Show("Failed to set FENCE_ACTION");
                 return;
             }
 
@@ -3108,13 +3191,13 @@ namespace ArdupilotMega.GCSViews
 
             if (MainV2.comPort.param["FENCE_ACTION"] == null || MainV2.comPort.param["FENCE_TOTAL"] == null)
             {
-                MessageBox.Show("Not Supported");
+                CustomMessageBox.Show("Not Supported");
                 return;
             }
 
             if (int.Parse(MainV2.comPort.param["FENCE_TOTAL"].ToString()) <= 1)
             {
-                MessageBox.Show("Nothing to download");
+                CustomMessageBox.Show("Nothing to download");
                 return;
             }
 
@@ -3236,7 +3319,7 @@ namespace ArdupilotMega.GCSViews
         {
             if (geofence.Markers.Count == 0)
             {
-                MessageBox.Show("Please set a return location");
+                CustomMessageBox.Show("Please set a return location");
                 return;
             }
 
@@ -3278,7 +3361,7 @@ namespace ArdupilotMega.GCSViews
 
                     sw.Close();
                 }
-                catch { MessageBox.Show("Failed to write fence file"); }
+                catch { CustomMessageBox.Show("Failed to write fence file"); }
             }
         }
 

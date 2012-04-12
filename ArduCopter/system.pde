@@ -76,24 +76,11 @@ static void init_ardupilot()
 	// Console serial port
 	//
 	// The console port buffers are defined to be sufficiently large to support
-	// the console's use as a logging device, optionally as the GPS port when
-	// GPS_PROTOCOL_IMU is selected, and as the telemetry port.
-	//
-	// XXX This could be optimised to reduce the buffer sizes in the cases
-	// where they are not otherwise required.
-	//
-	Serial.begin(SERIAL0_BAUD, 128, 128);
+    // the MAVLink protocol efficiently
+    //
+	Serial.begin(SERIAL0_BAUD, 128, 256);
 
 	// GPS serial port.
-	//
-	// Not used if the IMU/X-Plane GPS is in use.
-	//
-	// XXX currently the EM406 (SiRF receiver) is nominally configured
-	// at 57600, however it's not been supported to date.  We should
-	// probably standardise on 38400.
-	//
-	// XXX the 128 byte receive buffer may be too small for NMEA, depending
-	// on the message set configured.
 	//
 	#if GPS_PROTOCOL != GPS_PROTOCOL_IMU
 	Serial1.begin(38400, 128, 16);
@@ -143,50 +130,25 @@ static void init_ardupilot()
 #if CONFIG_RELAY == ENABLED
 	DDRL |= B00000100;						// Set Port L, pin 2 to output for the relay
 #endif
-	// XXX set Analog out 14 to output
-	//  	   76543210
-	//DDRK |= B01010000;
 
-	#if MOTOR_LEDS == 1
-		pinMode(FR_LED, OUTPUT);			// GPS status LED
-		pinMode(RE_LED, OUTPUT);			// GPS status LED
-		pinMode(RI_LED, OUTPUT);			// GPS status LED
-		pinMode(LE_LED, OUTPUT);			// GPS status LED
-	#endif
+#if COPTER_LEDS == ENABLED
+	pinMode(COPTER_LED_1, OUTPUT);		//Motor LED
+	pinMode(COPTER_LED_2, OUTPUT);		//Motor LED
+	pinMode(COPTER_LED_3, OUTPUT);		//Motor LED
+	pinMode(COPTER_LED_4, OUTPUT);		//Motor LED
+	pinMode(COPTER_LED_5, OUTPUT);		//Motor or Aux LED
+	pinMode(COPTER_LED_6, OUTPUT);		//Motor or Aux LED
+	pinMode(COPTER_LED_7, OUTPUT);		//Motor or GPS LED
+	pinMode(COPTER_LED_8, OUTPUT);		//Motor or GPS LED
+#endif
 
 	#if PIEZO == 1
 		pinMode(PIEZO_PIN,OUTPUT);
 		piezo_beep();
 	#endif
 
-
-	if (!g.format_version.load() ||
-	     g.format_version != Parameters::k_format_version) {
-		//Serial.printf_P(PSTR("\n\nForcing complete parameter reset..."));
-
-		/*Serial.printf_P(PSTR("\n\nEEPROM format version  %d not compatible with this firmware (requires %d)"
-		                     "\n\nForcing complete parameter reset..."),
-		                     g.format_version.get(),
-		                     Parameters::k_format_version);
-		*/
-
-		// erase all parameters
-		Serial.printf_P(PSTR("Firmware change: erasing EEPROM...\n"));
-		delay(100); // wait for serial send
-		AP_Var::erase_all();
-
-		// save the new format version
-		g.format_version.set_and_save(Parameters::k_format_version);
-
-		// save default radio values
-		default_dead_zones();
-	}else{
-		// save default radio values
-		//default_dead_zones();
-
-	    // Load all auto-loaded EEPROM variables
-	    AP_Var::load_all();
-	}
+    // load parameters from EEPROM
+    load_parameters();
 
 	// init the GCS
     gcs0.init(&Serial);
@@ -195,16 +157,17 @@ static void init_ardupilot()
     if (!usb_connected) {
         // we are not connected via USB, re-init UART0 with right
         // baud rate
-        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD));
     }
 #else
     // we have a 2nd serial port for telemetry
-    Serial3.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+    Serial3.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 256);
 	gcs3.init(&Serial3);
 #endif
 
     // identify ourselves correctly with the ground station
 	mavlink_system.sysid = g.sysid_this_mav;
+    mavlink_system.type = 2; //MAV_QUADROTOR;
 
 #if LOGGING_ENABLED == ENABLED
     DataFlash.Init();
@@ -228,8 +191,8 @@ static void init_ardupilot()
 	#endif
 
     #if FRAME_CONFIG ==	HELI_FRAME
-		g.heli_servo_manual = false;
-		heli_init_swash();  // heli initialisation
+		motors.servo_manual = false;
+		motors.init_swash();  // heli initialisation
 	#endif
 
     RC_Channel::set_apm_rc(&APM_RC);
@@ -243,7 +206,6 @@ static void init_ardupilot()
 #if HIL_MODE != HIL_MODE_ATTITUDE
 #if CONFIG_ADC == ENABLED
 		// begin filtering the ADC Gyros
-		adc.filter_result = true;
         adc.Init(&timer_scheduler);       // APM ADC library initialization
 #endif // CONFIG_ADC
 
@@ -333,14 +295,6 @@ static void init_ardupilot()
 	// ---------------------------
 	reset_control_switch();
 
-	#if HIL_MODE != HIL_MODE_ATTITUDE
-		dcm.kp_roll_pitch(0.130000);
-		dcm.ki_roll_pitch(0.00001278),	// 50 hz I term
-		dcm.kp_yaw(0.08);
-		dcm.ki_yaw(0.00004);
-		dcm._clamp = 5;
-	#endif
-
 	// init the Z damopener
 	// --------------------
 	#if ACCEL_ALT_HOLD != 0
@@ -352,36 +306,29 @@ static void init_ardupilot()
 
 #if LOGGING_ENABLED == ENABLED
 	Log_Write_Startup();
-	Log_Write_Data(10, g.pi_stabilize_roll.kP());
-	Log_Write_Data(11, g.pi_stabilize_pitch.kP());
-	Log_Write_Data(12, g.pi_rate_roll.kP());
-	Log_Write_Data(13, g.pi_rate_pitch.kP());
+	Log_Write_Data(10, (float)g.pi_stabilize_roll.kP());
+	Log_Write_Data(11, (float)g.pi_stabilize_roll.kI());
+
+	Log_Write_Data(12, (float)g.pid_rate_roll.kP());
+	Log_Write_Data(13, (float)g.pid_rate_roll.kI());
+	Log_Write_Data(14, (float)g.pid_rate_roll.kD());
+	Log_Write_Data(15, (float)g.stabilize_d.get());
+
+	Log_Write_Data(16, (float)g.pi_loiter_lon.kP());
+	Log_Write_Data(17, (float)g.pi_loiter_lon.kI());
+
+	Log_Write_Data(18, (float)g.pid_nav_lon.kP());
+	Log_Write_Data(19, (float)g.pid_nav_lon.kI());
+	Log_Write_Data(20, (float)g.pid_nav_lon.kD());
+
+	Log_Write_Data(21, (int32_t)g.auto_slew_rate.get());
+
+	Log_Write_Data(22, (float)g.pid_loiter_rate_lon.kP());
+	Log_Write_Data(23, (float)g.pid_loiter_rate_lon.kI());
+	Log_Write_Data(24, (float)g.pid_loiter_rate_lon.kD());
 #endif
 
 	SendDebug("\nReady to FLY ");
-}
-
-/*
-  reset all I integrators
- */
-static void reset_I_all(void)
-{
-	g.pi_rate_roll.reset_I();
-	g.pi_rate_pitch.reset_I();
-	g.pi_rate_yaw.reset_I();
-	g.pi_stabilize_roll.reset_I();
-	g.pi_stabilize_pitch.reset_I();
-	g.pi_stabilize_yaw.reset_I();
-	g.pi_loiter_lat.reset_I();
-	g.pi_loiter_lon.reset_I();
-	g.pi_nav_lat.reset_I();
-	g.pi_nav_lon.reset_I();
-	g.pi_alt_hold.reset_I();
-	g.pi_throttle.reset_I();
-	g.pi_acro_roll.reset_I();
-	g.pi_acro_pitch.reset_I();
-	g.pi_optflow_roll.reset_I();
-	g.pi_optflow_pitch.reset_I();
 }
 
 
@@ -405,8 +352,8 @@ static void startup_ground(void)
 	// ---------------------------
 	clear_leds();
 
-    // when we re-calibrate the gyros, all previous I values now
-    // make no sense
+    // when we re-calibrate the gyros,
+    // all previous I values are invalid
     reset_I_all();
 }
 
@@ -431,29 +378,31 @@ static void set_mode(byte mode)
 	// if we don't have GPS lock
 	if(home_is_set == false){
 		// our max mode should be
-		if (mode > ALT_HOLD)
+		if (mode > ALT_HOLD && mode != OF_LOITER)
 			mode = STABILIZE;
 	}
 
-	// nothing but Loiter for OptFlow only
+	// nothing but OF_LOITER for OptFlow only
 	if (g.optflow_enabled && GPS_enabled == false){
-		if (mode > ALT_HOLD && mode != LOITER)
+		if (mode > ALT_HOLD && mode != OF_LOITER)
 			mode = STABILIZE;
 	}
 
-	old_control_mode = control_mode;
-
-	control_mode = mode;
-	control_mode = constrain(control_mode, 0, NUM_MODES - 1);
+	old_control_mode 	= control_mode;
+	control_mode 		= mode;
+	control_mode 		= constrain(control_mode, 0, NUM_MODES - 1);
 
 	// used to stop fly_aways
-	motor_auto_armed = (g.rc_3.control_in > 0);
+	motors.auto_armed(g.rc_3.control_in > 0);
 
 	// clearing value used in interactive alt hold
 	manual_boost = 0;
 
 	// clearing value used to force the copter down in landing mode
 	landing_boost = 0;
+
+	// do we want to come to a stop or pass a WP?
+	slow_wp = false;
 
 	// do not auto_land if we are leaving RTL
 	auto_land_timer = 0;
@@ -462,7 +411,7 @@ static void set_mode(byte mode)
 	land_complete 	= false;
 
 	// debug to Serial terminal
-	Serial.println(flight_mode_strings[control_mode]);
+	//Serial.println(flight_mode_strings[control_mode]);
 
 	// report the GPS and Motor arming status
 	led_mode = NORMAL_LEDS;
@@ -470,10 +419,9 @@ static void set_mode(byte mode)
 	switch(control_mode)
 	{
 		case ACRO:
-			yaw_mode 		= YAW_ACRO;
+			yaw_mode 		= YAW_HOLD;
 			roll_pitch_mode = ROLL_PITCH_ACRO;
 			throttle_mode 	= THROTTLE_MANUAL;
-			reset_rate_I();
 			break;
 
 		case STABILIZE:
@@ -487,7 +435,7 @@ static void set_mode(byte mode)
 			roll_pitch_mode = ALT_HOLD_RP;
 			throttle_mode 	= ALT_HOLD_THR;
 
-			set_next_WP(&current_loc);
+			force_new_altitude(max(current_loc.alt, 100));
 			break;
 
 		case AUTO:
@@ -544,6 +492,13 @@ static void set_mode(byte mode)
 			do_RTL();
 			break;
 
+		case OF_LOITER:
+			yaw_mode 		= OF_LOITER_YAW;
+			roll_pitch_mode = OF_LOITER_RP;
+			throttle_mode 	= OF_LOITER_THR;
+			set_next_WP(&current_loc);
+			break;
+
 		default:
 			break;
 	}
@@ -553,22 +508,20 @@ static void set_mode(byte mode)
 		throttle_mode = THROTTLE_AUTO;
 		// does not wait for us to be in high throttle, since the
 		// Receiver will be outputting low throttle
-		motor_auto_armed = true;
+		motors.auto_armed(true);
 	}
 
-	if(throttle_mode == THROTTLE_MANUAL){
-		// reset all of the throttle iterms
-		update_throttle_cruise();
-	}else {
-		// an automatic throttle
-		// todo: replace with a throttle cruise estimator
-		init_throttle_cruise();
-	}
+	// called to calculate gain for alt hold
+	update_throttle_cruise();
 
 	if(roll_pitch_mode <= ROLL_PITCH_ACRO){
 		// We are under manual attitude control
-		// removes the navigation from roll and pitch commands, but leaves the wind compensation
-		reset_nav();
+		// remove the navigation from roll and pitch command
+		reset_nav_params();
+		// remove the wind compenstaion
+		reset_wind_I();
+		// Clears the alt hold compensation
+		reset_throttle_I();
 	}
 
 	Log_Write_Mode(control_mode);
@@ -600,7 +553,7 @@ static void set_failsafe(boolean mode)
 static void
 init_simple_bearing()
 {
-	initial_simple_bearing = dcm.yaw_sensor;
+	initial_simple_bearing = ahrs.yaw_sensor;
 }
 
 static void update_throttle_cruise()
@@ -608,22 +561,12 @@ static void update_throttle_cruise()
 	int16_t tmp = g.pi_alt_hold.get_integrator();
 	if(tmp != 0){
 		g.throttle_cruise += tmp;
-		g.pi_alt_hold.reset_I();
-		g.pi_throttle.reset_I();
+		reset_throttle_I();
 	}
-}
 
-static void
-init_throttle_cruise()
-{
-#if AUTO_THROTTLE_HOLD == 0
-	// are we moving from manual throttle to auto_throttle?
-	if((old_control_mode <= STABILIZE) && (g.rc_3.control_in > MINIMUM_THROTTLE)){
-		g.pi_throttle.reset_I();
-		g.pi_alt_hold.reset_I();
-		g.throttle_cruise.set_and_save(g.rc_3.control_in);
-	}
-#endif
+	// recalc kp
+	//g.pid_throttle.kP((float)g.throttle_cruise.get() / 981.0);
+	//Serial.printf("kp:%1.4f\n",kp);
 }
 
 #if CLI_SLIDER_ENABLED == ENABLED && CLI_ENABLED == ENABLED
@@ -640,6 +583,9 @@ check_startup_for_CLI()
 static uint32_t map_baudrate(int8_t rate, uint32_t default_baud)
 {
     switch (rate) {
+    case 1:    return 1200;
+    case 2:    return 2400;
+    case 4:    return 4800;
     case 9:    return 9600;
     case 19:   return 19200;
     case 38:   return 38400;
@@ -662,9 +608,9 @@ static void check_usb_mux(void)
     // the user has switched to/from the telemetry port
     usb_connected = usb_check;
     if (usb_connected) {
-        Serial.begin(SERIAL0_BAUD, 128, 128);
+        Serial.begin(SERIAL0_BAUD);
     } else {
-        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD));
     }
 }
 #endif
@@ -678,3 +624,38 @@ void flash_leds(bool on)
     digitalWrite(A_LED_PIN, on?LED_OFF:LED_ON);
     digitalWrite(C_LED_PIN, on?LED_ON:LED_OFF);
 }
+
+#ifndef DESKTOP_BUILD
+/*
+ * Read Vcc vs 1.1v internal reference
+ *
+ * This call takes about 150us total. ADC conversion is 13 cycles of
+ * 125khz default changes the mux if it isn't set, and return last
+ * reading (allows necessary settle time) otherwise trigger the
+ * conversion
+ */
+uint16_t board_voltage(void)
+{
+	const uint8_t mux = (_BV(REFS0)|_BV(MUX4)|_BV(MUX3)|_BV(MUX2)|_BV(MUX1));
+
+	if (ADMUX == mux) {
+		ADCSRA |= _BV(ADSC);                // Convert
+		uint16_t counter=4000; // normally takes about 1700 loops
+		while (bit_is_set(ADCSRA, ADSC) && counter)  // Wait
+			counter--;
+		if (counter == 0) {
+			// we don't actually expect this timeout to happen,
+			// but we don't want any more code that could hang. We
+			// report 0V so it is clear in the logs that we don't know
+			// the value
+			return 0;
+		}
+		uint32_t result = ADCL | ADCH<<8;
+		return 1126400UL / result;       // Read and back-calculate Vcc in mV
+    }
+    // switch mux, settle time is needed. We don't want to delay
+    // waiting for the settle, so report 0 as a "don't know" value
+    ADMUX = mux;
+	return 0; // we don't know the current voltage
+}
+#endif

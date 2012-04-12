@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#define THISFIRMWARE "ArduPlane V2.28"
+#define THISFIRMWARE "ArduPlane V2.33"
 /*
 Authors:    Doug Weibel, Jose Julio, Jordi Munoz, Jason Short, Andrew Tridgell, Randy Mackay, Pat Hickey, John Arne Birkeland, Olivier Adler
 Thanks to:  Chris Anderson, Michael Oborne, Paul Mather, Bill Premerlani, James Cohen, JB from rotorFX, Automatik, Fefenin, Peter Meister, Remzibi, Yury Smirnov, Sandro Benigno, Max Levine, Roberto Navoni, Lorenz Meier 
@@ -40,11 +40,12 @@ version 2.1 of the License, or (at your option) any later version.
 #include <AP_Math.h>        // ArduPilot Mega Vector/Matrix math Library
 #include <AP_InertialSensor.h> // Inertial Sensor (uncalibated IMU) Library
 #include <AP_IMU.h>         // ArduPilot Mega IMU Library
-#include <AP_DCM.h>         // ArduPilot Mega DCM Library
+#include <AP_AHRS.h>         // ArduPilot Mega DCM Library
 #include <PID.h>            // PID library
 #include <RC_Channel.h>     // RC Channel Library
 #include <AP_RangeFinder.h>	// Range finder library
-#include <ModeFilter.h>
+#include <Filter.h>			// Filter library
+#include <ModeFilter.h>		// Mode Filter from Filter library
 #include <AP_Relay.h>       // APM relay
 
 #if MOUNT==ENABLED
@@ -61,6 +62,8 @@ version 2.1 of the License, or (at your option) any later version.
 #include "defines.h"
 #include "Parameters.h"
 #include "GCS.h"
+
+#include <AP_Declination.h> // ArduPilot Mega Declination Helper Library
 
 ////////////////////////////////////////////////////////////////////////////////
 // Serial ports
@@ -157,7 +160,7 @@ static AP_Baro_BMP085          barometer(false);
 static AP_Baro_MS5611          barometer;
 #endif
 
-static AP_Compass_HMC5843      compass(Parameters::k_param_compass);
+static AP_Compass_HMC5843      compass;
 #endif
 
 // real GPS selection
@@ -191,8 +194,13 @@ AP_GPS_None     g_gps_driver(NULL);
 # else
   AP_InertialSensor_Oilpan ins( &adc, &timer_scheduler );
 #endif // CONFIG_IMU_TYPE
-AP_IMU_INS imu( &ins, Parameters::k_param_IMU_calibration , &timer_scheduler);
-AP_DCM  dcm(&imu, g_gps);
+AP_IMU_INS imu( &ins );
+
+#if QUATERNION_ENABLE == ENABLED
+  AP_AHRS_Quaternion ahrs(&imu, g_gps);
+#else
+  AP_AHRS_DCM  ahrs(&imu, g_gps);
+#endif
 
 #elif HIL_MODE == HIL_MODE_SENSORS
 // sensor emulators
@@ -202,14 +210,15 @@ AP_Compass_HIL          compass;
 AP_GPS_HIL              g_gps_driver(NULL);
 AP_InertialSensor_Oilpan ins( &adc, &timer_scheduler);
 AP_IMU_Shim imu;
-AP_DCM  dcm(&imu, g_gps);
+AP_AHRS_DCM  ahrs(&imu, g_gps);
 
 #elif HIL_MODE == HIL_MODE_ATTITUDE
 AP_ADC_HIL              adc;
-AP_DCM_HIL              dcm;
+AP_IMU_Shim             imu; // never used
+AP_AHRS_HIL             ahrs(&imu, g_gps);
 AP_GPS_HIL              g_gps_driver(NULL);
 AP_Compass_HIL          compass; // never used
-AP_IMU_Shim             imu; // never used
+AP_Baro_BMP085_HIL      barometer;
 
 #else
  #error Unrecognised HIL_MODE setting.
@@ -220,14 +229,14 @@ AP_IMU_Shim             imu; // never used
 // GCS selection
 ////////////////////////////////////////////////////////////////////////////////
 //
-GCS_MAVLINK	gcs0(Parameters::k_param_streamrates_port0);
-GCS_MAVLINK	gcs3(Parameters::k_param_streamrates_port3);
+GCS_MAVLINK	gcs0;
+GCS_MAVLINK	gcs3;
 
 ////////////////////////////////////////////////////////////////////////////////
 // PITOT selection
 ////////////////////////////////////////////////////////////////////////////////
 //
-ModeFilter sonar_mode_filter;
+ModeFilterInt16_Size5 sonar_mode_filter(2);
 
 #if CONFIG_PITOT_SOURCE == PITOT_SOURCE_ADC
 AP_AnalogSource_ADC pitot_analog_source( &adc,
@@ -249,7 +258,7 @@ AP_Relay relay;
 // Camera/Antenna mount tracking and stabilisation stuff
 // --------------------------------------
 #if MOUNT == ENABLED
-AP_Mount camera_mount(g_gps, &dcm);
+AP_Mount camera_mount(g_gps, &ahrs);
 #endif
 
 
@@ -707,18 +716,18 @@ static void fast_loop()
 	}
 
 	#if HIL_MODE == HIL_MODE_SENSORS
-		// update hil before dcm update
+		// update hil before AHRS update
 		gcs_update();
 	#endif
 
-	dcm.update_DCM();
+    ahrs.update();
 
 	// uses the yaw from the DCM to give more accurate turns
 	calc_bearing_error();
 
 	# if HIL_MODE == HIL_MODE_DISABLED
 		if (g.log_bitmask & MASK_LOG_ATTITUDE_FAST)
-			Log_Write_Attitude((int)dcm.roll_sensor, (int)dcm.pitch_sensor, (uint16_t)dcm.yaw_sensor);
+			Log_Write_Attitude((int)ahrs.roll_sensor, (int)ahrs.pitch_sensor, (uint16_t)ahrs.yaw_sensor);
 
 		if (g.log_bitmask & MASK_LOG_RAW)
 			Log_Write_Raw();
@@ -744,11 +753,8 @@ static void fast_loop()
 	// ------------------------------
 	set_servos();
 
-
-	// XXX is it appropriate to be doing the comms below on the fast loop?
-
     gcs_update();
-    gcs_data_stream_send(45,1000);
+    gcs_data_stream_send();
 }
 
 static void medium_loop()
@@ -772,14 +778,19 @@ static void medium_loop()
 
 			#if HIL_MODE != HIL_MODE_ATTITUDE
             if (g.compass_enabled && compass.read()) {
-                compass.calculate(dcm.get_dcm_matrix());  // Calculate heading
-                compass.null_offsets(dcm.get_dcm_matrix());
+                ahrs.set_compass(&compass);
+                // Calculate heading
+                Matrix3f m = ahrs.get_dcm_matrix();
+                compass.calculate(m);
+                compass.null_offsets();
+            } else {
+                ahrs.set_compass(NULL);
             }
 			#endif
 /*{
-Serial.print(dcm.roll_sensor, DEC);	Serial.printf_P(PSTR("\t"));
-Serial.print(dcm.pitch_sensor, DEC);	Serial.printf_P(PSTR("\t"));
-Serial.print(dcm.yaw_sensor, DEC);	Serial.printf_P(PSTR("\t"));
+Serial.print(ahrs.roll_sensor, DEC);	Serial.printf_P(PSTR("\t"));
+Serial.print(ahrs.pitch_sensor, DEC);	Serial.printf_P(PSTR("\t"));
+Serial.print(ahrs.yaw_sensor, DEC);	Serial.printf_P(PSTR("\t"));
 Vector3f tempaccel = imu.get_accel();
 Serial.print(tempaccel.x, DEC);	Serial.printf_P(PSTR("\t"));
 Serial.print(tempaccel.y, DEC);	Serial.printf_P(PSTR("\t"));
@@ -833,7 +844,7 @@ Serial.println(tempaccel.z, DEC);
 
 			#if HIL_MODE != HIL_MODE_ATTITUDE
 				if ((g.log_bitmask & MASK_LOG_ATTITUDE_MED) && !(g.log_bitmask & MASK_LOG_ATTITUDE_FAST))
-					Log_Write_Attitude((int)dcm.roll_sensor, (int)dcm.pitch_sensor, (uint16_t)dcm.yaw_sensor);
+					Log_Write_Attitude((int)ahrs.roll_sensor, (int)ahrs.pitch_sensor, (uint16_t)ahrs.yaw_sensor);
 
 				if (g.log_bitmask & MASK_LOG_CTUN)
 					Log_Write_Control_Tuning();
@@ -844,10 +855,6 @@ Serial.println(tempaccel.z, DEC);
 
 			if (g.log_bitmask & MASK_LOG_GPS)
 				Log_Write_GPS(g_gps->time, current_loc.lat, current_loc.lng, g_gps->altitude, current_loc.alt, (long) g_gps->ground_speed, g_gps->ground_course, g_gps->fix, g_gps->num_sats);
-
-            // send all requested output streams with rates requested
-            // between 5 and 45 Hz
-            gcs_data_stream_send(5,45);
 			break;
 
 		// This case controls the slow loop
@@ -909,7 +916,6 @@ static void slow_loop()
 			update_events();
 
             mavlink_system.sysid = g.sysid_this_mav;		// This is just an ugly hack to keep mavlink_system.sysid sync'd with our parameter
-            gcs_data_stream_send(3,5);
 
 #if USB_MUX_PIN > 0
             check_usb_mux();
@@ -926,7 +932,6 @@ static void one_second_loop()
 
 	// send a heartbeat
 	gcs_send_message(MSG_HEARTBEAT);
-    gcs_data_stream_send(1,3);
 }
 
 static void update_GPS(void)
@@ -962,6 +967,10 @@ static void update_GPS(void)
 					init_home();
 				}
 
+				if (g.compass_enabled) {
+					// Set compass declination automatically
+					compass.set_initial_location(g_gps->latitude, g_gps->longitude);
+				}
 				ground_start_count = 0;
 			}
 		}
@@ -982,7 +991,7 @@ static void update_current_flight_mode(void)
 
 		switch(nav_command_ID){
 			case MAV_CMD_NAV_TAKEOFF:
-				if (hold_course > -1) {
+				if (hold_course != -1) {
 					calc_nav_roll();
 				} else {
 					nav_roll = 0;
@@ -1015,12 +1024,16 @@ static void update_current_flight_mode(void)
 					nav_pitch = landing_pitch;      // pitch held constant
 				}
 
-				if (land_complete){
+				if (land_complete) {
+                    // we are in the final stage of a landing - force
+                    // zero throttle
 					g.channel_throttle.servo_out = 0;
 				}
 				break;
 
 			default:
+                // we are doing normal AUTO flight, the special cases
+                // are for takeoff and landing
 				hold_course = -1;
 				calc_nav_roll();
 				calc_nav_pitch();
@@ -1028,11 +1041,13 @@ static void update_current_flight_mode(void)
 				break;
 		}
 	}else{
+        // hold_course is only used in takeoff and landing
+        hold_course = -1;
+
 		switch(control_mode){
 			case RTL:
 			case LOITER:
 			case GUIDED:
-				hold_course = -1;
 				crash_checker();
 				calc_nav_roll();
 				calc_nav_pitch();

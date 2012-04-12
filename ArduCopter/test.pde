@@ -4,7 +4,7 @@
 
 // These are function definitions so the Menu can be constructed before the functions
 // are defined below. Order matters to the compiler.
-//static int8_t	test_radio_pwm(uint8_t argc, 	const Menu::arg *argv);
+static int8_t	test_radio_pwm(uint8_t argc, 	const Menu::arg *argv);
 static int8_t	test_radio(uint8_t argc, 		const Menu::arg *argv);
 //static int8_t	test_failsafe(uint8_t argc, 	const Menu::arg *argv);
 //static int8_t	test_stabilize(uint8_t argc, 	const Menu::arg *argv);
@@ -16,8 +16,9 @@ static int8_t	test_imu(uint8_t argc, 			const Menu::arg *argv);
 //static int8_t	test_dcm_eulers(uint8_t argc, 	const Menu::arg *argv);
 //static int8_t	test_dcm(uint8_t argc, 			const Menu::arg *argv);
 //static int8_t	test_omega(uint8_t argc, 		const Menu::arg *argv);
+//static int8_t	test_stab_d(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_battery(uint8_t argc, 		const Menu::arg *argv);
-//static int8_t	test_nav(uint8_t argc, 			const Menu::arg *argv);
+//static int8_t	test_boost(uint8_t argc, 		const Menu::arg *argv);
 //static int8_t	test_wp_nav(uint8_t argc, 		const Menu::arg *argv);
 //static int8_t	test_reverse(uint8_t argc, 		const Menu::arg *argv);
 static int8_t	test_tuning(uint8_t argc, 		const Menu::arg *argv);
@@ -55,7 +56,7 @@ static int8_t	test_rawgps(uint8_t argc, 		const Menu::arg *argv);
 // User enters the string in the console to call the functions on the right.
 // See class Menu in AP_Coommon for implementation details
 const struct Menu::command test_menu_commands[] PROGMEM = {
-//	{"pwm",			test_radio_pwm},
+	{"pwm",			test_radio_pwm},
 	{"radio",		test_radio},
 //	{"failsafe",	test_failsafe},
 //	{"stabilize",	test_stabilize},
@@ -65,12 +66,13 @@ const struct Menu::command test_menu_commands[] PROGMEM = {
 	{"imu",			test_imu},
 //	{"dcm",			test_dcm_eulers},
 	//{"omega",		test_omega},
+//	{"stab_d",		test_stab_d},
 	{"battery",		test_battery},
 	{"tune",		test_tuning},
 	//{"tri",			test_tri},
 	{"relay",		test_relay},
 	{"wp",			test_wp},
-	//{"nav",			test_nav},
+//	{"boost",		test_boost},
 #if HIL_MODE != HIL_MODE_ATTITUDE
 	{"altitude",	test_baro},
 	{"sonar",		test_sonar},
@@ -94,7 +96,7 @@ test_mode(uint8_t argc, const Menu::arg *argv)
 {
 	//Serial.printf_P(PSTR("Test Mode\n\n"));
 	test_menu.run();
-    return 0;
+	return 0;
 }
 
 static int8_t
@@ -112,38 +114,43 @@ test_eedump(uint8_t argc, const Menu::arg *argv)
 	return(0);
 }
 
-/*
-//static int8_t
-//test_radio_pwm(uint8_t argc, const Menu::arg *argv)
+
+static int8_t
+test_radio_pwm(uint8_t argc, const Menu::arg *argv)
 {
-	print_hit_enter();
-	delay(1000);
+	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
+		print_test_disabled();
+		return (0);
+	#else
+		print_hit_enter();
+		delay(1000);
 
-	while(1){
-		delay(20);
+		while(1){
+			delay(20);
 
-		// Filters radio input - adjust filters in the radio.pde file
-		// ----------------------------------------------------------
-		read_radio();
+			// Filters radio input - adjust filters in the radio.pde file
+			// ----------------------------------------------------------
+			read_radio();
 
-		// servo Yaw
-		//APM_RC.OutputCh(CH_7, g.rc_4.radio_out);
+			// servo Yaw
+			//APM_RC.OutputCh(CH_7, g.rc_4.radio_out);
 
-		Serial.printf_P(PSTR("IN: 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d\n"),
-							g.rc_1.radio_in,
-							g.rc_2.radio_in,
-							g.rc_3.radio_in,
-							g.rc_4.radio_in,
-							g.rc_5.radio_in,
-							g.rc_6.radio_in,
-							g.rc_7.radio_in,
-							g.rc_8.radio_in);
+			Serial.printf_P(PSTR("IN: 1: %d\t2: %d\t3: %d\t4: %d\t5: %d\t6: %d\t7: %d\t8: %d\n"),
+								g.rc_1.radio_in,
+								g.rc_2.radio_in,
+								g.rc_3.radio_in,
+								g.rc_4.radio_in,
+								g.rc_5.radio_in,
+								g.rc_6.radio_in,
+								g.rc_7.radio_in,
+								g.rc_8.radio_in);
 
-		if(Serial.available() > 0){
-			return (0);
+			if(Serial.available() > 0){
+				return (0);
+			}
 		}
-	}
-}*/
+	#endif
+}
 
 /*
 //static int8_t
@@ -174,37 +181,26 @@ test_eedump(uint8_t argc, const Menu::arg *argv)
 }*/
 
 /*
-//static int8_t
-//test_nav(uint8_t argc, const Menu::arg *argv)
+static int8_t
+//test_boost(uint8_t argc, const Menu::arg *argv)
 {
 	print_hit_enter();
 	delay(1000);
+	int16_t temp = MINIMUM_THROTTLE;
 
 	while(1){
-		delay(1000);
-		g_gps->ground_course = 19500;
-		calc_nav_rate2(g.waypoint_speed_max);
-		calc_nav_pitch_roll2();
+		delay(20);
+		g.rc_3.control_in = temp;
+		adjust_altitude();
+		Serial.printf("tmp:%d, boost: %d\n", temp, manual_boost);
+		temp++;
 
-		g_gps->ground_course = 28500;
-		calc_nav_rate2(g.waypoint_speed_max);
-		calc_nav_pitch_roll2();
-
-		g_gps->ground_course = 1500;
-		calc_nav_rate2(g.waypoint_speed_max);
-		calc_nav_pitch_roll2();
-
-		g_gps->ground_course = 10500;
-		calc_nav_rate2(g.waypoint_speed_max);
-		calc_nav_pitch_roll2();
-
-
-		//if(Serial.available() > 0){
+		if(temp > MAXIMUM_THROTTLE){
 			return (0);
-		//}
+		}
 	}
 }
-*/
+//*/
 
 static int8_t
 test_radio(uint8_t argc, const Menu::arg *argv)
@@ -320,8 +316,8 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 	Serial.printf_P(PSTR("g.pi_stabilize_roll.kP: %4.4f\n"), g.pi_stabilize_roll.kP());
 	Serial.printf_P(PSTR("max_stabilize_dampener:%d\n\n "), max_stabilize_dampener);
 
-	motor_auto_armed 	= false;
-	motor_armed 		= true;
+	motors.auto_armed(false);
+	motors.armed(true);
 
 	while(1){
 		// 50 hz
@@ -333,9 +329,10 @@ test_radio(uint8_t argc, const Menu::arg *argv)
 			if(g.compass_enabled){
 				medium_loopCounter++;
 				if(medium_loopCounter == 5){
+                    Matrix3f m = dcm.get_dcm_matrix();
 					compass.read();		 				// Read magnetometer
-					compass.calculate(dcm.roll, dcm.pitch);		// Calculate heading
-					compass.null_offsets(dcm.get_dcm_matrix());
+					compass.calculate(m);
+                    compass.null_offsets();
 					medium_loopCounter = 0;
 				}
 			}
@@ -469,7 +466,7 @@ test_ins(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_imu(uint8_t argc, const Menu::arg *argv)
 {
- 	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
+	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
 		print_test_disabled();
 		return (0);
 	#else
@@ -515,7 +512,7 @@ test_imu(uint8_t argc, const Menu::arg *argv)
 	//dcm.kp_yaw(0.02);
 	//dcm.ki_yaw(0);
 
-    imu.init(IMU::WARM_START, delay, flash_leds, &timer_scheduler);
+	imu.init(IMU::WARM_START, delay, flash_leds, &timer_scheduler);
 
 	report_imu();
 	imu.init_gyro(delay, flash_leds);
@@ -552,10 +549,12 @@ test_imu(uint8_t argc, const Menu::arg *argv)
 
 				if(g.compass_enabled){
 					compass.read();		 				// Read magnetometer
-					compass.calculate(dcm.get_dcm_matrix());
+                    Matrix3f m = dcm.get_dcm_matrix();
+					compass.calculate(m);
+                    compass.null_offsets();
 				}
 			}
-            fast_loopTimer = millis();
+			fast_loopTimer = millis();
 		}
 		if(Serial.available() > 0){
 			return (0);
@@ -597,6 +596,42 @@ test_gps(uint8_t argc, const Menu::arg *argv)
 	*/
 	return 0;
 }
+
+// used to test the gain scheduler for Stab_D
+/*
+static int8_t
+test_stab_d(uint8_t argc, const Menu::arg *argv)
+{
+	int16_t i = 0;
+	g.stabilize_d = 1;
+
+	g.stabilize_d_schedule = 1
+	for (i = -4600; i < 4600; i+=10) {
+		new_radio_frame = true;
+		g.rc_1.control_in = i;
+		g.rc_2.control_in = i;
+		update_roll_pitch_mode();
+    	Serial.printf("rin:%d, d:%1.6f \tpin:%d, d:%1.6f\n",g.rc_1.control_in, roll_scale_d, g.rc_2.control_in, pitch_scale_d);
+    }
+	g.stabilize_d_schedule = .5
+	for (i = -4600; i < 4600; i+=10) {
+		new_radio_frame = true;
+		g.rc_1.control_in = i;
+		g.rc_2.control_in = i;
+		update_roll_pitch_mode();
+    	Serial.printf("rin:%d, d:%1.6f \tpin:%d, d:%1.6f\n",g.rc_1.control_in, roll_scale_d, g.rc_2.control_in, pitch_scale_d);
+    }
+
+	g.stabilize_d_schedule = 0
+	for (i = -4600; i < 4600; i+=10) {
+		new_radio_frame = true;
+		g.rc_1.control_in = i;
+		g.rc_2.control_in = i;
+		update_roll_pitch_mode();
+    	Serial.printf("rin:%d, d:%1.6f \tpin:%d, d:%1.6f\n",g.rc_1.control_in, roll_scale_d, g.rc_2.control_in, pitch_scale_d);
+    }
+
+}*/
 
 /*
 //static int8_t
@@ -731,58 +766,77 @@ test_tuning(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_battery(uint8_t argc, const Menu::arg *argv)
 {
-	print_hit_enter();
-	//delta_ms_medium_loop = 100;
-
-	while(1){
-		delay(100);
-		read_radio();
-		read_battery();
-		if (g.battery_monitoring == 3){
-			Serial.printf_P(PSTR("V: %4.4f\n"),
-								battery_voltage1,
-								current_amps1,
-								current_total1);
-		} else {
-			Serial.printf_P(PSTR("V: %4.4f, A: %4.4f, Ah: %4.4f\n"),
-								battery_voltage1,
-								current_amps1,
-								current_total1);
+	#if defined( __AVR_ATmega1280__ )  // disable this test if we are using 1280
+		print_test_disabled();
+		return (0);
+	#else
+		Serial.printf_P(PSTR("\nCareful! Motors will spin! Press Enter to start.\n"));
+		Serial.flush();
+		while(!Serial.available()){
+			delay(100);
 		}
-		APM_RC.OutputCh(MOT_1, g.rc_3.radio_in);
-		APM_RC.OutputCh(MOT_2, g.rc_3.radio_in);
-		APM_RC.OutputCh(MOT_3, g.rc_3.radio_in);
-		APM_RC.OutputCh(MOT_4, g.rc_3.radio_in);
+		Serial.flush();
+		print_hit_enter();
 
-		if(Serial.available() > 0){
-			return (0);
+		// allow motors to spin
+		motors.enable();
+		motors.armed(true);
+
+		while(1){
+			delay(100);
+			read_radio();
+			read_battery();
+			if (g.battery_monitoring == 3){
+				Serial.printf_P(PSTR("V: %4.4f\n"),
+									battery_voltage1,
+									current_amps1,
+									current_total1);
+			} else {
+				Serial.printf_P(PSTR("V: %4.4f, A: %4.4f, Ah: %4.4f\n"),
+									battery_voltage1,
+									current_amps1,
+									current_total1);
+			}
+			motors.throttle_pass_through();
+
+			if(Serial.available() > 0){
+				motors.armed(false);
+				return (0);
+			}
 		}
-	}
-	return (0);
+		motors.armed(false);
+		return (0);
+	#endif
 }
-
 
 static int8_t test_relay(uint8_t argc, const Menu::arg *argv)
 {
-	print_hit_enter();
-	delay(1000);
+	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
+		print_test_disabled();
+		return (0);
+	#else
 
-	while(1){
-		Serial.printf_P(PSTR("Relay on\n"));
-		relay.on();
-		delay(3000);
-		if(Serial.available() > 0){
-			return (0);
-		}
+		print_hit_enter();
+		delay(1000);
 
-		Serial.printf_P(PSTR("Relay off\n"));
-		relay.off();
-		delay(3000);
-		if(Serial.available() > 0){
-			return (0);
+		while(1){
+			Serial.printf_P(PSTR("Relay on\n"));
+			relay.on();
+			delay(3000);
+			if(Serial.available() > 0){
+				return (0);
+			}
+
+			Serial.printf_P(PSTR("Relay off\n"));
+			relay.off();
+			delay(3000);
+			if(Serial.available() > 0){
+				return (0);
+			}
 		}
-	}
+	#endif
 }
+
 
 static int8_t
 test_wp(uint8_t argc, const Menu::arg *argv)
@@ -810,20 +864,20 @@ test_wp(uint8_t argc, const Menu::arg *argv)
 	/*
    print_hit_enter();
    delay(1000);
-    while(1){
-           if (Serial3.available()){
-                   digitalWrite(B_LED_PIN, LED_ON); // Blink Yellow LED if we are sending data to GPS
-                   Serial1.write(Serial3.read());
-                   digitalWrite(B_LED_PIN, LED_OFF);
-           }
-           if (Serial1.available()){
-                   digitalWrite(C_LED_PIN, LED_ON); // Blink Red LED if we are receiving data from GPS
-                   Serial3.write(Serial1.read());
-                   digitalWrite(C_LED_PIN, LED_OFF);
-           }
-           if(Serial.available() > 0){
-                   return (0);
-     }
+	while(1){
+		   if (Serial3.available()){
+				   digitalWrite(B_LED_PIN, LED_ON); // Blink Yellow LED if we are sending data to GPS
+				   Serial1.write(Serial3.read());
+				   digitalWrite(B_LED_PIN, LED_OFF);
+		   }
+		   if (Serial1.available()){
+				   digitalWrite(C_LED_PIN, LED_ON); // Blink Red LED if we are receiving data from GPS
+				   Serial3.write(Serial1.read());
+				   digitalWrite(C_LED_PIN, LED_OFF);
+		   }
+		   if(Serial.available() > 0){
+				   return (0);
+	 }
    }
    */
  //}
@@ -836,7 +890,7 @@ test_wp(uint8_t argc, const Menu::arg *argv)
 	Serial.printf_P(PSTR("Begin XBee X-CTU Range and RSSI Test:\n"));
 
 	while(1){
-  	    if (Serial3.available())
+  		if (Serial3.available())
    			Serial3.write(Serial3.read());
 
 		if(Serial.available() > 0){
@@ -850,30 +904,30 @@ test_wp(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_baro(uint8_t argc, const Menu::arg *argv)
 {
-	print_hit_enter();
-	init_barometer();
+	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
+		print_test_disabled();
+		return (0);
+	#else
+		print_hit_enter();
+		init_barometer();
 
-	while(1){
-		delay(100);
-		int32_t alt = read_barometer(); // calls barometer.read()
+		while(1){
+			delay(100);
+			int32_t alt = read_barometer(); // calls barometer.read()
 
-		#if defined( __AVR_ATmega1280__ )
-        Serial.printf_P(PSTR("alt: %ldcm\n"),alt);
-
-        #else
-        int32_t pres = barometer.get_pressure();
-        int16_t temp = barometer.get_temperature();
-        int32_t raw_pres = barometer.get_raw_pressure();
-        int32_t raw_temp = barometer.get_raw_temp();
-        Serial.printf_P(PSTR("alt: %ldcm, pres: %ldmbar, temp: %d/100degC,"
-                             " raw pres: %ld, raw temp: %ld\n"),
-                             alt, pres ,temp, raw_pres, raw_temp);
-        #endif
-		if(Serial.available() > 0){
-			return (0);
+			int32_t pres = barometer.get_pressure();
+			int16_t temp = barometer.get_temperature();
+			int32_t raw_pres = barometer.get_raw_pressure();
+			int32_t raw_temp = barometer.get_raw_temp();
+			Serial.printf_P(PSTR("alt: %ldcm, pres: %ldmbar, temp: %d/100degC,"
+								 " raw pres: %ld, raw temp: %ld\n"),
+								 alt, pres ,temp, raw_pres, raw_temp);
+			if(Serial.available() > 0){
+				return (0);
+			}
 		}
-	}
-	return 0;
+		return 0;
+	#endif
 }
 #endif
 
@@ -881,35 +935,38 @@ test_baro(uint8_t argc, const Menu::arg *argv)
 static int8_t
 test_mag(uint8_t argc, const Menu::arg *argv)
 {
-	if(g.compass_enabled) {
-		//Serial.printf_P(PSTR("MAG_ORIENTATION: %d\n"), MAG_ORIENTATION);
-
-		print_hit_enter();
-
-		while(1){
-			delay(100);
-			if (compass.read()) {
-                compass.calculate(dcm.get_dcm_matrix());
-                Vector3f maggy = compass.get_offsets();
-                Serial.printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d\n"),
-                                (wrap_360(ToDeg(compass.heading) * 100)) /100,
-                                compass.mag_x,
-                                compass.mag_y,
-                                compass.mag_z);
-            } else {
-                Serial.println_P(PSTR("not healthy"));
-            }
-
-			if(Serial.available() > 0){
-				return (0);
-			}
-		}
-	} else {
-		Serial.printf_P(PSTR("Compass: "));
-		print_enabled(false);
+	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
+		print_test_disabled();
 		return (0);
-	}
-	return (0);
+	#else
+		if(g.compass_enabled) {
+			print_hit_enter();
+
+			while(1){
+				delay(100);
+				if (compass.read()) {
+					compass.calculate(ahrs.get_dcm_matrix());
+					Vector3f maggy = compass.get_offsets();
+					Serial.printf_P(PSTR("Heading: %ld, XYZ: %d, %d, %d\n"),
+									(wrap_360(ToDeg(compass.heading) * 100)) /100,
+									compass.mag_x,
+									compass.mag_y,
+									compass.mag_z);
+				} else {
+					Serial.println_P(PSTR("not healthy"));
+				}
+
+				if(Serial.available() > 0){
+					return (0);
+				}
+			}
+		} else {
+			Serial.printf_P(PSTR("Compass: "));
+			print_enabled(false);
+			return (0);
+		}
+		return (0);
+	#endif
 }
 
 /*
@@ -1023,25 +1080,31 @@ test_optflow(uint8_t argc, const Menu::arg *argv)
 /*
   test the dataflash is working
  */
+
 static int8_t
 test_logging(uint8_t argc, const Menu::arg *argv)
 {
-	Serial.println_P(PSTR("Testing dataflash logging"));
-    if (!DataFlash.CardInserted()) {
-        Serial.println_P(PSTR("ERR: No dataflash inserted"));
-        return 0;
-    }
-    DataFlash.ReadManufacturerID();
-    Serial.printf_P(PSTR("Manufacturer: 0x%02x   Device: 0x%04x\n"),
-                    (unsigned)DataFlash.df_manufacturer,
-                    (unsigned)DataFlash.df_device);
-    Serial.printf_P(PSTR("NumPages: %u  PageSize: %u\n"),
-                    (unsigned)DataFlash.df_NumPages+1,
-                    (unsigned)DataFlash.df_PageSize);
-    DataFlash.StartRead(DataFlash.df_NumPages+1);
-    Serial.printf_P(PSTR("Format version: %lx  Expected format version: %lx\n"),
-                    (unsigned long)DataFlash.ReadLong(), (unsigned long)DF_LOGGING_FORMAT);
-    return 0;
+	#if defined( __AVR_ATmega1280__ )  // determines if optical flow code is included
+		print_test_disabled();
+		return (0);
+	#else
+		Serial.println_P(PSTR("Testing dataflash logging"));
+		if (!DataFlash.CardInserted()) {
+			Serial.println_P(PSTR("ERR: No dataflash inserted"));
+			return 0;
+		}
+		DataFlash.ReadManufacturerID();
+		Serial.printf_P(PSTR("Manufacturer: 0x%02x   Device: 0x%04x\n"),
+						(unsigned)DataFlash.df_manufacturer,
+						(unsigned)DataFlash.df_device);
+		Serial.printf_P(PSTR("NumPages: %u  PageSize: %u\n"),
+						(unsigned)DataFlash.df_NumPages+1,
+						(unsigned)DataFlash.df_PageSize);
+		DataFlash.StartRead(DataFlash.df_NumPages+1);
+		Serial.printf_P(PSTR("Format version: %lx  Expected format version: %lx\n"),
+						(unsigned long)DataFlash.ReadLong(), (unsigned long)DF_LOGGING_FORMAT);
+		return 0;
+	#endif
 }
 
 
@@ -1061,11 +1124,11 @@ static int8_t
 //}
 
 	// clear home
-	{Location t = {0,   	0,      0, 		0, 		0, 			0};
+	{Location t = {0,   	0,	  0, 		0, 		0, 			0};
 	set_cmd_with_index(t,0);}
 
 	// CMD										opt						pitch   	alt/cm
-	{Location t = {MAV_CMD_NAV_TAKEOFF,   		WP_OPTION_RELATIVE,      0, 		100, 		0, 			0};
+	{Location t = {MAV_CMD_NAV_TAKEOFF,   		WP_OPTION_RELATIVE,	  0, 		100, 		0, 			0};
 	set_cmd_with_index(t,1);}
 
 	if (!strcmp_P(argv[1].str, PSTR("wp"))) {
@@ -1074,25 +1137,25 @@ static int8_t
 		{Location t = {MAV_CMD_NAV_WAYPOINT,  			WP_OPTION_RELATIVE,		15, 0, 0, 0};
 		set_cmd_with_index(t,2);}
 		// CMD											opt
-		{Location t = {MAV_CMD_NAV_RETURN_TO_LAUNCH,   	WP_OPTION_YAW,      0, 		0, 		0,		0};
+		{Location t = {MAV_CMD_NAV_RETURN_TO_LAUNCH,   	WP_OPTION_YAW,	  0, 		0, 		0,		0};
 		set_cmd_with_index(t,3);}
 
 		// CMD											opt
-		{Location t = {MAV_CMD_NAV_LAND,				0,      0, 		0, 		0,		0};
+		{Location t = {MAV_CMD_NAV_LAND,				0,	  0, 		0, 		0,		0};
 		set_cmd_with_index(t,4);}
 
 	} else {
 		//2250 = 25 meteres
 		// CMD										opt		p1		//alt		//NS		//WE
-		{Location t = {MAV_CMD_NAV_LOITER_TIME,   	0,      10,  	0, 			0,			0}; // 19
+		{Location t = {MAV_CMD_NAV_LOITER_TIME,   	0,	  10,  	0, 			0,			0}; // 19
 		set_cmd_with_index(t,2);}
 
 		// CMD										opt		dir		angle/deg	deg/s	relative
-		{Location t = {MAV_CMD_CONDITION_YAW,		0,      1, 		360, 		60, 	1};
+		{Location t = {MAV_CMD_CONDITION_YAW,		0,	  1, 		360, 		60, 	1};
 		set_cmd_with_index(t,3);}
 
 		// CMD										opt
-		{Location t = {MAV_CMD_NAV_LAND,			0,      0, 		0, 			0, 		0};
+		{Location t = {MAV_CMD_NAV_LAND,			0,	  0, 		0, 			0, 		0};
 		set_cmd_with_index(t,4);}
 
 	}

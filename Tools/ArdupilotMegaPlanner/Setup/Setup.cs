@@ -48,14 +48,39 @@ namespace ArdupilotMega.Setup
 
         void timer_Tick(object sender, EventArgs e)
         {
-            MainV2.cs.UpdateCurrentSettings(currentStateBindingSource);
+            try
+            {
+                MainV2.cs.UpdateCurrentSettings(currentStateBindingSource);
+            }
+            catch { }
 
             float pwm = 0;
 
             if (MainV2.cs.firmware == MainV2.Firmwares.ArduPlane) // APM 
             {
-                pwm = MainV2.cs.ch8in;
-                LBL_flightmodepwm.Text = "8: " + MainV2.cs.ch8in.ToString();
+                if (MainV2.comPort.param.ContainsKey("FLTMODE_CH"))
+                {
+                    switch ((int)(float)MainV2.comPort.param["FLTMODE_CH"])
+                    {
+                        case 5:
+                            pwm = MainV2.cs.ch5in;
+                            break;
+                        case 6:
+                            pwm = MainV2.cs.ch6in;
+                            break;
+                        case 7:
+                            pwm = MainV2.cs.ch7in;
+                            break;
+                        case 8:
+                            pwm = MainV2.cs.ch8in;
+                            break;
+                        default:
+
+                            break;
+                    }
+                    
+                    LBL_flightmodepwm.Text = MainV2.comPort.param["FLTMODE_CH"].ToString() + ": " + pwm.ToString();
+                }
             }
 
             if (MainV2.cs.firmware == MainV2.Firmwares.ArduCopter2) // ac2
@@ -75,7 +100,7 @@ namespace ArdupilotMega.Setup
 
             fmodelist[no].BackColor = Color.Green;
 
-            if (tabControl1.SelectedTab == tabHeli)
+            if (Tabs.SelectedTab == tabHeli)
             {
                 if (MainV2.comPort.param["HSV_MAN"] == null || MainV2.comPort.param["HSV_MAN"].ToString() == "0")
                     return;
@@ -101,8 +126,8 @@ namespace ArdupilotMega.Setup
                 {
                     try
                     {
-                        HS3.minline = int.Parse(COL_MIN_.Text);
-                        HS3.maxline = int.Parse(COL_MAX_.Text);
+                        HS3.minline = int.Parse(COL_MIN.Text);
+                        HS3.maxline = int.Parse(COL_MAX.Text);
                         HS4.maxline = int.Parse(HS4_MIN.Text);
                         HS4.minline = int.Parse(HS4_MAX.Text);
                     }
@@ -134,7 +159,7 @@ namespace ArdupilotMega.Setup
                 return;
             }
 
-            MessageBox.Show("Ensure your transmitter is on and receiver is powered and connected\nEnsure your motor does not have power/no props!!!");
+            CustomMessageBox.Show("Ensure your transmitter is on and receiver is powered and connected\nEnsure your motor does not have power/no props!!!");
 
             byte oldrc = MainV2.cs.raterc;
             byte oldatt = MainV2.cs.rateattitude;
@@ -146,7 +171,13 @@ namespace ArdupilotMega.Setup
             MainV2.cs.rateposition = 0;
             MainV2.cs.ratestatus = 0;
 
-            MainV2.comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS, 10);
+            try
+            {
+
+                MainV2.comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS, 10);
+
+            }
+            catch {  }
 
             BUT_Calibrateradio.Text = "Click when Done";
 
@@ -214,7 +245,7 @@ namespace ArdupilotMega.Setup
                 }
             }
 
-            MessageBox.Show("Ensure all your sticks are centered, and click ok to continue");
+            CustomMessageBox.Show("Ensure all your sticks are centered and throttle is down, and click ok to continue");
 
             MainV2.cs.UpdateCurrentSettings(currentStateBindingSource, true, MainV2.comPort);
 
@@ -243,7 +274,7 @@ namespace ArdupilotMega.Setup
                     if (rctrim[a] < 1195 || rctrim[a] > 1205)
                         MainV2.comPort.setParam("RC" + (a + 1).ToString("0") + "_TRIM", rctrim[a]);
                 }
-                catch { MessageBox.Show("Failed to set Channel " + (a + 1).ToString()); }
+                catch { CustomMessageBox.Show("Failed to set Channel " + (a + 1).ToString()); }
 
                 data = data + "CH" + (a + 1) + " " + rcmin[a] + " | " + rcmax[a] + "\n";
             }
@@ -253,7 +284,13 @@ namespace ArdupilotMega.Setup
             MainV2.cs.rateposition = oldpos;
             MainV2.cs.ratestatus = oldstatus;
 
-            MainV2.comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS, oldrc);
+            try
+            {
+
+                MainV2.comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS, oldrc);
+
+            }
+            catch { }
 
             if (Configuration != null)
             {
@@ -262,7 +299,7 @@ namespace ArdupilotMega.Setup
                 Configuration.startup = false;
             }
 
-            MessageBox.Show("Here are the detected radio options\nNOTE Channels not connected are displayed as 1500 +-2\nNormal values are around 1100 | 1900\nChannel:Min | Max \n" + data, "Radio");
+            CustomMessageBox.Show("Here are the detected radio options\nNOTE Channels not connected are displayed as 1500 +-2\nNormal values are around 1100 | 1900\nChannel:Min | Max \n" + data, "Radio");
 
             BUT_Calibrateradio.Text = "Please goto the next tab";
         }
@@ -272,7 +309,10 @@ namespace ArdupilotMega.Setup
 
         private void tabControl1_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (tabControl1.SelectedTab == tabRadioIn)
+            int monosux = 0;
+            monosux *= 5;
+
+            if (Tabs.SelectedTab == tabRadioIn)
             {
                 startup = true;
 
@@ -296,11 +336,11 @@ namespace ArdupilotMega.Setup
                     CHK_revch3.Checked = MainV2.comPort.param["RC3_REV"].ToString() == "-1";
                     CHK_revch4.Checked = MainV2.comPort.param["RC4_REV"].ToString() == "-1";
                 }
-                catch (Exception ex) { MessageBox.Show("Missing RC rev Param "+ex.ToString()); }
+                catch (Exception ex) { CustomMessageBox.Show("Missing RC rev Param "+ex.ToString()); }
                 startup = false;
             }
 
-            if (tabControl1.SelectedTab == tabModes)
+            if (Tabs.SelectedTab == tabModes)
             {
                 if (MainV2.cs.firmware == MainV2.Firmwares.ArduPlane) // APM
                 {
@@ -376,7 +416,7 @@ namespace ArdupilotMega.Setup
                 }
             }
 
-            if (tabControl1.SelectedTab == tabHardware)
+            if (Tabs.SelectedTab == tabHardware)
             {
                 startup = true;
 
@@ -402,18 +442,37 @@ namespace ArdupilotMega.Setup
                 startup = false;
             }
 
-            if (tabControl1.SelectedTab == tabBattery)
+            if (Tabs.SelectedTab == tabBattery)
             {
                 startup = true;
                 bool not_supported = false;
                 if (MainV2.comPort.param["BATT_MONITOR"] != null)
                 {
-                    if (MainV2.comPort.param["BATT_MONITOR"].ToString() != "0")
+                    if (MainV2.comPort.param["BATT_MONITOR"].ToString() != "0.0")
                     {
-                        CMB_batmontype.SelectedIndex = (int)float.Parse(MainV2.comPort.param["BATT_MONITOR"].ToString());
+                        CMB_batmontype.SelectedIndex = getIndex(CMB_batmontype,(int)float.Parse(MainV2.comPort.param["BATT_MONITOR"].ToString()));
                     }
-                }
 
+                    // ignore language re . vs ,
+
+                    if (TXT_ampspervolt.Text == (13.6612).ToString())
+                    {
+                        CMB_batmonsensortype.SelectedIndex = 1;
+                    }
+                    else if (TXT_ampspervolt.Text == (27.3224).ToString())
+                    {
+                        CMB_batmonsensortype.SelectedIndex = 2;
+                    }
+                    else if (TXT_ampspervolt.Text == (54.64481).ToString())
+                    {
+                        CMB_batmonsensortype.SelectedIndex = 3;
+                    }
+                    else
+                    {
+                        CMB_batmonsensortype.SelectedIndex = 0;
+                    }
+                    
+                }
 
                 if (MainV2.comPort.param["BATT_CAPACITY"] != null)
                     TXT_battcapacity.Text = MainV2.comPort.param["BATT_CAPACITY"].ToString();
@@ -442,7 +501,7 @@ namespace ArdupilotMega.Setup
                 startup = false;
             }
 
-            if (tabControl1.SelectedTab == tabArducopter)
+            if (Tabs.SelectedTab == tabArducopter)
             {
                 if (MainV2.cs.firmware == MainV2.Firmwares.ArduPlane)
                 {
@@ -451,9 +510,9 @@ namespace ArdupilotMega.Setup
                 }
             }
 
-            if (tabControl1.SelectedTab == tabHeli)
+            if (Tabs.SelectedTab == tabHeli)
             {
-                if (MainV2.comPort.param["GYR_ENABLE_"] == null)
+                if (MainV2.comPort.param["GYR_ENABLE"] == null)
                 {
                     tabHeli.Enabled = false;
                     return;
@@ -461,6 +520,12 @@ namespace ArdupilotMega.Setup
                 startup = true;
                 try
                 {
+                    if (MainV2.comPort.param.ContainsKey("H1_ENABLE"))
+                    {
+                        CCPM.Checked = MainV2.comPort.param["H1_ENABLE"].ToString() == "0" ? true : false;
+                        H1_ENABLE.Checked = !CCPM.Checked;
+                    }
+
                     foreach (string value in MainV2.comPort.param.Keys)
                     {
                         if (value == "")
@@ -472,6 +537,12 @@ namespace ArdupilotMega.Setup
                             if (control[0].GetType() == typeof(TextBox))
                             {
                                 TextBox temp = (TextBox)control[0];
+                                string option = MainV2.comPort.param[value].ToString();
+                                temp.Text = option;
+                            }
+                            if (control[0].GetType() == typeof(NumericUpDown))
+                            {
+                                NumericUpDown temp = (NumericUpDown)control[0];
                                 string option = MainV2.comPort.param[value].ToString();
                                 temp.Text = option;
                             }
@@ -501,6 +572,19 @@ namespace ArdupilotMega.Setup
             }
         }
 
+        int getIndex(ComboBox ctl, int no)
+        {
+            foreach (var item in ctl.Items)
+            {
+                int ans = int.Parse(item.ToString().Substring(0, 1));
+
+                if (ans == no)
+                    return ctl.Items.IndexOf(item);
+            }
+
+            return -1;
+        }        
+
         private void BUT_SaveModes_Click(object sender, EventArgs e)
         {
             try
@@ -523,14 +607,26 @@ namespace ArdupilotMega.Setup
                     MainV2.comPort.setParam("FLTMODE5", (float)(int)Enum.Parse(typeof(Common.ac2modes), CMB_fmode5.Text));
                     MainV2.comPort.setParam("FLTMODE6", (float)(int)Enum.Parse(typeof(Common.ac2modes), CMB_fmode6.Text));
 
-                    float value = (float)(CB_simple1.Checked ? 1 : 0) + (CB_simple2.Checked ? 1 << 1 : 0) + (CB_simple3.Checked ? 1 << 2 : 0)
-                        + (CB_simple4.Checked ? 1 << 3 : 0) + (CB_simple5.Checked ? 1 << 4 : 0) + (CB_simple6.Checked ? 1 << 5 : 0);
+                    float value = (float)(CB_simple1.Checked ? (int)SimpleMode.Simple1 : 0) + (CB_simple2.Checked ? (int)SimpleMode.Simple2 : 0) + (CB_simple3.Checked ? (int)SimpleMode.Simple3 : 0)
+                        + (CB_simple4.Checked ? (int)SimpleMode.Simple4 : 0) + (CB_simple5.Checked ? (int)SimpleMode.Simple5 : 0) + (CB_simple6.Checked ? (int)SimpleMode.Simple6 : 0);
                     if (MainV2.comPort.param.ContainsKey("SIMPLE"))
                         MainV2.comPort.setParam("SIMPLE", value);
                 }
             }
-            catch { MessageBox.Show("Failed to set Flight modes"); }
+            catch { CustomMessageBox.Show("Failed to set Flight modes"); }
             BUT_SaveModes.Text = "Complete";
+        }
+
+        [Flags]
+        public enum SimpleMode
+        {
+            None = 0,
+            Simple1 = 1,
+            Simple2 = 2,
+            Simple3 = 4,
+            Simple4 = 8,
+            Simple5 = 16,
+            Simple6 = 32,
         }
 
         private void TXT_declination_Validating(object sender, CancelEventArgs e)
@@ -547,7 +643,7 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["COMPASS_DEC"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
@@ -567,14 +663,14 @@ namespace ArdupilotMega.Setup
                             dec -= ((mins) / 60.0f);
                         }
                     }
-                    catch { MessageBox.Show("Invalid input!"); return; }
+                    catch { CustomMessageBox.Show("Invalid input!"); return; }
 
                     TXT_declination.Text = dec.ToString();
 
                     MainV2.comPort.setParam("COMPASS_DEC", dec * deg2rad);
                 }
             }
-            catch { MessageBox.Show("Set COMPASS_DEC Failed"); }
+            catch { CustomMessageBox.Show("Set COMPASS_DEC Failed"); }
         }
 
 
@@ -586,14 +682,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["MAG_ENABLE"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("MAG_ENABLE", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set MAG_ENABLE Failed"); }
+            catch { CustomMessageBox.Show("Set MAG_ENABLE Failed"); }
         }
 
         //((CheckBox)sender).Checked = !((CheckBox)sender).Checked;
@@ -607,14 +703,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["SONAR_ENABLE"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("SONAR_ENABLE", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set SONAR_ENABLE Failed"); }
+            catch { CustomMessageBox.Show("Set SONAR_ENABLE Failed"); }
         }
 
         private void CHK_enableairspeed_CheckedChanged(object sender, EventArgs e)
@@ -625,14 +721,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["ARSPD_ENABLE"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("ARSPD_ENABLE", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set ARSPD_ENABLE Failed"); }
+            catch { CustomMessageBox.Show("Set ARSPD_ENABLE Failed"); }
         }
         private void CHK_enablebattmon_CheckedChanged(object sender, EventArgs e)
         {
@@ -650,12 +746,12 @@ namespace ArdupilotMega.Setup
                         CMB_batmontype.SelectedIndex = 1;
                 }
             }
-            catch { MessageBox.Show("Set BATT_MONITOR Failed"); }
+            catch { CustomMessageBox.Show("Set BATT_MONITOR Failed"); }
         }
         private void TXT_battcapacity_Validating(object sender, CancelEventArgs e)
         {
             float ans = 0;
-            e.Cancel = !float.TryParse(TXT_declination.Text, out ans);
+            e.Cancel = !float.TryParse(TXT_battcapacity.Text, out ans);
         }
         private void TXT_battcapacity_Validated(object sender, EventArgs e)
         {
@@ -665,14 +761,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["BATT_CAPACITY"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("BATT_CAPACITY", float.Parse(TXT_battcapacity.Text));
                 }
             }
-            catch { MessageBox.Show("Set BATT_CAPACITY Failed"); }
+            catch { CustomMessageBox.Show("Set BATT_CAPACITY Failed"); }
         }
         private void CMB_batmontype_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -682,14 +778,41 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["BATT_MONITOR"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
-                    MainV2.comPort.setParam("BATT_MONITOR", CMB_batmontype.SelectedIndex);
+                    int selection = int.Parse(CMB_batmontype.Text.Substring(0,1));
+
+                    CMB_batmonsensortype.Enabled = true;
+
+                    TXT_voltage.Enabled = false;
+
+                    if (selection == 0)
+                    {
+                        CMB_batmonsensortype.Enabled = false;
+                        groupBox4.Enabled = false;
+                    }
+                    else if (selection == 4)
+                    {
+                        CMB_batmonsensortype.Enabled = true;
+                        groupBox4.Enabled = true;
+                        TXT_ampspervolt.Enabled = true;
+                    }
+                    else if (selection == 3)
+                    {
+                        groupBox4.Enabled = true;
+                        CMB_batmonsensortype.Enabled = false;
+                        TXT_ampspervolt.Enabled = false;
+                        TXT_inputvoltage.Enabled = true;
+                        TXT_measuredvoltage.Enabled = true;
+                        TXT_divider.Enabled = true;
+                    }
+
+                    MainV2.comPort.setParam("BATT_MONITOR", selection);
                 }
             }
-            catch { MessageBox.Show("Set BATT_MONITOR Failed"); }
+            catch { CustomMessageBox.Show("Set BATT_MONITOR Failed"); }
         }
         private void TXT_inputvoltage_Validating(object sender, CancelEventArgs e)
         {
@@ -704,14 +827,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["INPUT_VOLTS"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("INPUT_VOLTS", float.Parse(TXT_inputvoltage.Text));
                 }
             }
-            catch { MessageBox.Show("Set INPUT_VOLTS Failed"); }
+            catch { CustomMessageBox.Show("Set INPUT_VOLTS Failed"); }
         }
         private void TXT_measuredvoltage_Validating(object sender, CancelEventArgs e)
         {
@@ -722,25 +845,30 @@ namespace ArdupilotMega.Setup
         {
             if (startup || ((TextBox)sender).Enabled == false)
                 return;
-            float measuredvoltage = float.Parse(TXT_measuredvoltage.Text);
-            float voltage = float.Parse(TXT_voltage.Text);
-            float divider = float.Parse(TXT_divider.Text);
-            if (voltage == 0)
-                return;
-            float new_divider = (measuredvoltage * divider) / voltage;
-            TXT_divider.Text = new_divider.ToString();
+            try
+            {
+                float measuredvoltage = float.Parse(TXT_measuredvoltage.Text);
+                float voltage = float.Parse(TXT_voltage.Text);
+                float divider = float.Parse(TXT_divider.Text);
+                if (voltage == 0)
+                    return;
+                float new_divider = (measuredvoltage * divider) / voltage;
+                TXT_divider.Text = new_divider.ToString();
+            }
+            catch { CustomMessageBox.Show("Invalid number entered"); return; }
+
             try
             {
                 if (MainV2.comPort.param["VOLT_DIVIDER"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("VOLT_DIVIDER", float.Parse(TXT_divider.Text));
                 }
             }
-            catch { MessageBox.Show("Set VOLT_DIVIDER Failed"); }
+            catch { CustomMessageBox.Show("Set VOLT_DIVIDER Failed"); }
         }
         private void TXT_divider_Validating(object sender, CancelEventArgs e)
         {
@@ -755,14 +883,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["VOLT_DIVIDER"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("VOLT_DIVIDER", float.Parse(TXT_divider.Text));
                 }
             }
-            catch { MessageBox.Show("Set VOLT_DIVIDER Failed"); }
+            catch { CustomMessageBox.Show("Set VOLT_DIVIDER Failed"); }
         }
         private void TXT_ampspervolt_Validating(object sender, CancelEventArgs e)
         {
@@ -777,14 +905,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["AMP_PER_VOLT"] == null)
                 {
-                    MessageBox.Show("Not Available");
+                    CustomMessageBox.Show("Not Available");
                 }
                 else
                 {
                     MainV2.comPort.setParam("AMP_PER_VOLT", float.Parse(TXT_ampspervolt.Text));
                 }
             }
-            catch { MessageBox.Show("Set AMP_PER_VOLT Failed"); }
+            catch { CustomMessageBox.Show("Set AMP_PER_VOLT Failed"); }
         }
 
         private void BUT_reset_Click(object sender, EventArgs e)
@@ -793,9 +921,9 @@ namespace ArdupilotMega.Setup
             {
                 MainV2.comPort.setParam("SYSID_SW_MREV", UInt16.MaxValue);
             }
-            catch { MessageBox.Show("Set SYSID_SW_MREV Failed"); return; }
+            catch { CustomMessageBox.Show("Set SYSID_SW_MREV Failed"); return; }
 
-            MainV2.givecomport = true;
+            MainV2.giveComport = true;
 
             ICommsSerial comPortT = MainV2.comPort.BaseStream;
 
@@ -811,7 +939,7 @@ namespace ArdupilotMega.Setup
                 comPortT.DtrEnable = true;
                 comPortT.Open();
             }
-            catch (Exception ex) { MainV2.givecomport = false; MessageBox.Show("Invalid Comport Settings : " + ex.Message); return; }
+            catch (Exception ex) { MainV2.giveComport = false; CustomMessageBox.Show("Invalid Comport Settings : " + ex.Message); return; }
 
             BUT_reset.Text = "Rebooting (17 sec)";
             BUT_reset.Refresh();
@@ -831,14 +959,14 @@ namespace ArdupilotMega.Setup
 
             comPortT.Close();
 
-            MainV2.givecomport = false;
+            MainV2.giveComport = false;
             try
             {
                 MainV2.comPort.Open(true);
             }
             catch
             {
-                MessageBox.Show("Failed to re-connect : Please try again");
+                CustomMessageBox.Show("Failed to re-connect : Please try again");
                 this.Close();
             }
 
@@ -865,9 +993,9 @@ namespace ArdupilotMega.Setup
             try
             {
                 MainV2.comPort.setParam("FRAME", 0f);
-                MessageBox.Show("Set to +");
+                CustomMessageBox.Show("Set to +");
             }
-            catch { MessageBox.Show("Set frame failed"); }
+            catch { CustomMessageBox.Show("Set frame failed"); }
         }
 
         private void pictureBoxQuadX_Click(object sender, EventArgs e)
@@ -875,17 +1003,21 @@ namespace ArdupilotMega.Setup
             try
             {
                 MainV2.comPort.setParam("FRAME", 1f);
-                MessageBox.Show("Set to x");
+                CustomMessageBox.Show("Set to x");
             }
-            catch { MessageBox.Show("Set frame failed"); }
+            catch { CustomMessageBox.Show("Set frame failed"); }
         }
 
         private void Setup_Load(object sender, EventArgs e)
         {
             if (!MainV2.comPort.BaseStream.IsOpen)
             {
-                MessageBox.Show("Please Connect First");
+                CustomMessageBox.Show("Please Connect First");
                 this.Close();
+            }
+            else
+            {
+                tabControl1_SelectedIndexChanged(null, new EventArgs());
             }
         }
 
@@ -909,7 +1041,7 @@ namespace ArdupilotMega.Setup
                 MainV2.comPort.setParam("HSV_MAN", 0); // randy request - last
 
             }
-            catch { MessageBox.Show("Set " + ((TextBox)sender).Name + " failed"); }
+            catch { CustomMessageBox.Show("Set " + ((TextBox)sender).Name + " failed"); }
         }
 
         private void TXT_srvpos2_Validating(object sender, CancelEventArgs e)
@@ -931,7 +1063,7 @@ namespace ArdupilotMega.Setup
                 System.Threading.Thread.Sleep(100);
                 MainV2.comPort.setParam("HSV_MAN", 0); // randy request - last
             }
-            catch { MessageBox.Show("Set " + ((TextBox)sender).Name + " failed"); }
+            catch { CustomMessageBox.Show("Set " + ((TextBox)sender).Name + " failed"); }
         }
 
         private void TXT_srvpos3_Validating(object sender, CancelEventArgs e)
@@ -953,21 +1085,21 @@ namespace ArdupilotMega.Setup
                 System.Threading.Thread.Sleep(100);
                 MainV2.comPort.setParam("HSV_MAN", 0); // randy request - last
             }
-            catch { MessageBox.Show("Set " + ((TextBox)sender).Name + " failed"); }
+            catch { CustomMessageBox.Show("Set " + ((TextBox)sender).Name + " failed"); }
         }
 
         private void BUT_0collective_Click(object sender, EventArgs e)
         {
-            MessageBox.Show("Make sure your blades are at 0 degrees");
+            CustomMessageBox.Show("Make sure your blades are at 0 degrees");
 
             try
             {
 
-                MainV2.comPort.setParam("COL_MID_", MainV2.cs.ch3in);
+                MainV2.comPort.setParam("COL_MID", MainV2.cs.ch3in);
 
-                COL_MID_.Text = MainV2.comPort.param["COL_MID_"].ToString();
+                COL_MID.Text = MainV2.comPort.param["COL_MID"].ToString();
             }
-            catch { MessageBox.Show("Set COL_MID_ failed"); }
+            catch { CustomMessageBox.Show("Set COL_MID_ failed"); }
         }
 
         private void HS1_REV_CheckedChanged(object sender, EventArgs e)
@@ -1067,7 +1199,7 @@ namespace ArdupilotMega.Setup
             {
                 MainV2.comPort.setParam(((TextBox)sender).Name, test);
             }
-            catch { MessageBox.Show("Failed to set Gyro Gain"); }
+            catch { CustomMessageBox.Show("Failed to set Gyro Gain"); }
         }
 
         private void GYR_ENABLE__CheckedChanged(object sender, EventArgs e)
@@ -1092,7 +1224,7 @@ namespace ArdupilotMega.Setup
             }
             catch
             {
-                MessageBox.Show("Failed to level : ac2 2.0.37+ is required");
+                CustomMessageBox.Show("Failed to level : ac2 2.0.37+ is required");
             }
         }
 
@@ -1103,7 +1235,7 @@ namespace ArdupilotMega.Setup
                 //System.Diagnostics.Process.Start("http://www.ngdc.noaa.gov/geomagmodels/Declination.jsp");
                 System.Diagnostics.Process.Start("http://www.magnetic-declination.com/");
             }
-            catch { MessageBox.Show("Webpage open failed... do you have a virus?\nhttp://www.magnetic-declination.com/"); }
+            catch { CustomMessageBox.Show("Webpage open failed... do you have a virus?\nhttp://www.magnetic-declination.com/"); }
         }
 
         void reverseChannel(string name, bool normalreverse, Control progressbar)
@@ -1128,16 +1260,16 @@ namespace ArdupilotMega.Setup
                 try
                 {
                     MainV2.comPort.setParam("SWITCH_ENABLE", 0);
-                    MessageBox.Show("Disabled Dip Switchs");
+                    CustomMessageBox.Show("Disabled Dip Switchs");
                 }
-                catch { MessageBox.Show("Error Disableing Dip Switch"); }
+                catch { CustomMessageBox.Show("Error Disableing Dip Switch"); }
             }
             try
             {
                 int i = normalreverse == false ? 1 : -1;
                 MainV2.comPort.setParam(name, i);
             }
-            catch { MessageBox.Show("Error Reversing"); }
+            catch { CustomMessageBox.Show("Error Reversing"); }
         }
 
         private void CHK_revch1_CheckedChanged(object sender, EventArgs e)
@@ -1166,20 +1298,30 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["HSV_MAN"].ToString() == "1")
                 {
-                    MainV2.comPort.setParam("COL_MIN_", int.Parse(COL_MIN_.Text));
-                    MainV2.comPort.setParam("COL_MAX_", int.Parse(COL_MAX_.Text));
+                    MainV2.comPort.setParam("COL_MIN", int.Parse(COL_MIN.Text));
+                    MainV2.comPort.setParam("COL_MAX", int.Parse(COL_MAX.Text));
                     MainV2.comPort.setParam("HSV_MAN", 0); // randy request - last
                     BUT_swash_manual.Text = "Manual";
+
+                    COL_MAX.Enabled = false;
+                    COL_MID.Enabled = false;
+                    COL_MIN.Enabled = false;
+                    BUT_0collective.Enabled = false;
                 }
                 else
                 {
-                    COL_MAX_.Text = "1500";
-                    COL_MIN_.Text = "1500";
+                    COL_MAX.Text = "1500";
+                    COL_MIN.Text = "1500";
                     MainV2.comPort.setParam("HSV_MAN", 1); // randy request
                     BUT_swash_manual.Text = "Save";
+
+                    COL_MAX.Enabled = true;
+                    COL_MID.Enabled = true;
+                    COL_MIN.Enabled = true;
+                    BUT_0collective.Enabled = true;
                 }
             }
-            catch { MessageBox.Show("Failed to set HSV_MAN"); }
+            catch { CustomMessageBox.Show("Failed to set HSV_MAN"); }
         }
 
         private void BUT_HS4save_Click(object sender, EventArgs e)
@@ -1192,6 +1334,9 @@ namespace ArdupilotMega.Setup
                     MainV2.comPort.setParam("HS4_MAX", int.Parse(HS4_MAX.Text));
                     MainV2.comPort.setParam("HSV_MAN", 0); // randy request - last
                     BUT_HS4save.Text = "Manual";
+
+                    HS4_MAX.Enabled = false;
+                    HS4_MIN.Enabled = false;
                 }
                 else
                 {
@@ -1199,9 +1344,13 @@ namespace ArdupilotMega.Setup
                     HS4_MAX.Text = "1500";
                     MainV2.comPort.setParam("HSV_MAN", 1); // randy request
                     BUT_HS4save.Text = "Save";
+
+
+                    HS4_MAX.Enabled = true;
+                    HS4_MIN.Enabled = true;
                 }
             }
-            catch { MessageBox.Show("Failed to set HSV_MAN"); }
+            catch { CustomMessageBox.Show("Failed to set HSV_MAN"); }
         }
 
         private void tabHeli_Click(object sender, EventArgs e)
@@ -1225,10 +1374,10 @@ namespace ArdupilotMega.Setup
         {
             try
             {
-                if (int.Parse(COL_MIN_.Text) > HS3.minline)
-                    COL_MIN_.Text = HS3.minline.ToString();
-                if (int.Parse(COL_MAX_.Text) < HS3.maxline)
-                    COL_MAX_.Text = HS3.maxline.ToString();
+                if (int.Parse(COL_MIN.Text) > HS3.minline)
+                    COL_MIN.Text = HS3.minline.ToString();
+                if (int.Parse(COL_MAX.Text) < HS3.maxline)
+                    COL_MAX.Text = HS3.maxline.ToString();
             }
             catch { }
         }
@@ -1287,6 +1436,11 @@ namespace ArdupilotMega.Setup
         {
             timer.Stop();
             timer.Dispose();
+
+            Tabs.SelectedIndex = 0;
+
+            // mono runs validation on all controls on exit. try and skip it
+            startup = true;
         }
 
         private void CHK_enableoptflow_CheckedChanged(object sender, EventArgs e)
@@ -1298,14 +1452,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["FLOW_ENABLE"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("FLOW_ENABLE", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set FLOW_ENABLE Failed"); }
+            catch { CustomMessageBox.Show("Set FLOW_ENABLE Failed"); }
         }
 
         private void CMB_sonartype_SelectedIndexChanged(object sender, EventArgs e)
@@ -1316,14 +1470,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["SONAR_TYPE"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("SONAR_TYPE", ((ComboBox)sender).SelectedIndex);
                 }
             }
-            catch { MessageBox.Show("Set SONAR_TYPE Failed"); }
+            catch { CustomMessageBox.Show("Set SONAR_TYPE Failed"); }
         }
 
         private void CHK_mixmode_CheckedChanged(object sender, EventArgs e)
@@ -1334,14 +1488,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["ELEVON_MIXING"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("ELEVON_MIXING", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set ELEVON_MIXING Failed"); }
+            catch { CustomMessageBox.Show("Set ELEVON_MIXING Failed"); }
         }
 
         private void CHK_elevonrev_CheckedChanged(object sender, EventArgs e)
@@ -1352,14 +1506,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["ELEVON_REVERSE"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("ELEVON_REVERSE", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set ELEVON_REVERSE Failed"); }
+            catch { CustomMessageBox.Show("Set ELEVON_REVERSE Failed"); }
         }
 
         private void CHK_elevonch1rev_CheckedChanged(object sender, EventArgs e)
@@ -1370,14 +1524,14 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["ELEVON_CH1_REV"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("ELEVON_CH1_REV", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set ELEVON_CH1_REV Failed"); }
+            catch { CustomMessageBox.Show("Set ELEVON_CH1_REV Failed"); }
         }
 
         private void CHK_elevonch2rev_CheckedChanged(object sender, EventArgs e)
@@ -1388,14 +1542,189 @@ namespace ArdupilotMega.Setup
             {
                 if (MainV2.comPort.param["ELEVON_CH2_REV"] == null)
                 {
-                    MessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
                 }
                 else
                 {
                     MainV2.comPort.setParam("ELEVON_CH2_REV", ((CheckBox)sender).Checked == true ? 1 : 0);
                 }
             }
-            catch { MessageBox.Show("Set ELEVON_CH2_REV Failed"); }
+            catch { CustomMessageBox.Show("Set ELEVON_CH2_REV Failed"); }
+        }
+
+        private void CMB_batmonsensortype_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            int selection = int.Parse(CMB_batmonsensortype.Text.Substring(0,1));
+
+
+            if (selection == 1) // atto 45
+            {
+                float maxvolt = 13.6f;
+                float maxamps = 44.7f;
+                float mvpervolt = 242.3f;
+                float mvperamp = 73.20f;
+
+                // ~ 3.295v
+                float topvolt = (maxvolt * mvpervolt) / 1000;
+                // ~ 3.294v
+                float topamps = (maxamps * mvperamp) / 1000;
+
+                TXT_divider.Text = (maxvolt / topvolt).ToString();
+                TXT_ampspervolt.Text = (maxamps / topamps).ToString();
+            }
+            else if (selection == 2) // atto 90
+            {
+                float maxvolt = 50f;
+                float maxamps = 89.4f;
+                float mvpervolt = 63.69f;
+                float mvperamp = 36.60f;
+
+                float topvolt = (maxvolt * mvpervolt) / 1000;
+                float topamps = (maxamps * mvperamp) / 1000;
+
+                TXT_divider.Text = (maxvolt / topvolt).ToString();
+                TXT_ampspervolt.Text = (maxamps / topamps).ToString();
+            }
+            else if (selection == 3) // atto 180
+            {
+                float maxvolt = 50f;
+                float maxamps = 178.8f;
+                float mvpervolt = 63.69f;
+                float mvperamp = 18.30f;
+
+                float topvolt = (maxvolt * mvpervolt) / 1000;
+                float topamps = (maxamps * mvperamp) / 1000;
+
+                TXT_divider.Text = (maxvolt / topvolt).ToString();
+                TXT_ampspervolt.Text = (maxamps / topamps).ToString();
+            }
+
+            // enable to update
+            TXT_divider.Enabled = true;
+            TXT_ampspervolt.Enabled = true;
+            TXT_measuredvoltage.Enabled = true;
+            TXT_inputvoltage.Enabled = true;
+
+            // update
+            TXT_ampspervolt_Validated(TXT_ampspervolt, null);
+
+            TXT_divider_Validated(TXT_divider, null);
+
+            // disable
+            TXT_divider.Enabled = false;
+            TXT_ampspervolt.Enabled = false;
+            TXT_measuredvoltage.Enabled = false;
+
+            //reenable if needed
+            if (selection == 0)
+            {
+                TXT_divider.Enabled = true;
+                TXT_ampspervolt.Enabled = true;
+                TXT_measuredvoltage.Enabled = true;
+                TXT_inputvoltage.Enabled = true;
+            }
+        }
+
+        private void H1_ENABLE_CheckedChanged(object sender, EventArgs e)
+        {
+            if (startup)
+                return;
+            try
+            {
+                if (MainV2.comPort.param["H1_ENABLE"] == null)
+                {
+                    CustomMessageBox.Show("Not Available on " + MainV2.cs.firmware.ToString());
+                }
+                else
+                {
+                    MainV2.comPort.setParam("H1_ENABLE", ((RadioButton)sender).Checked == true ? 1 : 0);
+                }
+            }
+            catch { CustomMessageBox.Show("Set H1_ENABLE Failed"); }
+        }
+
+        private void BUT_MagCalibration_Click(object sender, EventArgs e)
+        {
+            if (DialogResult.Yes == CustomMessageBox.Show("Use live data, or a log\n\nYes for Live data", "Mag Calibration", MessageBoxButtons.YesNo))
+            {
+                List<Tuple<float, float, float>> data = new List<Tuple<float, float, float>>();
+
+                byte backupratesens = MainV2.cs.ratesensors;
+
+                MainV2.cs.ratesensors = 10;
+
+                MainV2.comPort.requestDatastream((byte)MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_SENSORS, MainV2.cs.ratesensors); // mag captures at 10 hz
+
+                CustomMessageBox.Show("Data will be collected for 30 seconds, Please click ok and move the apm around all axises");
+
+                DateTime deadline = DateTime.Now.AddSeconds(30);
+
+                float oldmx = 0;
+                float oldmy = 0;
+                float oldmz = 0;
+
+                while (deadline > DateTime.Now)
+                {
+                    Application.DoEvents();
+
+                    if (oldmx != MainV2.cs.mx &&
+                        oldmy != MainV2.cs.my &&
+                        oldmz != MainV2.cs.mz)
+                    {
+                        data.Add(new Tuple<float, float, float>(
+                            MainV2.cs.mx - (float)MainV2.cs.mag_ofs_x,
+                            MainV2.cs.my - (float)MainV2.cs.mag_ofs_y,
+                            MainV2.cs.mz - (float)MainV2.cs.mag_ofs_z));
+
+                        oldmx = MainV2.cs.mx;
+                        oldmy = MainV2.cs.my;
+                        oldmz = MainV2.cs.mz;
+                    }
+                }
+
+                MainV2.cs.ratesensors = backupratesens;
+
+                if (data.Count < 10)
+                {
+                    CustomMessageBox.Show("Log does not contain enough data");
+                    return;
+                }
+
+                double[] ans =  MagCalib.LeastSq(data);
+
+                MagCalib.SaveOffsets(ans);
+
+            }
+            else
+            {
+                string minthro = "30";
+                Common.InputBox("Min Throttle", "Use only data above this throttle percent.", ref minthro);
+
+                int ans = 0;
+                int.TryParse(minthro, out ans);
+
+                MagCalib.ProcessLog(ans);
+            }
+        }
+
+        private void BUT_levelplane_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                MainV2.comPort.setParam("MANUAL_LEVEL",1);
+
+#if MAVLINK10
+                int fixme; // needs to be accel only
+                MainV2.comPort.doCommand(MAVLink.MAV_CMD.PREFLIGHT_CALIBRATION,1,1,1,1,1,1,1);
+#else
+                MainV2.comPort.doAction(MAVLink.MAV_ACTION.MAV_ACTION_CALIBRATE_ACC);
+#endif
+                BUT_levelplane.Text = "Complete";
+            }
+            catch
+            {
+                CustomMessageBox.Show("Failed to level : AP 2.32+ is required");
+            }
         }
     }
 }

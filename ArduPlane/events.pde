@@ -71,7 +71,10 @@ static void failsafe_short_off_event()
 
 	// re-read the switch so we can return to our preferred mode
 	// --------------------------------------------------------
-	reset_control_switch();
+    if (control_mode == CIRCLE ||
+        (g.short_fs_action == 1 && control_mode == RTL)) {
+        reset_control_switch();
+    }
 
 	// Reset control integrators
 	// ---------------------
@@ -79,7 +82,7 @@ static void failsafe_short_off_event()
 }
 
 #if BATTERY_EVENT == ENABLED
-static void low_battery_event(void)
+void low_battery_event(void)
 {
 	gcs_send_text_P(SEVERITY_HIGH,PSTR("Low Battery!"));
 	set_mode(RTL);

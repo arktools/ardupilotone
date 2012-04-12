@@ -35,7 +35,7 @@ static void init_barometer(void)
 		//Serial.printf("init %ld, %d, -, %ld, %ld\n", barometer.RawTemp, barometer.Temp, barometer.RawPress,  barometer.Press);
 	}
 
-	for(i = 0; i < 20; i++){
+	for(i = 0; i < 40; i++){
 		delay(20);
 
 		#if HIL_MODE == HIL_MODE_SENSORS
@@ -44,16 +44,26 @@ static void init_barometer(void)
 
 		// Get initial data from absolute pressure sensor
 		barometer.read();
-		ground_pressure = barometer.get_pressure();
-		ground_temperature	= (ground_temperature * 7 + barometer.get_temperature()) / 8;
-		//Serial.printf("init %ld, %d, -, %ld, %ld, -, %d, %ld\n", barometer.RawTemp, barometer.Temp, barometer.RawPress,  barometer.Press, ground_temperature, ground_pressure);
+		ground_pressure 	= baro_filter.apply(barometer.get_pressure());
+
+		//Serial.printf("t: %ld, p: %d\n", ground_pressure, ground_temperature);
+
+		/*Serial.printf("init %d, %d, -, %d, %d, -, %d, %d\n",
+				barometer.RawTemp,
+				barometer.Temp,
+				barometer.RawPress,
+				barometer.Press,
+				ground_temperature,
+				ground_pressure);*/
 	}
+	// save our ground temp
+	ground_temperature	= barometer.get_temperature();
 }
 
 static void reset_baro(void)
 {
-		ground_pressure 	= barometer.get_pressure();
-		ground_temperature	= barometer.get_temperature();
+	ground_pressure 	= baro_filter.apply(barometer.get_pressure());
+	ground_temperature	= barometer.get_temperature();
 }
 
 static int32_t read_barometer(void)
@@ -61,7 +71,7 @@ static int32_t read_barometer(void)
  	float x, scaling, temp;
 
 	barometer.read();
-	float abs_pressure = barometer.get_pressure();
+	float abs_pressure = baro_filter.apply(barometer.get_pressure());
 
 
 	//Serial.printf("%ld, %ld, %ld, %ld\n", barometer.RawTemp, barometer.RawPress, barometer.Press, abs_pressure);
@@ -78,10 +88,13 @@ static int32_t read_barometer(void)
 static void init_compass()
 {
 	compass.set_orientation(MAG_ORIENTATION);						// set compass's orientation on aircraft
-	dcm.set_compass(&compass);
-	compass.init();
-	compass.get_offsets();					// load offsets to account for airframe magnetic interference
-	compass.null_offsets_enable();
+	if (!compass.init() || !compass.read()) {
+        // make sure we don't pass a broken compass to DCM
+        Serial.println_P(PSTR("COMPASS INIT ERROR"));
+        return;
+    }
+    ahrs.set_compass(&compass);
+    compass.null_offsets_enable();
 }
 
 static void init_optflow()
@@ -92,6 +105,8 @@ static void init_optflow()
 	    SendDebug("\nFailed to Init OptFlow ");
 	}
 	optflow.set_orientation(OPTFLOW_ORIENTATION);			// set optical flow sensor's orientation on aircraft
+	optflow.set_frame_rate(2000);							// set minimum update rate (which should lead to maximum low light performance
+	optflow.set_resolution(OPTFLOW_RESOLUTION);				// set optical flow sensor's resolution
 	optflow.set_field_of_view(OPTFLOW_FOV);					// set optical flow sensor's field of view
 	// setup timed read of sensor
 	//timer_scheduler.register_process(&AP_OpticalFlow::read);
@@ -106,11 +121,10 @@ static void read_battery(void)
 		return;
 	}
 
-	if(g.battery_monitoring == 3 || g.battery_monitoring == 4) {
+    if(g.battery_monitoring == 3 || g.battery_monitoring == 4)
 		battery_voltage1 = BATTERY_VOLTAGE(analogRead(BATTERY_PIN_1)) * .1 + battery_voltage1 * .9;
-	}
 	if(g.battery_monitoring == 4) {
-		current_amps1	 = CURRENT_AMPS(analogRead(CURRENT_PIN_1)) * .1 + current_amps1 * .9; //reads power sensor current pin
+		current_amps1	 = CURRENT_AMPS(analogRead(CURRENT_PIN_1)) * .1 + current_amps1 * .9; 	//reads power sensor current pin
 		current_total1	 += current_amps1 * 0.02778;	// called at 100ms on average, .0002778 is 1/3600 (conversion to hours)
 	}
 

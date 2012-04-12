@@ -5,6 +5,7 @@
 #include "avr/pgmspace.h"
 #include <BetterStream.h>
 #include <sys/time.h>
+#include <signal.h>
 #include "desktop.h"
 
 extern "C" {
@@ -13,6 +14,24 @@ volatile uint8_t __iomem[1024];
 
 unsigned __brkval = 0x2000;
 unsigned __bss_end = 0x1000;
+
+// disable interrupts
+void cli(void)
+{
+	sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGALRM);
+        sigprocmask(SIG_BLOCK,&set,NULL);
+}
+
+// enable interrupts
+void sei(void)
+{
+	sigset_t set;
+        sigemptyset(&set);
+        sigaddset(&set, SIGALRM);
+        sigprocmask(SIG_UNBLOCK,&set,NULL);
+}
 
 void pinMode(uint8_t pin, uint8_t mode)
 {
@@ -40,7 +59,10 @@ long unsigned int micros(void)
 
 void delayMicroseconds(unsigned usec)
 {
-	usleep(usec);
+	uint32_t start = micros();
+	while (micros() - start < usec) {
+		usleep(usec - (micros() - start));
+	}
 }
 
 void delay(long unsigned msec)
@@ -85,6 +107,16 @@ int strcasecmp_P(PGM_P str1, PGM_P str2)
 int strcmp_P(PGM_P str1, PGM_P str2)
 {
 	return strcmp(str1, str2);
+}
+
+int strncmp_P(PGM_P str1, PGM_P str2, size_t n)
+{
+	return strncmp(str1, str2, n);
+}
+
+char *strncpy_P(char *dest, PGM_P src, size_t n)
+{
+	return strncpy(dest, src, n);
 }
 
 void *memcpy_P(void *dest, PGM_P src, size_t n)

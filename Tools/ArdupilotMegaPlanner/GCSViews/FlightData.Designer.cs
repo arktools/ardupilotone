@@ -55,7 +55,7 @@
             this.zg1 = new ZedGraph.ZedGraphControl();
             this.lbl_winddir = new ArdupilotMega.MyLabel();
             this.lbl_windvel = new ArdupilotMega.MyLabel();
-            this.gMapControl1 = new GMap.NET.WindowsForms.GMapControl();
+            this.gMapControl1 = new ArdupilotMega.myGMAP();
             this.panel1 = new System.Windows.Forms.Panel();
             this.TXT_lat = new ArdupilotMega.MyLabel();
             this.Zoomlevel = new System.Windows.Forms.NumericUpDown();
@@ -168,6 +168,7 @@
             this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("navroll", this.bindingSource1, "nav_roll", true));
             this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("pitch", this.bindingSource1, "pitch", true));
             this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("roll", this.bindingSource1, "roll", true));
+            this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("status", this.bindingSource1, "armed", true));
             this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("targetalt", this.bindingSource1, "targetalt", true));
             this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("targetheading", this.bindingSource1, "nav_bearing", true));
             this.hud1.DataBindings.Add(new System.Windows.Forms.Binding("targetspeed", this.bindingSource1, "targetairspeed", true));
@@ -192,6 +193,7 @@
             this.hud1.opengl = true;
             this.hud1.pitch = 0F;
             this.hud1.roll = 0F;
+            this.hud1.status = 0;
             this.hud1.streamjpg = null;
             this.hud1.targetalt = 0F;
             this.hud1.targetheading = 0F;
@@ -1206,6 +1208,7 @@
             this.CHK_autopan.Name = "CHK_autopan";
             this.toolTip1.SetToolTip(this.CHK_autopan, resources.GetString("CHK_autopan.ToolTip"));
             this.CHK_autopan.UseVisualStyleBackColor = true;
+            this.CHK_autopan.CheckedChanged += new System.EventHandler(this.CHK_autopan_CheckedChanged);
             // 
             // CB_tuning
             // 
@@ -1318,7 +1321,7 @@
         private ArdupilotMega.MyLabel TXT_long;
         private ArdupilotMega.MyLabel TXT_alt;
         private System.Windows.Forms.CheckBox CHK_autopan;
-        private GMap.NET.WindowsForms.GMapControl gMapControl1;
+        private myGMAP gMapControl1;
         private ZedGraph.ZedGraphControl zg1;
         private System.Windows.Forms.TabControl tabControl1;
         private System.Windows.Forms.TabPage tabGauges;

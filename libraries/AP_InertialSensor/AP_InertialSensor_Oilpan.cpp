@@ -50,7 +50,7 @@ AP_InertialSensor_Oilpan::AP_InertialSensor_Oilpan( AP_ADC * adc, AP_PeriodicPro
 
 bool AP_InertialSensor_Oilpan::update()
 {
-  uint16_t adc_values[6];
+  float adc_values[6];
 
   _sample_time = _adc->Ch6(_sensors, adc_values);
   _temp = _adc->Ch(_gyro_temp_ch);
@@ -64,6 +64,11 @@ bool AP_InertialSensor_Oilpan::update()
   _accel.z = _accel_scale * _sensor_signs[5] * _accel_apply_std_offset( adc_values[5] );
 
   return true;
+}
+
+bool AP_InertialSensor_Oilpan::new_data_available( void )
+{
+    return _adc->new_data_available(_sensors);
 }
 
 float AP_InertialSensor_Oilpan::gx() { return _gyro.x; }
@@ -105,14 +110,21 @@ void AP_InertialSensor_Oilpan::reset_sample_time() { }
 
 /* ------ Private functions -------------------------------------------*/
 
-float AP_InertialSensor_Oilpan::_gyro_apply_std_offset( uint16_t adc_value )
+float AP_InertialSensor_Oilpan::_gyro_apply_std_offset( float adc_value )
 {
   /* Magic number from AP_ADC_Oilpan.h */
   return ((float) adc_value ) - 1658.0f;
 }
 
-float AP_InertialSensor_Oilpan::_accel_apply_std_offset( uint16_t adc_value )
+float AP_InertialSensor_Oilpan::_accel_apply_std_offset( float adc_value )
 {
   /* Magic number from AP_ADC_Oilpan.h */
   return ((float) adc_value ) - 2041.0f;
+}
+
+// return the oilpan gyro drift rate in radian/s/s
+float AP_InertialSensor_Oilpan::get_gyro_drift_rate(void)
+{
+    // 3.0 degrees/second/minute
+    return ToRad(3.0/60);
 }

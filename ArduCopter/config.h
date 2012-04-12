@@ -105,6 +105,11 @@
 # define INSTANT_PWM	DISABLED
 #endif
 
+// default RC speed in Hz if INSTANT_PWM is not used
+#ifndef RC_FAST_SPEED
+# define RC_FAST_SPEED 490
+#endif
+
 // LED and IO Pins
 //
 #if CONFIG_APM_HARDWARE == APM_HARDWARE_APM1
@@ -133,6 +138,10 @@
 # define OPTFLOW_CS_PIN   A6
 # define BATTERY_PIN_1      1
 # define CURRENT_PIN_1      2
+#endif
+
+#ifndef COPTER_LEDS
+#define COPTER_LEDS ENABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -176,7 +185,7 @@
 # endif
 #elif CONFIG_SONAR_SOURCE == SONAR_SOURCE_ANALOG_PIN
 # ifndef CONFIG_SONAR_SOURCE_ANALOG_PIN
-#  define CONFIG_SONAR_SOURCE_ANALOG_PIN A1
+#  define CONFIG_SONAR_SOURCE_ANALOG_PIN A0
 # endif
 #else
 # warning Invalid value for CONFIG_SONAR_SOURCE, disabling sonar
@@ -188,6 +197,13 @@
 # define CONFIG_SONAR ENABLED
 #endif
 
+//////////////////////////////////////////////////////////////////////////////
+// Channel Config (custom MOT channel mappings)
+//
+
+#ifndef CONFIG_CHANNELS
+# define CONFIG_CHANNELS CHANNEL_CONFIG_DEFAULT
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Acrobatics
@@ -313,21 +329,30 @@
 #ifndef OPTFLOW_ORIENTATION
 # define OPTFLOW_ORIENTATION 	AP_OPTICALFLOW_ADNS3080_PINS_FORWARD
 #endif
+#ifndef OPTFLOW_RESOLUTION
+# define OPTFLOW_RESOLUTION 	ADNS3080_RESOLUTION_1600
+#endif
 #ifndef OPTFLOW_FOV
 # define OPTFLOW_FOV 			AP_OPTICALFLOW_ADNS3080_08_FOV
 #endif
 // optical flow based loiter PI values
 #ifndef OPTFLOW_ROLL_P
-  #define OPTFLOW_ROLL_P 6.4
+  #define OPTFLOW_ROLL_P 2.5
 #endif
 #ifndef OPTFLOW_ROLL_I
-  #define OPTFLOW_ROLL_I 0.068
+  #define OPTFLOW_ROLL_I 3.2
+#endif
+#ifndef OPTFLOW_ROLL_D
+  #define OPTFLOW_ROLL_D 0.12
 #endif
 #ifndef OPTFLOW_PITCH_P
-  #define OPTFLOW_PITCH_P 6.4
+  #define OPTFLOW_PITCH_P 2.5
 #endif
 #ifndef OPTFLOW_PITCH_I
-  #define OPTFLOW_PITCH_I 0.068
+  #define OPTFLOW_PITCH_I 3.2
+#endif
+#ifndef OPTFLOW_PITCH_D
+  #define OPTFLOW_PITCH_D 0.12
 #endif
 #ifndef OPTFLOW_IMAX
   #define OPTFLOW_IMAX 4
@@ -382,7 +407,11 @@
 # define MINIMUM_THROTTLE	130
 #endif
 #ifndef MAXIMUM_THROTTLE
-# define MAXIMUM_THROTTLE	1000
+# define MAXIMUM_THROTTLE	850
+#endif
+
+#ifndef AUTO_LAND_TIME
+# define AUTO_LAND_TIME	20
 #endif
 
 
@@ -399,7 +428,6 @@
 #ifndef GROUND_START_DELAY
 # define GROUND_START_DELAY		3
 #endif
-
 
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
@@ -490,6 +518,24 @@
 # define SUPER_SIMPLE		DISABLED
 #endif
 
+// RTL Mode
+#ifndef RTL_AUTO_LAND
+# define RTL_AUTO_LAND 		ENABLED
+#endif
+
+
+// LOITER Mode
+#ifndef OF_LOITER_YAW
+# define OF_LOITER_YAW 		YAW_HOLD
+#endif
+
+#ifndef OF_LOITER_RP
+# define OF_LOITER_RP 			ROLL_PITCH_STABLE_OF
+#endif
+
+#ifndef OF_LOITER_THR
+# define OF_LOITER_THR			THROTTLE_HOLD
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Attitude Control
@@ -498,176 +544,213 @@
 // Extra motor values that are changed from time to time by jani @ jDrones as software
 // and charachteristics changes.
 #ifdef MOTORS_JD880
-# define STABILIZE_ROLL_P 		3.6
+# define STABILIZE_ROLL_P 		3.7
 # define STABILIZE_ROLL_I 		0.0
-# define STABILIZE_ROLL_IMAX 	        40.0		// degrees
-# define STABILIZE_PITCH_P		3.6
+# define STABILIZE_ROLL_IMAX	40.0		// degrees
+# define STABILIZE_PITCH_P		3.7
 # define STABILIZE_PITCH_I		0.0
-# define STABILIZE_PITCH_IMAX	        40.0		// degrees
+# define STABILIZE_PITCH_IMAX	40.0		// degrees
 #endif
 
 #ifdef MOTORS_JD850
-# define STABILIZE_ROLL_P 		4.0
+# define STABILIZE_ROLL_P 		4.2
 # define STABILIZE_ROLL_I 		0.0
-# define STABILIZE_ROLL_IMAX 	        40.0		// degrees
-# define STABILIZE_PITCH_P		4.0
+# define STABILIZE_ROLL_IMAX 	40.0		// degrees
+# define STABILIZE_PITCH_P		4.2
 # define STABILIZE_PITCH_I		0.0
-# define STABILIZE_PITCH_IMAX	        40.0		// degrees
+# define STABILIZE_PITCH_IMAX	40.0		// degrees
 #endif
 
 
-#ifndef STABILIZE_D
-# define STABILIZE_D 		.2
+#ifndef ACRO_P
+# define ACRO_P 		4.5
 #endif
 
-// Jasons default values that are good for smaller payload motors.
+
+#ifndef AXIS_LOCK_ENABLED
+# define AXIS_LOCK_ENABLED 	DISABLED
+#endif
+
+#ifndef AXIS_LOCK_P
+# define AXIS_LOCK_P 		.02
+#endif
+
+
+// Good for smaller payload motors.
 #ifndef STABILIZE_ROLL_P
-# define STABILIZE_ROLL_P 		4.6
+# define STABILIZE_ROLL_P 		4.5
 #endif
 #ifndef STABILIZE_ROLL_I
-# define STABILIZE_ROLL_I 		0.02
+# define STABILIZE_ROLL_I 		0.1
 #endif
 #ifndef STABILIZE_ROLL_IMAX
 # define STABILIZE_ROLL_IMAX 	40		// degrees
 #endif
 
 #ifndef STABILIZE_PITCH_P
-# define STABILIZE_PITCH_P		4.6
+# define STABILIZE_PITCH_P		4.5
 #endif
 #ifndef STABILIZE_PITCH_I
-# define STABILIZE_PITCH_I		0.02
+# define STABILIZE_PITCH_I		0.1
 #endif
 #ifndef STABILIZE_PITCH_IMAX
 # define STABILIZE_PITCH_IMAX	40		// degrees
 #endif
 
-//////////////////////////////////////////////////////////////////////////////
-// Acro Rate Control
-//
-#ifndef ACRO_ROLL_P
-# define ACRO_ROLL_P         0.155
+#ifndef  STABILIZE_YAW_P
+# define STABILIZE_YAW_P		7.0		// increase for more aggressive Yaw Hold, decrease if it's bouncy
 #endif
-#ifndef ACRO_ROLL_I
-# define ACRO_ROLL_I         0.0
+#ifndef  STABILIZE_YAW_I
+# define STABILIZE_YAW_I		0.01
 #endif
-#ifndef ACRO_ROLL_IMAX
-# define ACRO_ROLL_IMAX	 	15			// degrees
+#ifndef  STABILIZE_YAW_IMAX
+# define STABILIZE_YAW_IMAX		8		// degrees * 100
 #endif
 
-#ifndef ACRO_PITCH_P
-# define ACRO_PITCH_P       0.155
-#endif
-#ifndef ACRO_PITCH_I
-# define ACRO_PITCH_I		0 //0.18
-#endif
-#ifndef ACRO_PITCH_IMAX
-# define ACRO_PITCH_IMAX   	15			// degrees
-#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Stabilize Rate Control
 //
 #ifndef RATE_ROLL_P
-# define RATE_ROLL_P         0.155
+# define RATE_ROLL_P        0.14
 #endif
 #ifndef RATE_ROLL_I
-# define RATE_ROLL_I         0.0
+# define RATE_ROLL_I        0.0
+#endif
+#ifndef RATE_ROLL_D
+# define RATE_ROLL_D        0.000 //.002
 #endif
 #ifndef RATE_ROLL_IMAX
-# define RATE_ROLL_IMAX	 	15			// degrees
+# define RATE_ROLL_IMAX	 	5			// degrees
 #endif
 
 #ifndef RATE_PITCH_P
-# define RATE_PITCH_P       0.155
+# define RATE_PITCH_P       0.14
 #endif
 #ifndef RATE_PITCH_I
-# define RATE_PITCH_I		0 //0.18
+# define RATE_PITCH_I		0.0
+#endif
+#ifndef RATE_PITCH_D
+# define RATE_PITCH_D       0.00
 #endif
 #ifndef RATE_PITCH_IMAX
-# define RATE_PITCH_IMAX   	15			// degrees
-#endif
-
-//////////////////////////////////////////////////////////////////////////////
-// YAW Control
-//
-#ifndef  STABILIZE_YAW_P
-# define STABILIZE_YAW_P		7.5			// increase for more aggressive Yaw Hold, decrease if it's bouncy
-#endif
-#ifndef  STABILIZE_YAW_I
-# define STABILIZE_YAW_I		0.01		// set to .0001 to try and get over user's steady state error caused by poor balance
-#endif
-#ifndef  STABILIZE_YAW_IMAX
-# define STABILIZE_YAW_IMAX		8			// degrees * 100
+# define RATE_PITCH_IMAX   	5			// degrees
 #endif
 
 #ifndef RATE_YAW_P
-# define RATE_YAW_P     .13			// used to control response in turning
+# define RATE_YAW_P    		 .13
 #endif
 #ifndef RATE_YAW_I
-# define RATE_YAW_I     0.0
+# define RATE_YAW_I    		 0.0
+#endif
+#ifndef RATE_YAW_D
+# define RATE_YAW_D    		 0.000
 #endif
 #ifndef RATE_YAW_IMAX
-# define RATE_YAW_IMAX   50
+# define RATE_YAW_IMAX 		  50		// degrees
 #endif
 
+
+#ifndef STABILIZE_D
+# define STABILIZE_D 		0.15
+#endif
+
+#ifndef STABILIZE_D_SCHEDULE
+# define STABILIZE_D_SCHEDULE 		0.5
+#endif
 
 //////////////////////////////////////////////////////////////////////////////
 // Loiter control gains
 //
 #ifndef LOITER_P
-# define LOITER_P			2.0		// was .25 in previous
+# define LOITER_P			.35
 #endif
 #ifndef LOITER_I
-# define LOITER_I			0.04	// Wind control
+# define LOITER_I			0.0
 #endif
 #ifndef LOITER_IMAX
-# define LOITER_IMAX		30		// degrees°
+# define LOITER_IMAX		30		// degrees
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// Loiter Navigation control gains
+//
+#ifndef LOITER_RATE_P
+# define LOITER_RATE_P		2.0			//
+#endif
+#ifndef LOITER_RATE_I
+# define LOITER_RATE_I		0.2		// Wind control
+#endif
+#ifndef LOITER_RATE_D
+# define LOITER_RATE_D		0			// try 2 or 3 for LOITER_RATE 1
+#endif
+#ifndef LOITER_RATE_IMAX
+# define LOITER_RATE_IMAX	30			// degrees
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
 // WP Navigation control gains
 //
 #ifndef NAV_P
-# define NAV_P				2.2			// 3 was causing rapid oscillations in Loiter
+# define NAV_P				3.0			//
 #endif
 #ifndef NAV_I
-# define NAV_I				0.15		// used in traverals
+# define NAV_I				0.20		// Wind control
+#endif
+#ifndef NAV_D
+# define NAV_D				0.00		//
 #endif
 #ifndef NAV_IMAX
 # define NAV_IMAX			30			// degrees
 #endif
 
+#ifndef AUTO_SLEW_RATE
+# define AUTO_SLEW_RATE		30			// degrees
+#endif
+
+
 #ifndef WAYPOINT_SPEED_MAX
-# define WAYPOINT_SPEED_MAX			600			// for 6m/s error = 13mph
+# define WAYPOINT_SPEED_MAX		600			// 6m/s error = 13mph
+#endif
+
+#ifndef WAYPOINT_SPEED_MIN
+# define WAYPOINT_SPEED_MIN		100			// 1m/s
 #endif
 
 
 //////////////////////////////////////////////////////////////////////////////
 // Throttle control gains
 //
-#ifndef THROTTLE_CRUISE
-# define THROTTLE_CRUISE	350			//
+#ifndef AUTO_THROTTLE_HOLD
+# define AUTO_THROTTLE_HOLD 1
 #endif
 
-#ifndef THR_HOLD_P
-# define THR_HOLD_P		0.4			//
+#ifndef THROTTLE_CRUISE
+# define THROTTLE_CRUISE	450		//
 #endif
-#ifndef THR_HOLD_I
-# define THR_HOLD_I		0.01		// with 4m error, 12.5s windup
+
+#ifndef ALT_HOLD_P
+# define ALT_HOLD_P			0.5		//
 #endif
-#ifndef THR_HOLD_IMAX
-# define THR_HOLD_IMAX	300
+#ifndef ALT_HOLD_I
+# define ALT_HOLD_I			0.015
+#endif
+#ifndef ALT_HOLD_IMAX
+# define ALT_HOLD_IMAX		300
 #endif
 
 // RATE control
 #ifndef THROTTLE_P
-# define THROTTLE_P		0.5			//
+# define THROTTLE_P			0.25	//
 #endif
 #ifndef THROTTLE_I
-# define THROTTLE_I		0.0			//
+# define THROTTLE_I			0.0		// Don't edit
+#endif
+#ifndef THROTTLE_D
+# define THROTTLE_D			0.02	//
 #endif
 #ifndef THROTTLE_IMAX
-# define THROTTLE_IMAX	300
+# define THROTTLE_IMAX		300
 #endif
 
 
@@ -746,27 +829,31 @@
 #ifndef LOG_MOTORS
 # define LOG_MOTORS				DISABLED
 #endif
-// guess!
+// optical flow
 #ifndef LOG_OPTFLOW
-# define LOG_OPTFLOW				DISABLED
+# define LOG_OPTFLOW			DISABLED
+#endif
+#ifndef LOG_PID
+# define LOG_PID				DISABLED
 #endif
 
 // calculate the default log_bitmask
 #define LOGBIT(_s)     (LOG_##_s ? MASK_LOG_##_s : 0)
 
 #define DEFAULT_LOG_BITMASK \
-               LOGBIT(ATTITUDE_FAST)	| \
-               LOGBIT(ATTITUDE_MED)		| \
-               LOGBIT(GPS)				| \
-               LOGBIT(PM)               | \
-               LOGBIT(CTUN)				| \
-               LOGBIT(NTUN)				| \
-               LOGBIT(MODE)             | \
-               LOGBIT(RAW)              | \
-               LOGBIT(CMD)              | \
-               LOGBIT(CUR)				| \
-               LOGBIT(MOTORS)			| \
-               LOGBIT(OPTFLOW)
+			LOGBIT(ATTITUDE_FAST)	| \
+			LOGBIT(ATTITUDE_MED)	| \
+			LOGBIT(GPS)				| \
+			LOGBIT(PM)				| \
+			LOGBIT(CTUN)			| \
+			LOGBIT(NTUN)			| \
+			LOGBIT(MODE)			| \
+			LOGBIT(RAW)				| \
+			LOGBIT(CMD)				| \
+			LOGBIT(CUR)				| \
+			LOGBIT(MOTORS)			| \
+			LOGBIT(OPTFLOW)			| \
+			LOGBIT(PID)
 
 // if we are using fast, Disable Medium
 //#if LOG_ATTITUDE_FAST == ENABLED
@@ -819,18 +906,9 @@
 # define USE_CURRENT_ALT FALSE
 #endif
 
-
-#ifndef AUTO_RESET_LOITER
-# define AUTO_RESET_LOITER	1	// enables Loiter to reset it's current location based on stick input.
-#endif
 #ifndef CUT_MOTORS
 # define CUT_MOTORS		1		// do we cut the motors with no throttle?
 #endif
-
-#ifndef MOTOR_LEDS
-# define MOTOR_LEDS		1		// 0 = off, 1 = on
-#endif
-
 
 //////////////////////////////////////////////////////////////////////////////
 // RC override
@@ -859,5 +937,9 @@
 #endif
 
 
+// experimental quaternion code
+#ifndef QUATERNION_ENABLE
+# define QUATERNION_ENABLE DISABLED
+#endif
 
 #endif // __ARDUCOPTER_CONFIG_H__

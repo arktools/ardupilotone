@@ -13,11 +13,20 @@ using System.Net;
 
 using GMap.NET.WindowsForms;
 using GMap.NET.CacheProviders;
+using log4net;
+
+using System.Security.Permissions;
 
 namespace ArdupilotMega
 {
     public partial class temp : Form
     {
+        [DllImport("DIFXApi.dll", CharSet = CharSet.Unicode)]
+        public static extern Int32 DriverPackagePreinstall(string DriverPackageInfPath, Int32 Flags);
+
+
+        private static readonly ILog log =
+          LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         public temp()
         {
             InitializeComponent();
@@ -132,7 +141,7 @@ namespace ArdupilotMega
 
                     ArduinoComms port = new ArduinoSTK();
 
-                    if (DialogResult.Yes == MessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
+                    if (DialogResult.Yes == CustomMessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
                     {
                         port = new ArduinoSTK();
                         port.BaudRate = 57600;
@@ -148,7 +157,7 @@ namespace ArdupilotMega
             port.Parity = Parity.None;
             port.DtrEnable = true;
 
-            port.PortName = ArdupilotMega.MainV2.comportname;
+            port.PortName = ArdupilotMega.MainV2.comPortName;
             try
             {
                 port.Open();
@@ -159,7 +168,7 @@ namespace ArdupilotMega
                     int start = 0;
                     int end = 1024*4;
 
-                        Console.WriteLine(start + " to " + end);
+                        log.Info(start + " to " + end);
                         port.upload(EEPROM, (short)start, (short)(end - start), (short)start);
 
                         if (port.keepalive())
@@ -173,23 +182,23 @@ namespace ArdupilotMega
                             }
                             else
                             {
-                                MessageBox.Show("Communication Error - WPs wrote but no config");
+                                CustomMessageBox.Show("Communication Error - WPs wrote but no config");
                             }
                         }
                         else
                         {
-                            MessageBox.Show("Communication Error - Bad data");
+                            CustomMessageBox.Show("Communication Error - Bad data");
                         }
                 }
                 else
                 {
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Port in use? " + ex.ToString()); port.Close(); }
+            catch (Exception ex) { CustomMessageBox.Show("Port in use? " + ex.ToString()); port.Close(); }
                 }
-                catch (Exception) { MessageBox.Show("Error reading file"); }
+                catch (Exception) { CustomMessageBox.Show("Error reading file"); }
             }
         }
 
@@ -204,7 +213,7 @@ namespace ArdupilotMega
 
             ArduinoComms port = new ArduinoSTK();
 
-            if (DialogResult.Yes == MessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
+            if (DialogResult.Yes == CustomMessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
             {
                 port = new ArduinoSTK();
                 port.BaudRate = 57600;
@@ -219,7 +228,7 @@ namespace ArdupilotMega
             port.Parity = Parity.None;
             port.DtrEnable = true;
 
-            port.PortName = ArdupilotMega.MainV2.comportname;
+            port.PortName = ArdupilotMega.MainV2.comPortName;
             try
             {
                 port.Open();
@@ -230,7 +239,7 @@ namespace ArdupilotMega
                     int start = 0;
                     int end = 1024*4;
 
-                        Console.WriteLine(start + " to " + end);
+                        log.Info(start + " to " + end);
                         port.upload(EEPROM, (short)start, (short)(end - start), (short)start);
 
                         if (port.keepalive())
@@ -244,21 +253,21 @@ namespace ArdupilotMega
                             }
                             else
                             {
-                                MessageBox.Show("Communication Error - WPs wrote but no config");
+                                CustomMessageBox.Show("Communication Error - WPs wrote but no config");
                             }
                         }
                         else
                         {
-                            MessageBox.Show("Communication Error - Bad data");
+                            CustomMessageBox.Show("Communication Error - Bad data");
                         }
                 }
                 else
                 {
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Port in use? " + ex.ToString()); port.Close(); }
+            catch (Exception ex) { CustomMessageBox.Show("Port in use? " + ex.ToString()); port.Close(); }
         }
 
         private void BUT_flashdl_Click(object sender, EventArgs e)
@@ -267,7 +276,7 @@ namespace ArdupilotMega
 
             ArduinoComms port = new ArduinoSTK();
 
-            if (DialogResult.Yes == MessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
+            if (DialogResult.Yes == CustomMessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
             {
                 port = new ArduinoSTK();
                 port.BaudRate = 57600;
@@ -282,7 +291,7 @@ namespace ArdupilotMega
             port.Parity = Parity.None;
             port.DtrEnable = true;
 
-            port.PortName = ArdupilotMega.MainV2.comportname;
+            port.PortName = ArdupilotMega.MainV2.comPortName;
             try
             {
                 port.Open();
@@ -295,11 +304,11 @@ namespace ArdupilotMega
                     int start = 0;
                     short length = 0x100;
 
-                    Console.WriteLine(start + " to " + FLASH.Length);
+                    log.Info(start + " to " + FLASH.Length);
 
                     while (start < FLASH.Length)
                     {
-                        Console.WriteLine("Doing " + length + " at " + start);
+                        log.Info("Doing " + length + " at " + start);
                         port.setaddress(start);
                         port.downloadflash(length).CopyTo(FLASH, start);
                         start += length;
@@ -335,15 +344,15 @@ namespace ArdupilotMega
 
                     sw.Close();
 
-                    Console.WriteLine("Downloaded");
+                    log.Info("Downloaded");
                 }
                 else
                 {
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Port in use? " + ex.ToString()); port.Close(); }
+            catch (Exception ex) { CustomMessageBox.Show("Port in use? " + ex.ToString()); port.Close(); }
         }
 
         public int swapend(int value)
@@ -368,10 +377,10 @@ namespace ArdupilotMega
                 sr.Close();
 
             }
-            catch (Exception ex) { MessageBox.Show("Failed to read firmware.hex : " + ex.Message); }
+            catch (Exception ex) { CustomMessageBox.Show("Failed to read firmware.hex : " + ex.Message); }
             ArduinoComms port = new ArduinoSTK();
 
-            if (DialogResult.Yes == MessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
+            if (DialogResult.Yes == CustomMessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
             {
                 port = new ArduinoSTK();
                 port.BaudRate = 57600;
@@ -389,7 +398,7 @@ namespace ArdupilotMega
 
             try
             {
-                port.PortName = ArdupilotMega.MainV2.comportname;
+                port.PortName = ArdupilotMega.MainV2.comPortName;
 
                 port.Open();
 
@@ -397,7 +406,7 @@ namespace ArdupilotMega
 
                 if (port.connectAP())
                 {
-                    Console.WriteLine("starting");
+                    log.Info("starting");
                     
                     
                     port.uploadflash(FLASH, 0, FLASH.Length, 0);
@@ -405,21 +414,21 @@ namespace ArdupilotMega
                     
                     
 
-                    Console.WriteLine("Uploaded");
+                    log.Info("Uploaded");
 
                     
                 }
                 else
                 {
                     
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
 
 
 
             }
-            catch (Exception ex) {  MessageBox.Show("Check port settings or Port in use? " + ex.ToString()); port.Close(); }
+            catch (Exception ex) {  CustomMessageBox.Show("Check port settings or Port in use? " + ex.ToString()); port.Close(); }
 
         }
 
@@ -442,7 +451,7 @@ namespace ArdupilotMega
                 int length = Convert.ToInt32(match.Groups[1].Value.ToString(), 16);
                 int address = Convert.ToInt32(match.Groups[2].Value.ToString(), 16);
                 int option = Convert.ToInt32(match.Groups[3].Value.ToString(), 16);
-                Console.WriteLine("len {0} add {1} opt {2}", length, address, option);
+                log.InfoFormat("len {0} add {1} opt {2}", length, address, option);
                 if (option == 0)
                 {
                     string data = match.Groups[4].Value.ToString();
@@ -484,7 +493,7 @@ namespace ArdupilotMega
                     int length = Convert.ToInt32(line.Substring(1, 2), 16);
                     int address = Convert.ToInt32(line.Substring(3, 4), 16);
                     int option = Convert.ToInt32(line.Substring(7, 2), 16);
-                    Console.WriteLine("len {0} add {1} opt {2}", length, address, option);
+                    log.InfoFormat("len {0} add {1} opt {2}", length, address, option);
 
                     if (option == 0)
                     {
@@ -516,7 +525,7 @@ namespace ArdupilotMega
         {
             ArduinoComms port = new ArduinoSTK();
 
-            if (DialogResult.Yes == MessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
+            if (DialogResult.Yes == CustomMessageBox.Show("is this a 1280?", "", MessageBoxButtons.YesNo))
             {
                 port = new ArduinoSTK();
                 port.BaudRate = 57600;
@@ -533,14 +542,14 @@ namespace ArdupilotMega
 
             try
             {
-                port.PortName = ArdupilotMega.MainV2.comportname;
+                port.PortName = ArdupilotMega.MainV2.comPortName;
 
-                Console.WriteLine("Open Port");
+                log.Info("Open Port");
                 port.Open();
-                Console.WriteLine("Connect AP");
+                log.Info("Connect AP");
                 if (port.connectAP())
                 {
-                    Console.WriteLine("Download AP");
+                    log.Info("Download AP");
                     byte[] EEPROM = new byte[1024*4];
 
                     for (int a = 0; a < 4 * 1024; a += 0x100)
@@ -548,7 +557,7 @@ namespace ArdupilotMega
                         port.setaddress(a);
                         port.download(0x100).CopyTo(EEPROM,a);
                     }
-                    Console.WriteLine("Verify State");
+                    log.Info("Verify State");
                     if (port.keepalive())
                     {
                         StreamWriter sw = new StreamWriter(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"EEPROM.bin");
@@ -560,16 +569,16 @@ namespace ArdupilotMega
                     }
                     else
                     {
-                        MessageBox.Show("Communication Error - Bad data");
+                        CustomMessageBox.Show("Communication Error - Bad data");
                     }
                 }
                 else
                 {
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Port Error? " + ex.ToString()); if (port != null && port.IsOpen) { port.Close(); } }
+            catch (Exception ex) { CustomMessageBox.Show("Port Error? " + ex.ToString()); if (port != null && port.IsOpen) { port.Close(); } }
 
         }
 
@@ -584,14 +593,14 @@ namespace ArdupilotMega
 
             try
             {
-                port.PortName = ArdupilotMega.MainV2.comportname;
+                port.PortName = ArdupilotMega.MainV2.comPortName;
 
-                Console.WriteLine("Open Port");
+                log.Info("Open Port");
                 port.Open();
-                Console.WriteLine("Connect AP");
+                log.Info("Connect AP");
                 if (port.connectAP())
                 {
-                    Console.WriteLine("Download AP");
+                    log.Info("Download AP");
                     byte[] EEPROM = new byte[1024 * 4];
 
                     for (int a = 0; a < 4 * 1024; a += 0x100)
@@ -599,7 +608,7 @@ namespace ArdupilotMega
                         port.setaddress(a);
                         port.download(0x100).CopyTo(EEPROM, a);
                     }
-                    Console.WriteLine("Verify State");
+                    log.Info("Verify State");
                     if (port.keepalive())
                     {
                         StreamWriter sw = new StreamWriter(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"EEPROM1280.bin");
@@ -607,7 +616,7 @@ namespace ArdupilotMega
                         bw.Write(EEPROM, 0, EEPROM.Length);
                         bw.Close();
 
-                        Console.WriteLine("Download AP");
+                        log.Info("Download AP");
                         byte[] FLASH = new byte[1024 * 128];
 
                         for (int a = 0; a < FLASH.Length; a += 0x100)
@@ -624,16 +633,16 @@ namespace ArdupilotMega
                     }
                     else
                     {
-                        MessageBox.Show("Communication Error - Bad data");
+                        CustomMessageBox.Show("Communication Error - Bad data");
                     }
                 }
                 else
                 {
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Port Error? " + ex.ToString()); if (port != null && port.IsOpen) { port.Close(); } }
+            catch (Exception ex) { CustomMessageBox.Show("Port Error? " + ex.ToString()); if (port != null && port.IsOpen) { port.Close(); } }
             
         }
 
@@ -648,14 +657,14 @@ namespace ArdupilotMega
 
             try
             {
-                port.PortName = ArdupilotMega.MainV2.comportname;
+                port.PortName = ArdupilotMega.MainV2.comPortName;
 
-                Console.WriteLine("Open Port");
+                log.Info("Open Port");
                 port.Open();
-                Console.WriteLine("Connect AP");
+                log.Info("Connect AP");
                 if (port.connectAP())
                 {
-                    Console.WriteLine("Download AP");
+                    log.Info("Download AP");
                     byte[] EEPROM = new byte[1024 * 4];
 
                     for (int a = 0; a < EEPROM.Length; a += 0x100)
@@ -663,7 +672,7 @@ namespace ArdupilotMega
                         port.setaddress(a);
                         port.download(0x100).CopyTo(EEPROM, a);
                     }
-                    Console.WriteLine("Verify State");
+                    log.Info("Verify State");
                     if (port.keepalive())
                     {
                         StreamWriter sw = new StreamWriter(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"EEPROM2560.bin");
@@ -671,7 +680,7 @@ namespace ArdupilotMega
                         bw.Write(EEPROM, 0, EEPROM.Length);
                         bw.Close();
 
-                        Console.WriteLine("Download AP");
+                        log.Info("Download AP");
                         byte[] FLASH = new byte[1024 * 256];
 
                         for (int a = 0; a < FLASH.Length; a += 0x100)
@@ -688,16 +697,16 @@ namespace ArdupilotMega
                     }
                     else
                     {
-                        MessageBox.Show("Communication Error - Bad data");
+                        CustomMessageBox.Show("Communication Error - Bad data");
                     }
                 }
                 else
                 {
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
             }
-            catch (Exception ex) { MessageBox.Show("Port Error? " + ex.ToString()); if (port != null && port.IsOpen) { port.Close(); } }
+            catch (Exception ex) { CustomMessageBox.Show("Port Error? " + ex.ToString()); if (port != null && port.IsOpen) { port.Close(); } }
         }
 
         private void BUT_copyto1280_Click(object sender, EventArgs e)
@@ -725,7 +734,7 @@ namespace ArdupilotMega
 
             try
             {
-                port.PortName = ArdupilotMega.MainV2.comportname;
+                port.PortName = ArdupilotMega.MainV2.comPortName;
 
                 port.Open();
 
@@ -733,7 +742,7 @@ namespace ArdupilotMega
 
                 if (port.connectAP())
                 {
-                    Console.WriteLine("starting");
+                    log.Info("starting");
 
 
                     port.uploadflash(FLASH, 0, FLASH.Length, 0);
@@ -741,21 +750,21 @@ namespace ArdupilotMega
                     port.upload(EEPROM, 0, (short)EEPROM.Length, 0);
 
 
-                    Console.WriteLine("Uploaded");
+                    log.Info("Uploaded");
 
 
                 }
                 else
                 {
 
-                    MessageBox.Show("Communication Error - no connection");
+                    CustomMessageBox.Show("Communication Error - no connection");
                 }
                 port.Close();
 
 
 
             }
-            catch (Exception ex) { MessageBox.Show("Check port settings or Port in use? " + ex.ToString()); port.Close(); }
+            catch (Exception ex) { CustomMessageBox.Show("Check port settings or Port in use? " + ex.ToString()); port.Close(); }
         }
 
         private void button2_Click(object sender, EventArgs e)
@@ -768,7 +777,7 @@ namespace ArdupilotMega
                     sr.Close();
 
                 }
-                catch (Exception ex) { MessageBox.Show("Failed to read firmware.hex : " + ex.Message); }
+                catch (Exception ex) { CustomMessageBox.Show("Failed to read firmware.hex : " + ex.Message); }
 
                 StreamWriter sw = new StreamWriter(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"firmware.bin");
                 BinaryWriter bw = new BinaryWriter(sw.BaseStream);
@@ -800,7 +809,7 @@ namespace ArdupilotMega
 
                 foreach (string file in files)
                 {
-                    Console.WriteLine(DateTime.Now.Millisecond +  " Doing "+ file);
+                    log.Info(DateTime.Now.Millisecond +  " Doing "+ file);
                     Regex reg = new Regex(@"Z([0-9]+)\\([0-9]+)\\([0-9]+)");
 
                     Match mat = reg.Match(file);
@@ -820,7 +829,7 @@ namespace ArdupilotMega
                     Img.Save(tile,System.Drawing.Imaging.ImageFormat.Jpeg);
 
                     tile.Seek(0, SeekOrigin.Begin);
-                    Console.WriteLine(pnt.X + " " + pnt.Y);
+                    log.Info(pnt.X + " " + pnt.Y);
 
                     Application.DoEvents();
 
@@ -855,12 +864,12 @@ namespace ArdupilotMega
 
             int removed =  ((GMap.NET.CacheProviders.SQLitePureImageCache)MainMap.Manager.ImageCacheLocal).DeleteOlderThan(DateTime.Now, GMap.NET.MapType.Custom);
 
-            MessageBox.Show("Removed "+removed + " images\nshrinking file next");
+            CustomMessageBox.Show("Removed "+removed + " images\nshrinking file next");
 
             GMap.NET.CacheProviders.SQLitePureImageCache.VacuumDb(MainMap.CacheLocation + @"\TileDBv3\en\Data.gmdb");
 
 
-            Console.WriteLine("Removed {0} images",removed);
+            log.InfoFormat("Removed {0} images", removed);
         }
         private void BUT_lang_edit_Click(object sender, EventArgs e)
         {
@@ -869,7 +878,32 @@ namespace ArdupilotMega
 
         private void BUT_georefimage_Click(object sender, EventArgs e)
         {
-            new georefimage().Show();
+            new Georefimage().Show();
+        }
+
+        private void BUT_follow_me_Click(object sender, EventArgs e)
+        {
+            SerialInput si = new SerialInput();
+            ThemeManager.ApplyThemeTo((Form)si);
+            si.Show();
+        }
+
+        private void BUT_ant_track_Click(object sender, EventArgs e)
+        {
+            new Antenna.Tracker().Show();
+        }
+
+        private void BUT_magcalib_Click(object sender, EventArgs e)
+        {
+            MagCalib.ProcessLog();
+        }
+
+        void driverinstall()
+        {
+            int result = DriverPackagePreinstall(@"\Driver\XYZ.inf", 0);
+            if (result != 0)
+                MessageBox.Show("Driver installation failed.");
+
         }
     }
 }

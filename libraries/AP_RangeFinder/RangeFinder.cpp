@@ -13,7 +13,11 @@
 */
 
 // AVR LibC Includes
-#include "WConstants.h"
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include "WConstants.h"
+#endif
 #include "RangeFinder.h"
 
 
@@ -39,7 +43,7 @@ int RangeFinder::read()
 	// ensure distance is within min and max
 	temp_dist = constrain(temp_dist, min_distance, max_distance);
 
-	distance = _mode_filter->get_filtered_with_sample(temp_dist);
+	distance = _mode_filter->apply(temp_dist);
 	return distance;
 }
 

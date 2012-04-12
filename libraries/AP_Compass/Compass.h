@@ -5,6 +5,7 @@
 #include <inttypes.h>
 #include "../AP_Common/AP_Common.h"
 #include "../AP_Math/AP_Math.h"
+#include "../AP_Declination/AP_Declination.h" // ArduPilot Mega Declination Helper Library
 
 // compass product id
 #define AP_COMPASS_TYPE_UNKNOWN  0x00
@@ -12,42 +13,22 @@
 #define AP_COMPASS_TYPE_HMC5843  0x02
 #define AP_COMPASS_TYPE_HMC5883L 0x03
 
-// standard rotation matrices
-#define ROTATION_NONE               Matrix3f(1, 0, 0, 0, 1, 0, 0 ,0, 1)
-#define ROTATION_YAW_45             Matrix3f(0.70710678, -0.70710678, 0, 0.70710678, 0.70710678, 0, 0, 0, 1)
-#define ROTATION_YAW_90             Matrix3f(0, -1, 0, 1, 0, 0, 0, 0, 1)
-#define ROTATION_YAW_135            Matrix3f(-0.70710678, -0.70710678, 0, 0.70710678, -0.70710678, 0, 0, 0, 1)
-#define ROTATION_YAW_180            Matrix3f(-1, 0, 0, 0, -1, 0, 0, 0, 1)
-#define ROTATION_YAW_225            Matrix3f(-0.70710678, 0.70710678, 0, -0.70710678, -0.70710678, 0, 0, 0, 1)
-#define ROTATION_YAW_270            Matrix3f(0, 1, 0, -1, 0, 0, 0, 0, 1)
-#define ROTATION_YAW_315            Matrix3f(0.70710678, 0.70710678, 0, -0.70710678, 0.70710678, 0, 0, 0, 1)
-#define ROTATION_ROLL_180           Matrix3f(1, 0, 0, 0, -1, 0, 0, 0, -1)
-#define ROTATION_ROLL_180_YAW_45    Matrix3f(0.70710678, 0.70710678, 0, 0.70710678, -0.70710678, 0, 0, 0, -1)
-#define ROTATION_ROLL_180_YAW_90    Matrix3f(0, 1, 0, 1, 0, 0, 0, 0, -1)
-#define ROTATION_ROLL_180_YAW_135   Matrix3f(-0.70710678, 0.70710678, 0, 0.70710678, 0.70710678, 0, 0, 0, -1)
-#define ROTATION_PITCH_180          Matrix3f(-1, 0, 0, 0, 1, 0, 0, 0, -1)
-#define ROTATION_ROLL_180_YAW_225   Matrix3f(-0.70710678, -0.70710678, 0, -0.70710678, 0.70710678, 0, 0, 0, -1)
-#define ROTATION_ROLL_180_YAW_270   Matrix3f(0, -1, 0, -1, 0, 0, 0, 0, -1)
-#define ROTATION_ROLL_180_YAW_315   Matrix3f(0.70710678, -0.70710678, 0, -0.70710678, -0.70710678, 0, 0, 0, -1)
-
 class Compass
 {
 public:
-	int				product_id;     /// product id
-	int             mag_x;          ///< magnetic field strength along the X axis
-	int             mag_y;          ///< magnetic field strength along the Y axis
-	int             mag_z;          ///< magnetic field strength along the Z axis
+	int16_t			product_id;     /// product id
+	int16_t         mag_x;          ///< magnetic field strength along the X axis
+	int16_t         mag_y;          ///< magnetic field strength along the Y axis
+	int16_t         mag_z;          ///< magnetic field strength along the Z axis
 	float           heading;        ///< compass heading in radians
 	float           heading_x;      ///< compass vector X magnitude
 	float           heading_y;      ///< compass vector Y magnitude
-	unsigned long   last_update;    ///< millis() time of last update
+	uint32_t        last_update;    ///< micros() time of last update
 	bool			healthy;        ///< true if last read OK
 
 	/// Constructor
 	///
-	/// @param  key         Storage key used for configuration data.
-	///
-	Compass(AP_Var::Key key);
+	Compass();
 
 	/// Initialize the compass device.
 	///
@@ -79,7 +60,7 @@ public:
 	/// @param  rotation_matrix     Rotation matrix to transform magnetometer readings
 	///                             to the body frame.
 	///
-	virtual void set_orientation(const Matrix3f &rotation_matrix);
+	virtual void set_orientation(enum Rotation rotation);
 
 	/// Sets the compass offset x/y/z values.
 	///
@@ -100,6 +81,13 @@ public:
 	///
 	virtual Vector3f &get_offsets();
 
+	/// Sets the initial location used to get declination
+	///
+	/// @param  latitude             GPS Latitude.
+	/// @param  longitude            GPS Longitude.
+	///
+	void set_initial_location(long latitude, long longitude);
+
 	/// Program new offset values.
 	///
 	/// @param  x                   Offset to the raw mag_x value.
@@ -108,11 +96,9 @@ public:
 	///
 	void set_offsets(int x, int y, int z) { set_offsets(Vector3f(x, y, z)); }
 
-	/// Perform automatic offset updates using the results of the DCM matrix.
+	/// Perform automatic offset updates
 	///
-	/// @param  dcm_matrix          The DCM result matrix.
-	///
-	void null_offsets(const Matrix3f &dcm_matrix);
+	void null_offsets(void);
 
 
 	/// Enable/Start automatic offset updates 
@@ -124,6 +110,8 @@ public:
 	///
 	void null_offsets_disable(void);
 
+    /// return true if the compass should be used for yaw calculations
+    bool use_for_yaw(void) { return healthy && _use_for_yaw; }
 
 	/// Sets the local magnetic field declination.
 	///
@@ -132,15 +120,22 @@ public:
 	virtual void set_declination(float radians);
 	float get_declination();
 
+    static const struct AP_Param::GroupInfo var_info[];
+
 protected:
-	AP_Var_group        _group;                 ///< storage group holding the compass' calibration data
-	AP_VarS<Matrix3f>   _orientation_matrix;
-	AP_VarS<Vector3f>   _offset;
+    enum Rotation		_orientation;
+	AP_Vector3f         _offset;
 	AP_Float            _declination;
+    AP_Int8             _learn;                 ///<enable calibration learning
+    AP_Int8             _use_for_yaw;           ///<enable use for yaw calculation
+    AP_Int8             _auto_declination;      ///<enable automatic declination code
 
 	bool                _null_enable;        	///< enabled flag for offset nulling
 	bool                _null_init_done;        ///< first-time-around flag used by offset nulling
-	Matrix3f            _last_dcm_matrix;       ///< previous DCM matrix used by offset nulling
-	Vector3f            _mag_body_last;         ///< ?? used by offset nulling
+
+    ///< used by offset correction
+    static const uint8_t _mag_history_size = 20;
+    uint8_t				_mag_history_index;
+	Vector3i            _mag_history[_mag_history_size];
 };
 #endif

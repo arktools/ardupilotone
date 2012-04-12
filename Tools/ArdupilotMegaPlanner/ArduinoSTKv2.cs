@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using System.IO.Ports;
 using System.Threading;
+using log4net;
 
 // Written by Michael Oborne
 
@@ -10,7 +12,26 @@ namespace ArdupilotMega
 {
     class ArduinoSTKv2 : SerialPort,ArduinoComms
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         public event ProgressEventHandler Progress;
+
+        public new void Open()
+        {
+            // default dtr status is false
+
+            //from http://svn.savannah.nongnu.org/viewvc/RELEASE_5_11_0/arduino.c?root=avrdude&view=markup
+            base.Open();
+
+            base.DtrEnable = false;
+            base.RtsEnable = false;
+
+            System.Threading.Thread.Sleep(50);
+
+            base.DtrEnable = true;
+            base.RtsEnable = true;
+
+            System.Threading.Thread.Sleep(50);
+        }
 
         public byte[] genstkv2packet(byte[] message)
         {
@@ -232,7 +253,7 @@ namespace ArdupilotMega
 
                 byte[] command = new byte[] { (byte)0x13, (byte)(sending >> 8), (byte)(sending & 0xff) };
 
-                Console.WriteLine((startfrom + (length - totalleft)) + " - " + sending);
+                log.InfoFormat((startfrom + (length - totalleft)) + " - " + sending);
 
                 Array.Resize<byte>(ref command, sending + 10); // sending + head
 
@@ -244,11 +265,11 @@ namespace ArdupilotMega
 
 
                 if (Progress != null)
-                    Progress((int)(((float)startaddress / (float)length) * 100));
+                    Progress((int)(((float)startaddress / (float)length) * 100),"");
 
                 if (command[1] != 0)
                 {
-                    Console.WriteLine("No Sync");
+                    log.InfoFormat("No Sync");
                     return false;
                 }
             }
@@ -272,7 +293,7 @@ namespace ArdupilotMega
                 throw new Exception("Address must be an even number");
             }
                 
-            Console.WriteLine("Sending address   " + ((address / 2)));
+            log.InfoFormat("Sending address   " + ((address / 2)));
 
             int tempstart = address / 2; // words
             byte[] temp = new byte[] { 0x6, (byte)((tempstart >> 24) & 0xff), (byte)((tempstart >> 16) & 0xff), (byte)((tempstart >> 8) & 0xff), (byte)((tempstart >> 0) & 0xff) };
@@ -324,7 +345,7 @@ namespace ArdupilotMega
 
                 byte[] command = new byte[] { (byte)0x15, (byte)(sending >> 8), (byte)(sending & 0xff) };
 
-                Console.WriteLine((startfrom + (length - totalleft)) + " - " + sending);
+                log.InfoFormat((startfrom + (length - totalleft)) + " - " + sending);
 
                 Array.Resize<byte>(ref command, sending + 10); // sending + head
 
@@ -336,11 +357,11 @@ namespace ArdupilotMega
 
 
                 if (Progress != null)
-                    Progress((int)(((float)startaddress / (float)length) * 100));
+                    Progress((int)(((float)startaddress / (float)length) * 100),"");
 
                 if (command[1] != 0)
                 {
-                    Console.WriteLine("No Sync");
+                    log.InfoFormat("No Sync");
                     return false;
                 }
             }
@@ -358,7 +379,9 @@ namespace ArdupilotMega
 
             if (base.IsOpen)
                 base.Close();
-            //this.DtrEnable = false;
+
+            base.DtrEnable = false;
+            base.RtsEnable = false;
             return true;
         }
     }

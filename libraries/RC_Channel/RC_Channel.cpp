@@ -11,7 +11,11 @@
 
 #include <math.h>
 #include <avr/eeprom.h>
-#include "WProgram.h"
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include "WProgram.h"
+#endif
 #include "RC_Channel.h"
 
 #define RC_CHANNEL_ANGLE 0
@@ -19,6 +23,15 @@
 #define RC_CHANNEL_ANGLE_RAW 2
 
 APM_RC_Class *RC_Channel::_apm_rc;
+
+const AP_Param::GroupInfo RC_Channel::var_info[] PROGMEM = {
+	AP_GROUPINFO("MIN",  0, RC_Channel, radio_min),
+	AP_GROUPINFO("TRIM", 1, RC_Channel, radio_trim),
+	AP_GROUPINFO("MAX",  2, RC_Channel, radio_max),
+	AP_GROUPINFO("REV",  3, RC_Channel, _reverse),
+	AP_GROUPINFO("DZ",   4, RC_Channel, _dead_zone),
+	AP_GROUPEND
+};
 
 // setup the control preferences
 void
@@ -95,6 +108,8 @@ RC_Channel::set_pwm(int pwm)
 	if(_type == RC_CHANNEL_RANGE){
 		//Serial.print("range ");
 		control_in = pwm_to_range();
+		//control_in = constrain(control_in, _low, _high);
+		control_in = min(control_in, _high);
 		control_in = (control_in < _dead_zone) ? 0 : control_in;
 
 		if (fabs(scale_output) != 1){
@@ -105,8 +120,7 @@ RC_Channel::set_pwm(int pwm)
 
 		//RC_CHANNEL_ANGLE, RC_CHANNEL_ANGLE_RAW
 		control_in = pwm_to_angle();
-		// deadzone moved to
-		//control_in = (abs(control_in) < _dead_zone) ? 0 : control_in;
+
 
 		if (fabs(scale_output) != 1){
 			control_in *= scale_output;
@@ -160,13 +174,21 @@ RC_Channel::calc_pwm(void)
 void
 RC_Channel::load_eeprom(void)
 {
-    _group.load();
+	radio_min.load();
+	radio_trim.load();
+	radio_max.load();
+	_reverse.load();
+	_dead_zone.load();
 }
 
 void
 RC_Channel::save_eeprom(void)
 {
-    _group.save();
+	radio_min.save();
+	radio_trim.save();
+	radio_max.save();
+	_reverse.save();
+	_dead_zone.save();
 }
 
 // ------------------------------------------
@@ -191,9 +213,9 @@ RC_Channel::pwm_to_angle()
 {
 	int radio_trim_high = radio_trim + _dead_zone;
 	int radio_trim_low  = radio_trim - _dead_zone;
-    
+
     // prevent div by 0
-    if ((radio_trim_low - radio_min) == 0 || (radio_max - radio_trim_high) == 0) 
+    if ((radio_trim_low - radio_min) == 0 || (radio_max - radio_trim_high) == 0)
         return 0;
 
 	if(radio_in > radio_trim_high){
@@ -248,10 +270,12 @@ RC_Channel::norm_input()
 float
 RC_Channel::norm_output()
 {
-	if(radio_out < radio_trim)
-		return (float)(radio_out - radio_trim) / (float)(radio_trim - radio_min);
+    int16_t mid = (radio_max + radio_min) / 2;
+
+	if(radio_out < mid)
+		return (float)(radio_out - mid) / (float)(mid - radio_min);
 	else
-		return (float)(radio_out - radio_trim) / (float)(radio_max  - radio_trim);
+		return (float)(radio_out - mid) / (float)(radio_max  - mid);
 }
 
 void RC_Channel::set_apm_rc( APM_RC_Class * apm_rc )

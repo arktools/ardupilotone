@@ -1,20 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Reflection;
 using System.Text;
 using System.IO.Ports;
 using System.Threading;
 using System.Net; // dns, ip address
 using System.Net.Sockets; // tcplistner
+using log4net;
 
 namespace System.IO.Ports
 {
     public class TcpSerial : ArdupilotMega.ICommsSerial
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         TcpClient client = new TcpClient();
         IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
         byte[] rbuffer = new byte[0];
         int rbufferread = 0;
+
+        int retrys = 3;
 
         public int WriteBufferSize { get; set; }
         public int WriteTimeout { get; set; }
@@ -61,6 +66,8 @@ namespace System.IO.Ports
             get { return client.Available + rbuffer.Length - rbufferread; }
         }
 
+        public int BytesToWrite { get { return 0; } }
+
         public bool IsOpen { get { try { return client.Client.Connected; } catch { return false; } } }
 
         public bool DtrEnable
@@ -73,26 +80,38 @@ namespace System.IO.Ports
         {
             if (client.Client.Connected)
             {
-                Console.WriteLine("tcpserial socket already open");
+                log.Warn("tcpserial socket already open");
                 return;
             }
 
             string dest = Port;
             string host = "127.0.0.1";
+
+            if (ArdupilotMega.MainV2.config["TCP_port"] != null)
+                dest = ArdupilotMega.MainV2.config["TCP_port"].ToString();
+
+            if (ArdupilotMega.MainV2.config["TCP_host"] != null)
+                host = ArdupilotMega.MainV2.config["TCP_host"].ToString();
+
             if (Windows.Forms.DialogResult.Cancel == ArdupilotMega.Common.InputBox("remote host", "Enter host name/ip (ensure remote end is already started)", ref host))
             {
-                return;
+                throw new Exception("Canceled by request");
             }
             if (Windows.Forms.DialogResult.Cancel == ArdupilotMega.Common.InputBox("remote Port", "Enter remote port", ref dest))
             {
-                return;
+                throw new Exception("Canceled by request");
             }
             Port = dest;
+
+            ArdupilotMega.MainV2.config["TCP_port"] = Port;
+            ArdupilotMega.MainV2.config["TCP_host"] = host;
 
             client = new TcpClient(host, int.Parse(Port));
 
             client.NoDelay = true;
             client.Client.NoDelay = true;
+
+            VerifyConnected();
 
             return;
         }
@@ -106,6 +125,14 @@ namespace System.IO.Ports
                     client.Close();
                 }
                 catch { }
+
+                // this should only happen if we have established a connection in the first place
+                if (client != null && retrys > 0)
+                {
+                    client.Connect(ArdupilotMega.MainV2.config["TCP_host"].ToString(), int.Parse(ArdupilotMega.MainV2.config["TCP_port"].ToString()));
+                    retrys--;
+                }
+
                 throw new Exception("The socket/serialproxy is closed");
             }
         }
@@ -184,7 +211,7 @@ namespace System.IO.Ports
             VerifyConnected();
             int size = client.Available;
             byte[] crap = new byte[size];
-            Console.WriteLine("TcpSerial DiscardInBuffer {0}",size);
+            log.InfoFormat("TcpSerial DiscardInBuffer {0}",size);
             Read(crap, 0, size);
         }
 

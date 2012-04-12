@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections;
 using System.Linq;
 using System.Text;
+using log4net;
 using Microsoft.DirectX.DirectInput;
 using System.Reflection;
 
@@ -10,6 +11,7 @@ namespace ArdupilotMega
 {
     public class Joystick
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         Device joystick;
         JoystickState state;
         public bool enabled = false;
@@ -115,7 +117,7 @@ namespace ArdupilotMega
 
             joystick.Acquire();
 
-            System.Windows.Forms.MessageBox.Show("Please ensure you have calibrated your joystick in Windows first");
+            System.Windows.Forms.CustomMessageBox.Show("Please ensure you have calibrated your joystick in Windows first");
 
             joystick.Poll();
 
@@ -131,7 +133,7 @@ namespace ArdupilotMega
             values["Slider1"] = obj.GetSlider()[0];
             values["Slider2"] = obj.GetSlider()[1];
 
-            System.Windows.Forms.MessageBox.Show("Please move the joystick axis you want assigned to this function after clicking ok");
+            System.Windows.Forms.CustomMessageBox.Show("Please move the joystick axis you want assigned to this function after clicking ok");
 
             DateTime start = DateTime.Now;
 
@@ -148,12 +150,12 @@ namespace ArdupilotMega
                 {
                     //Console.WriteLine("Name: " + property.Name + ", Value: " + property.GetValue(obj, null));
 
-                    Console.WriteLine("test name {0} old {1} new {2} ", property.Name, values[property.Name], int.Parse(property.GetValue(nextstate, null).ToString()));
-                    Console.WriteLine("{0}  {1}", (int)values[property.Name], (int.Parse(property.GetValue(nextstate, null).ToString()) + threshold));
+                    log.InfoFormat("test name {0} old {1} new {2} ", property.Name, values[property.Name], int.Parse(property.GetValue(nextstate, null).ToString()));
+                    log.InfoFormat("{0}  {1}", (int)values[property.Name], (int.Parse(property.GetValue(nextstate, null).ToString()) + threshold));
                     if ((int)values[property.Name] > (int.Parse(property.GetValue(nextstate, null).ToString()) + threshold) ||
                         (int)values[property.Name] < (int.Parse(property.GetValue(nextstate, null).ToString()) - threshold))
                     {
-                        Console.WriteLine("{0}", property.Name);
+                        log.Info(property.Name);
                         joystick.Unacquire();
                         return (joystickaxis)Enum.Parse(typeof(joystickaxis), property.Name);
                     }
@@ -176,7 +178,7 @@ namespace ArdupilotMega
                 }
             }
 
-            System.Windows.Forms.MessageBox.Show("No valid option was detected");
+            System.Windows.Forms.CustomMessageBox.Show("No valid option was detected");
             
             return joystickaxis.None;
         }
@@ -208,7 +210,7 @@ namespace ArdupilotMega
 
             joystick.Poll();
 
-            System.Windows.Forms.MessageBox.Show("Please press the joystick button you want assigned to this function after clicking ok");
+            System.Windows.Forms.CustomMessageBox.Show("Please press the joystick button you want assigned to this function after clicking ok");
 
             DateTime start = DateTime.Now;
 
@@ -226,7 +228,7 @@ namespace ArdupilotMega
                 }
             }
 
-            System.Windows.Forms.MessageBox.Show("No valid option was detected");
+            System.Windows.Forms.CustomMessageBox.Show("No valid option was detected");
 
             return -1;
         }
@@ -318,6 +320,15 @@ namespace ArdupilotMega
                     if (getJoystickAxis(4) != Joystick.joystickaxis.None)
                         MainV2.cs.rcoverridech4 = pickchannel(4, JoyChannels[4].axis, JoyChannels[4].reverse, JoyChannels[4].expo);//(ushort)(((int)state.X / 65.535) + 1000);
 
+                    if (getJoystickAxis(5) != Joystick.joystickaxis.None)
+                        MainV2.cs.rcoverridech5 = pickchannel(5, JoyChannels[5].axis, JoyChannels[5].reverse, JoyChannels[5].expo);
+                    if (getJoystickAxis(6) != Joystick.joystickaxis.None)
+                        MainV2.cs.rcoverridech6 = pickchannel(6, JoyChannels[6].axis, JoyChannels[6].reverse, JoyChannels[6].expo);
+                    if (getJoystickAxis(7) != Joystick.joystickaxis.None)
+                        MainV2.cs.rcoverridech7 = pickchannel(7, JoyChannels[7].axis, JoyChannels[7].reverse, JoyChannels[7].expo);
+                    if (getJoystickAxis(8) != Joystick.joystickaxis.None)
+                        MainV2.cs.rcoverridech8 = pickchannel(8, JoyChannels[8].axis, JoyChannels[8].reverse, JoyChannels[8].expo);
+
                     foreach (JoyButton but in JoyButtons)
                     {
                         if (but.buttonno != -1 && getButtonState(but.buttonno))
@@ -330,14 +341,14 @@ namespace ArdupilotMega
                                     MainV2.comPort.setMode(mode); 
 
                                 }
-                                catch { System.Windows.Forms.MessageBox.Show("Failed to change Modes"); }
+                                catch { System.Windows.Forms.CustomMessageBox.Show("Failed to change Modes"); }
                             });
                         }
                     }
 
                     //Console.WriteLine("{0} {1} {2} {3}", MainV2.cs.rcoverridech1, MainV2.cs.rcoverridech2, MainV2.cs.rcoverridech3, MainV2.cs.rcoverridech4);
                 }
-                catch (Exception ex) { Console.WriteLine("Joystick thread error "+ex.ToString()); } // so we cant fall out
+                catch (Exception ex) { log.Info("Joystick thread error "+ex.ToString()); } // so we cant fall out
             }
         }
 
@@ -484,7 +495,7 @@ namespace ArdupilotMega
                 state = joystick.CurrentJoystickState;
 
                 ushort ans = pickchannel(channel, JoyChannels[channel].axis, JoyChannels[channel].reverse, JoyChannels[channel].expo);
-                Console.WriteLine("{0} = {1} = {2}",channel,ans, state.X);
+                log.DebugFormat("{0} = {1} = {2}",channel,ans, state.X);
                 return ans;
         }
 
@@ -514,6 +525,7 @@ namespace ArdupilotMega
             }
             if (chan == 3)
             {
+                trim = (min + max) / 2;
 //                trim = min; // throttle
             }
             

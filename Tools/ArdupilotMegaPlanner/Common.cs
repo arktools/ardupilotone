@@ -12,10 +12,13 @@ using GMap.NET;
 using GMap.NET.WindowsForms;
 using GMap.NET.WindowsForms.Markers;
 
+using System.Security.Cryptography.X509Certificates;
+
 using System.Net;
 using System.Net.Sockets;
 using System.Xml; // config file
 using System.Runtime.InteropServices; // dll imports
+using log4net;
 using ZedGraph; // Graphs
 using ArdupilotMega;
 using System.Reflection;
@@ -118,13 +121,19 @@ namespace ArdupilotMega
             g.TranslateTransform(LocalPosition.X, LocalPosition.Y);
 
             int length = 500;
-
-            g.DrawLine(new Pen(Color.Red, 2), 0.0f, 0.0f, (float)Math.Cos((heading - 90) * deg2rad) * length, (float)Math.Sin((heading - 90) * deg2rad) * length);
+// anti NaN
+            try
+            {
+                g.DrawLine(new Pen(Color.Red, 2), 0.0f, 0.0f, (float)Math.Cos((heading - 90) * deg2rad) * length, (float)Math.Sin((heading - 90) * deg2rad) * length);
+            }
+            catch { }
             g.DrawLine(new Pen(Color.Green, 2), 0.0f, 0.0f, (float)Math.Cos((nav_bearing - 90) * deg2rad) * length, (float)Math.Sin((nav_bearing - 90) * deg2rad) * length);
             g.DrawLine(new Pen(Color.Black, 2), 0.0f, 0.0f, (float)Math.Cos((cog - 90) * deg2rad) * length, (float)Math.Sin((cog - 90) * deg2rad) * length);
             g.DrawLine(new Pen(Color.Orange, 2), 0.0f, 0.0f, (float)Math.Cos((target - 90) * deg2rad) * length, (float)Math.Sin((target - 90) * deg2rad) * length);
-
+// anti NaN
+            try {
             g.RotateTransform(heading);
+            } catch{}
             g.DrawImageUnscaled(global::ArdupilotMega.Properties.Resources.planeicon, global::ArdupilotMega.Properties.Resources.planeicon.Width / -2, global::ArdupilotMega.Properties.Resources.planeicon.Height / -2);
 
             g.Transform = temp;
@@ -157,14 +166,21 @@ namespace ArdupilotMega
             g.TranslateTransform(LocalPosition.X, LocalPosition.Y);
 
             int length = 500;
-
-            g.DrawLine(new Pen(Color.Red, 2), 0.0f, 0.0f, (float)Math.Cos((heading - 90) * deg2rad) * length, (float)Math.Sin((heading - 90) * deg2rad) * length);
+// anti NaN
+            try
+            {
+                g.DrawLine(new Pen(Color.Red, 2), 0.0f, 0.0f, (float)Math.Cos((heading - 90) * deg2rad) * length, (float)Math.Sin((heading - 90) * deg2rad) * length);
+            }
+            catch { }
             //g.DrawLine(new Pen(Color.Green, 2), 0.0f, 0.0f, (float)Math.Cos((nav_bearing - 90) * deg2rad) * length, (float)Math.Sin((nav_bearing - 90) * deg2rad) * length);
             g.DrawLine(new Pen(Color.Black, 2), 0.0f, 0.0f, (float)Math.Cos((cog - 90) * deg2rad) * length, (float)Math.Sin((cog - 90) * deg2rad) * length);
             g.DrawLine(new Pen(Color.Orange, 2), 0.0f, 0.0f, (float)Math.Cos((target - 90) * deg2rad) * length, (float)Math.Sin((target - 90) * deg2rad) * length);
-
-
-            g.RotateTransform(heading);
+// anti NaN
+            try
+            {
+                g.RotateTransform(heading);
+            }
+            catch { }
             g.DrawImageUnscaled(global::ArdupilotMega.Properties.Resources.quadicon, global::ArdupilotMega.Properties.Resources.quadicon.Width / -2 + 2, global::ArdupilotMega.Properties.Resources.quadicon.Height / -2);
 
             g.Transform = temp;
@@ -198,9 +214,48 @@ namespace ArdupilotMega
             this.Lng = pll.Lng;
         }
 
+        public PointLatLngAlt(Locationwp locwp)
+        {
+            this.Lat = locwp.lat;
+            this.Lng = locwp.lng;
+            this.Alt = locwp.alt;
+        }
+
+        public PointLatLngAlt(PointLatLngAlt plla)
+        {
+            this.Lat = plla.Lat;
+            this.Lng = plla.Lng;
+            this.Alt = plla.Alt;
+            this.color = plla.color;
+            this.Tag = plla.Tag;
+        }
+
         public PointLatLng Point()
         {
             return new PointLatLng(Lat, Lng);
+        }
+
+        public override bool Equals(Object pllaobj)
+         {
+             PointLatLngAlt plla = (PointLatLngAlt)pllaobj;
+
+             if (plla == null)
+                 return false;
+
+             if (this.Lat == plla.Lat &&
+             this.Lng == plla.Lng &&
+             this.Alt == plla.Alt &&
+             this.color == plla.color &&
+             this.Tag == plla.Tag)
+             {
+                 return true;
+             }
+             return false;
+         }
+
+        public override int GetHashCode()
+        {
+            return (int)((Lat + Lng + Alt) * 100);
         }
 
         /// <summary>
@@ -222,8 +277,18 @@ namespace ArdupilotMega
         }
     }
 
+    class NoCheckCertificatePolicy : ICertificatePolicy
+    {
+        public bool CheckValidationResult(ServicePoint srvPoint, X509Certificate certificate, WebRequest request, int certificateProblem)
+        {
+            return true;
+        }
+    } 
+
+
     public class Common
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         public enum distances
         {
             Meters,
@@ -263,8 +328,68 @@ namespace ArdupilotMega
             RTL = 6,				// AUTO control
             CIRCLE = 7,
             POSITION = 8,
-            LAND = 9				// AUTO control
-        }        
+            LAND = 9,				// AUTO control
+            OF_LOITER = 10
+        }
+
+        public enum ac2ch7modes
+        {
+            CH7_DO_NOTHING = 0,
+            CH7_SET_HOVER = 1,
+            CH7_FLIP = 2,
+            CH7_SIMPLE_MODE = 3,
+            CH7_RTL = 4,
+            CH7_AUTO_TRIM = 5,
+            CH7_ADC_FILTER = 6,
+            CH7_SAVE_WP = 7
+        }
+
+        public enum ac2ch6modes
+        {
+            // CH_6 Tuning
+            // -----------
+            CH6_NONE = 0,
+            // Attitude
+            CH6_STABILIZE_KP = 1,
+            CH6_STABILIZE_KI = 2,
+            CH6_YAW_KP = 3,
+            // Rate
+            CH6_RATE_KP = 4,
+            CH6_RATE_KI = 5,
+            CH6_RATE_KD = 21,
+            CH6_YAW_RATE_KP = 6,
+            // Altitude rate controller
+            CH6_THROTTLE_KP = 7,
+            // Extras
+            CH6_TOP_BOTTOM_RATIO = 8,
+            CH6_RELAY = 9,
+            CH6_TRAVERSE_SPEED = 10,
+
+            CH6_NAV_P = 11,
+            CH6_LOITER_P = 12,
+            CH6_HELI_EXTERNAL_GYRO = 13,
+
+            // altitude controller
+            CH6_THR_HOLD_KP = 14,
+            CH6_Z_GAIN = 15,
+            CH6_DAMP = 16,
+
+            // optical flow controller
+            CH6_OPTFLOW_KP = 17,
+            CH6_OPTFLOW_KI = 18,
+            CH6_OPTFLOW_KD = 19,
+
+            CH6_NAV_I = 20,
+            CH6_LOITER_RATE_P = 22,
+            CH6_LOITER_RATE_D = 23,
+            CH6_YAW_KI = 24,
+            CH6_ACRO_KP = 25,
+            CH6_YAW_RATE_KD = 26,
+            CH6_LOITER_KI = 27,
+            CH6_LOITER_RATE_KI = 28,
+            CH6_STABILIZE_KD = 29
+        }
+
 
         public static void linearRegression()
         {
@@ -295,18 +420,18 @@ namespace ArdupilotMega
             double a = v1 / v2;
             double b = yAvg - a * xAvg;
 
-            Console.WriteLine("y = ax + b");
-            Console.WriteLine("a = {0}, the slope of the trend line.", Math.Round(a, 2));
-            Console.WriteLine("b = {0}, the intercept of the trend line.", Math.Round(b, 2));
+            log.Debug("y = ax + b");
+            log.DebugFormat("a = {0}, the slope of the trend line.", Math.Round(a, 2));
+            log.DebugFormat("b = {0}, the intercept of the trend line.", Math.Round(b, 2));
 
             //Console.ReadLine();
         }
        
 		#if MAVLINK10
 		
-        public static bool translateMode(string modein, ref MAVLink.__mavlink_set_mode_t mode)
+        public static bool translateMode(string modein, ref MAVLink.mavlink_set_mode_t mode)
         {
-            //MAVLink.__mavlink_set_mode_t mode = new MAVLink.__mavlink_set_mode_t();
+            //MAVLink.mavlink_set_mode_t mode = new MAVLink.mavlink_set_mode_t();
             mode.target_system = MainV2.comPort.sysid;
 
             try
@@ -323,7 +448,7 @@ namespace ArdupilotMega
                         case (int)Common.apmmodes.LOITER:
                         case (int)Common.apmmodes.FLY_BY_WIRE_A:
                         case (int)Common.apmmodes.FLY_BY_WIRE_B:
-                            mode.base_mode = (byte)MAVLink.MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
+                            mode.base_mode = (byte)MAVLink.MAV_MODE_FLAG.CUSTOM_MODE_ENABLED;
                             mode.custom_mode = (uint)(int)Enum.Parse(Common.getModes(), modein);
                             break;
                         default:
@@ -343,7 +468,7 @@ namespace ArdupilotMega
                         case (int)Common.ac2modes.ALT_HOLD:
                         case (int)Common.ac2modes.CIRCLE:
                         case (int)Common.ac2modes.POSITION:
-                            mode.base_mode = (byte)MAVLink.MAV_MODE_FLAG.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED;
+                            mode.base_mode = (byte)MAVLink.MAV_MODE_FLAG.CUSTOM_MODE_ENABLED;
                             mode.custom_mode = (uint)(int)Enum.Parse(Common.getModes(), modein);
                             break;
                         default:
@@ -358,14 +483,14 @@ namespace ArdupilotMega
         }
 		
 		#else
-        public static bool translateMode(string modein, ref  MAVLink.__mavlink_set_nav_mode_t navmode, ref MAVLink.__mavlink_set_mode_t mode)
+        public static bool translateMode(string modein, ref  MAVLink.mavlink_set_nav_mode_t navmode, ref MAVLink.mavlink_set_mode_t mode)
         {
 
-            //MAVLink.__mavlink_set_nav_mode_t navmode = new MAVLink.__mavlink_set_nav_mode_t();
+            //MAVLink.mavlink_set_nav_mode_t navmode = new MAVLink.mavlink_set_nav_mode_t();
             navmode.target = MainV2.comPort.sysid;
             navmode.nav_mode = 255;
 
-            //MAVLink.__mavlink_set_mode_t mode = new MAVLink.__mavlink_set_mode_t();
+            //MAVLink.mavlink_set_mode_t mode = new MAVLink.mavlink_set_mode_t();
             mode.target = MainV2.comPort.sysid;
 
             try
@@ -406,7 +531,7 @@ namespace ArdupilotMega
                             mode.mode = (byte)MAVLink.MAV_MODE.MAV_MODE_TEST2;
                             break;
                         default:
-                            MessageBox.Show("No Mode Changed " + (int)Enum.Parse(Common.getModes(), modein));
+                            CustomMessageBox.Show("No Mode Changed " + (int)Enum.Parse(Common.getModes(), modein));
                             return false;
                     }
                 }
@@ -434,30 +559,38 @@ namespace ArdupilotMega
                             mode.mode = (byte)MAVLink.MAV_MODE.MAV_MODE_AUTO;
                             break;
                         default:
-                            MessageBox.Show("No Mode Changed " + (int)Enum.Parse(Common.getModes(), modein));
+                            CustomMessageBox.Show("No Mode Changed " + (int)Enum.Parse(Common.getModes(), modein));
                             return false;
                     }
                 }
             }
-            catch { System.Windows.Forms.MessageBox.Show("Failed to find Mode"); return false; }
+            catch { System.Windows.Forms.CustomMessageBox.Show("Failed to find Mode"); return false; }
 
             return true;
         }		
 		#endif
+
+
         
         public static bool getFilefromNet(string url,string saveto) {
             try
             {
+                // this is for mono to a ssl server
+                //ServicePointManager.CertificatePolicy = new NoCheckCertificatePolicy(); 
+
+                ServicePointManager.ServerCertificateValidationCallback =
+    new System.Net.Security.RemoteCertificateValidationCallback((sender, certificate, chain, policyErrors) => { return true; });
+
                 // Create a request using a URL that can receive a post. 
                 WebRequest request = WebRequest.Create(url);
-                request.Timeout = 5000;
+                request.Timeout = 10000;
                 // Set the Method property of the request to POST.
                 request.Method = "GET";
                 // Get the response.
                 WebResponse response = request.GetResponse();
                 // Display the status.
-                Console.WriteLine(((HttpWebResponse)response).StatusDescription);
-                if (((HttpWebResponse)response).StatusDescription != "200")
+                log.Info(((HttpWebResponse)response).StatusDescription);
+                if (((HttpWebResponse)response).StatusCode != HttpStatusCode.OK)
                     return false;
                 // Get the stream containing content returned by the server.
                 Stream dataStream = response.GetResponseStream();
@@ -467,14 +600,14 @@ namespace ArdupilotMega
 
                 byte[] buf1 = new byte[1024];
 
-                FileStream fs = new FileStream(saveto+".new", FileMode.Create);
+                FileStream fs = new FileStream(saveto + ".new", FileMode.Create);
 
                 DateTime dt = DateTime.Now;
 
                 while (dataStream.CanRead && bytes > 0)
                 {
                     Application.DoEvents();
-                    Console.WriteLine(saveto + " " + bytes);
+                    log.Info(saveto + " " + bytes);
                     int len = dataStream.Read(buf1, 0, buf1.Length);
                     bytes -= len;
                     fs.Write(buf1, 0, len);
@@ -489,7 +622,7 @@ namespace ArdupilotMega
 
                 return true;
             }
-            catch { return false; }
+            catch (Exception ex) { log.Info("getFilefromNet(): " + ex.ToString()); return false; }
         }
 
         public static Type getModes()
@@ -528,7 +661,7 @@ namespace ArdupilotMega
             form.MinimizeBox = false;
             form.MaximizeBox = false;
 
-            MainV2.fixtheme(form);
+            ThemeManager.ApplyThemeTo(form);
 
             form.Show();
             form.Refresh();
@@ -582,9 +715,13 @@ namespace ArdupilotMega
             form.MinimizeBox = false;
             form.MaximizeBox = false;
 
-            MainV2.fixtheme(form);
+            ThemeManager.ApplyThemeTo(form);
 
-            return form.ShowDialog();
+            DialogResult dialogResult =form.ShowDialog();
+
+            form.Dispose();
+
+            return dialogResult;
         }
 
         static void chk_CheckStateChanged(object sender, EventArgs e)
@@ -632,13 +769,19 @@ namespace ArdupilotMega
             form.AcceptButton = buttonOk;
             form.CancelButton = buttonCancel;
 
-            MainV2.fixtheme(form);
+            ThemeManager.ApplyThemeTo(form);
 
-            DialogResult dialogResult = form.ShowDialog();
+            DialogResult dialogResult = DialogResult.Cancel;
+
+            dialogResult = form.ShowDialog();
+
             if (dialogResult == DialogResult.OK)
             {
                 value = textBox.Text;
             }
+
+            form.Dispose();
+            
             return dialogResult;
         }
 

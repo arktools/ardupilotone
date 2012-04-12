@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.Reflection;
 using System.Text;
 using System.Windows.Forms;
 using System.IO.Ports;
@@ -15,16 +16,17 @@ using Core.Geometry;
 using ICSharpCode.SharpZipLib.Zip;
 using ICSharpCode.SharpZipLib.Checksums;
 using ICSharpCode.SharpZipLib.Core;
+using log4net;
 
 
 namespace ArdupilotMega
 {
     public partial class Log : Form
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         ICommsSerial comPort;
         int logcount = 0;
         serialstatus status = serialstatus.Connecting;
-        byte[] buffer = new byte[4000];
         StreamWriter sw;
         int currentlog = 0;
         bool threadrun = true;
@@ -72,14 +74,15 @@ namespace ArdupilotMega
                 comPort.toggleDTR();
                 //comPort.Open();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                MessageBox.Show("Error opening comport");
+                log.Error("Error opening comport", ex);
+                CustomMessageBox.Show("Error opening comport");
             }
 
-            System.Threading.Thread t11 = new System.Threading.Thread(delegate()
+            var t11 = new System.Threading.Thread(delegate()
             {
-                DateTime start = DateTime.Now;
+                var start = DateTime.Now;
 
                 threadrun = true;
 
@@ -87,9 +90,11 @@ namespace ArdupilotMega
 
                 try
                 {
-                    comPort.Write("\n\n\n\n");
+                    comPort.Write("\n\n\n\n"); // more in "connecting"
                 }
-                catch {  }
+                catch
+                {
+                }
 
                 while (threadrun)
                 {
@@ -105,13 +110,14 @@ namespace ArdupilotMega
                             comPort_DataReceived((object)null, (SerialDataReceivedEventArgs)null);
                         }
                     }
-                    catch (Exception ex) { Console.WriteLine("crash in comport reader " + ex.ToString()); } // cant exit unless told to
+                    catch (Exception ex)
+                    {
+                        log.Error("crash in comport reader " + ex);
+                    } // cant exit unless told to
                 }
-                Console.WriteLine("Comport thread close");
-            });
-            t11.Name = "comport reader";
+                log.Info("Comport thread close");
+            }) {Name = "comport reader"};
             t11.Start();
-            MainV2.threads.Add(t11);
 
             // doesnt seem to work on mac
             //comPort.DataReceived += new SerialDataReceivedEventHandler(comPort_DataReceived);
@@ -187,8 +193,14 @@ namespace ArdupilotMega
                     {
                         case serialstatus.Connecting:
 
-                            if (line.Contains("reset to FLY") || line.Contains("interactive setup") || line.Contains("CLI:") || line.Contains("Ardu"))
+                            if (line.Contains("ENTER") || line.Contains("GROUND START") || line.Contains("reset to FLY") || line.Contains("interactive setup") || line.Contains("CLI") || line.Contains("Ardu"))
                             {
+                                try
+                                {
+                                    comPort.Write("\n\n\n\n");
+                                }
+                                catch { }
+
                                 comPort.Write("logs\r");
                                 status = serialstatus.Done;
                             }
@@ -221,7 +233,7 @@ namespace ArdupilotMega
                         case serialstatus.Createfile:
                             receivedbytes = 0;
                             Directory.CreateDirectory(Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"logs");
-                            logfile = Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"logs" + Path.DirectorySeparatorChar + DateTime.Now.ToString("yyyy-MM-dd hh-mm") + " " + currentlog + ".log";
+                            logfile = Path.GetDirectoryName(Application.ExecutablePath) + Path.DirectorySeparatorChar + @"logs" + Path.DirectorySeparatorChar + DateTime.Now.ToString("yyyy-MM-dd HH-mm") + " " + currentlog + ".log";
                             sw = new StreamWriter(logfile);
                             status = serialstatus.Waiting;
                             lock (thisLock)
@@ -276,7 +288,7 @@ namespace ArdupilotMega
 
                             Console.Write(line);
 
-                            TXT_seriallog.AppendText(line);
+                            TXT_seriallog.AppendText(line.Replace((char)0x0,' '));
 
                             // auto scroll
                             if (TXT_seriallog.TextLength >= 10000)
@@ -297,9 +309,9 @@ namespace ArdupilotMega
                     }
                 }
 
-                Console.WriteLine("exit while");
+                log.Info("exit while");
             }
-            catch (Exception ex) { MessageBox.Show("Error reading data" + ex.ToString()); }
+            catch (Exception ex) { CustomMessageBox.Show("Error reading data" + ex.ToString()); }
         }
 
         string lastline = "";
@@ -442,15 +454,15 @@ namespace ArdupilotMega
             foreach (Data mod in flightdata)
             {
                 xw.WriteStartElement("trkpt");
-                xw.WriteAttributeString("lat",mod.model.Location.latitude.ToString());
-                xw.WriteAttributeString("lon", mod.model.Location.longitude.ToString());
+                xw.WriteAttributeString("lat", mod.model.Location.latitude.ToString(new System.Globalization.CultureInfo("en-US")));
+                xw.WriteAttributeString("lon", mod.model.Location.longitude.ToString(new System.Globalization.CultureInfo("en-US")));
 
-                xw.WriteElementString("ele", mod.model.Location.altitude.ToString());
+                xw.WriteElementString("ele", mod.model.Location.altitude.ToString(new System.Globalization.CultureInfo("en-US")));
                 xw.WriteElementString("time", start.AddMilliseconds(mod.datetime).ToString("yyyy-MM-ddTHH:mm:sszzzzzz"));
-                xw.WriteElementString("course", (mod.model.Orientation.heading).ToString());
+                xw.WriteElementString("course", (mod.model.Orientation.heading).ToString(new System.Globalization.CultureInfo("en-US")));
 
-                xw.WriteElementString("roll", mod.model.Orientation.roll.ToString());
-                xw.WriteElementString("pitch", mod.model.Orientation.tilt.ToString());
+                xw.WriteElementString("roll", mod.model.Orientation.roll.ToString(new System.Globalization.CultureInfo("en-US")));
+                xw.WriteElementString("pitch", mod.model.Orientation.tilt.ToString(new System.Globalization.CultureInfo("en-US")));
                 //xw.WriteElementString("speed", mod.model.Orientation.);
                 //xw.WriteElementString("fix", mod.model.Location.altitude);
 
@@ -526,7 +538,7 @@ namespace ArdupilotMega
 
                 Style style2 = new Style();
                 Color color = Color.FromArgb(0xff, (stylecode >> 16) & 0xff, (stylecode >> 8) & 0xff, (stylecode >> 0) & 0xff);
-                Console.WriteLine("colour " + color.ToArgb().ToString("X") + " " + color.ToKnownColor().ToString());
+                log.Info("colour " + color.ToArgb().ToString("X") + " " + color.ToKnownColor().ToString());
                 style2.Add(new LineStyle(color, 4));
 
 
@@ -715,7 +727,6 @@ namespace ArdupilotMega
                 System.Threading.Thread t11 = new System.Threading.Thread(delegate() { downloadthread(1, logcount); });
                 t11.Name = "Log Download All thread";
                 t11.Start();
-                MainV2.threads.Add(t11);
             }
         }
 
@@ -766,7 +777,6 @@ namespace ArdupilotMega
                 System.Threading.Thread t11 = new System.Threading.Thread(delegate() { downloadsinglethread(); });
                 t11.Name = "Log download single thread";
                 t11.Start();
-                MainV2.threads.Add(t11);
             }
         }
 
@@ -775,7 +785,7 @@ namespace ArdupilotMega
             System.Threading.Thread.Sleep(500);
             comPort.Write("erase\r");
             System.Threading.Thread.Sleep(100);
-            TXT_seriallog.AppendText("!!Allow 30 seconds for erase\n");
+            TXT_seriallog.AppendText("!!Allow 30-90 seconds for erase\n");
             status = serialstatus.Done;
             CHK_logs.Items.Clear();
         }
@@ -886,7 +896,7 @@ namespace ArdupilotMega
 
                         tr.Close();
                     }
-                    catch (Exception ex) { MessageBox.Show("Error processing log. Is it still downloading? " + ex.Message); continue; }
+                    catch (Exception ex) { CustomMessageBox.Show("Error processing log. Is it still downloading? " + ex.Message); continue; }
 
                     writeKMLFirstPerson(logfile + ".kml");
 

@@ -2,17 +2,17 @@
   I2C.cpp - I2C library
   Copyright (c) 2011 Wayne Truchsess.  All right reserved.
   Rev 2.0 - September 19th, 2011
-          - Added support for timeout function to prevent 
+          - Added support for timeout function to prevent
             and recover from bus lockup (thanks to PaulS
             and CrossRoads on the Arduino forum)
           - Changed return type for stop() from void to
-            uint8_t to handle timeOut function 
+            uint8_t to handle timeOut function
   Rev 1.0 - August 8th, 2011
-  
-  This is a modified version of the Arduino Wire/TWI 
+
+  This is a modified version of the Arduino Wire/TWI
   library.  Functions were rewritten to provide more functionality
   and also the use of Repeated Start.  Some I2C devices will not
-  function correctly without the use of a Repeated Start.  The 
+  function correctly without the use of a Repeated Start.  The
   initial version of this library only supports the Master.
 
 
@@ -31,9 +31,13 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#include "WProgram.h"
 #include <inttypes.h>
 #include "I2C.h"
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include "WProgram.h"
+#endif
 
 
 
@@ -93,7 +97,7 @@ void I2C::setSpeed(boolean _fast)
     TWBR = ((CPU_FREQ / 400000) - 16) / 2;
   }
 }
-  
+
 void I2C::pullup(boolean activate)
 {
   if(activate)
@@ -201,7 +205,7 @@ uint8_t I2C::receive()
   return(data[bufferIndex]);
 }
 
-  
+
 
 
 
@@ -228,7 +232,7 @@ uint8_t I2C::write(int address, int registerAddress)
 uint8_t I2C::write(uint8_t address, uint8_t registerAddress, uint8_t databyte)
 {
   returnStatus = 0;
-  returnStatus = start(); 
+  returnStatus = start();
   if(returnStatus){return(returnStatus);}
   returnStatus = sendAddress(SLA_W(address));
   if(returnStatus){return(returnStatus);}
@@ -433,7 +437,7 @@ uint8_t I2C::start()
       lockUp();
       return(1);
     }
-       
+
   }
   if ((TWI_STATUS == START) || (TWI_STATUS == REPEATED_START))
   {
@@ -455,7 +459,7 @@ uint8_t I2C::sendAddress(uint8_t i2cAddress)
       lockUp();
       return(1);
     }
-       
+
   }
   if ((TWI_STATUS == MT_SLA_ACK) || (TWI_STATUS == MR_SLA_ACK))
   {
@@ -477,7 +481,7 @@ uint8_t I2C::sendByte(uint8_t i2cData)
       lockUp();
       return(1);
     }
-       
+
   }
   if (TWI_STATUS == MT_DATA_ACK)
   {
@@ -506,7 +510,7 @@ uint8_t I2C::receiveByte(boolean ack)
       lockUp();
       return(1);
     }
-       
+
   }
   return(TWI_STATUS);
 }
@@ -523,7 +527,7 @@ uint8_t I2C::stop()
       lockUp();
       return(1);
     }
-       
+
   }
   return(0);
 }
@@ -532,6 +536,12 @@ void I2C::lockUp()
 {
   TWCR = 0; //releases SDA and SCL lines to high impedance
   TWCR = _BV(TWEN) | _BV(TWIE) | _BV(TWEA); //reinitialize TWI
+  _lockup_count++;
+}
+
+uint8_t I2C::lockup_count(void)
+{
+	return _lockup_count;
 }
 
 SIGNAL(TWI_vect)
@@ -547,11 +557,10 @@ SIGNAL(TWI_vect)
     case 0x78:
     case 0xB0:
          TWCR = 0; //releases SDA and SCL lines to high impedance
-  	 TWCR = _BV(TWEN) | _BV(TWIE) | _BV(TWEA); //reinitialize TWI
+	 TWCR = _BV(TWEN) | _BV(TWIE) | _BV(TWEA); //reinitialize TWI
 	 break;
   }
 }
 
 
 I2C I2c = I2C();
-

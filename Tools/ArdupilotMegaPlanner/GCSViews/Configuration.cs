@@ -67,29 +67,37 @@ namespace ArdupilotMega.GCSViews
             // fix for dup name
             //XTRK_ANGLE_CD1.Name = "XTRK_ANGLE_CD";
             XTRK_GAIN_SC1.Name = "XTRK_GAIN_SC";
+
+            // enable disable relevbant hardware tabs
+            if (MainV2.APMFirmware == MainV2.Firmwares.ArduPlane)
+            {
+                this.ConfigTabs.SuspendLayout();
+                ConfigTabs.SelectedIndex = 0;
+                TabAP.Enabled = true;
+                TabAC.Enabled = false;
+                this.ConfigTabs.ResumeLayout();
+            }
+            else
+            {
+                this.ConfigTabs.SuspendLayout();
+                ConfigTabs.SelectedIndex = 1;
+                TabAP.Enabled = false;
+                TabAC.Enabled = true;
+                this.ConfigTabs.ResumeLayout();
+            }
         }
 
         private void Configuration_Load(object sender, EventArgs e)
         {
             startup = true;
 
-            // enable disable relevbant hardware tabs
-            if (MainV2.APMFirmware == MainV2.Firmwares.ArduPlane)
-            {
-                ConfigTabs.SelectedIndex = 0;
-                TabAP.Enabled = true;
-                TabAC.Enabled = false;
-            }
-            else
-            {
-                ConfigTabs.SelectedIndex = 1;
-                TabAP.Enabled = false;
-                TabAC.Enabled = true;
-            }
-
             // read tooltips
             if (tooltips.Count == 0)
                 readToolTips();
+
+            // ensure the fields are populated before setting them
+            CH7_OPT.DataSource = Enum.GetNames(typeof(Common.ac2ch7modes));
+            TUNE.DataSource = Enum.GetNames(typeof(Common.ac2ch6modes));
 
             // prefill all fields
             param = MainV2.comPort.param;
@@ -137,6 +145,7 @@ namespace ArdupilotMega.GCSViews
             CMB_rateposition.Text = MainV2.cs.rateposition.ToString();
             CMB_raterc.Text = MainV2.cs.raterc.ToString();
             CMB_ratestatus.Text = MainV2.cs.ratestatus.ToString();
+            CMB_ratesensors.Text = MainV2.cs.ratesensors.ToString();
 
 
             if (MainV2.config["CHK_GDIPlus"] != null)
@@ -160,6 +169,7 @@ namespace ArdupilotMega.GCSViews
             // set distance/speed unit states
             CMB_distunits.DataSource = Enum.GetNames(typeof(Common.distances));
             CMB_speedunits.DataSource = Enum.GetNames(typeof(Common.speeds));
+
             if (MainV2.config["distunits"] != null)
                 CMB_distunits.Text = MainV2.config["distunits"].ToString();
             if (MainV2.config["speedunits"] != null)
@@ -167,28 +177,22 @@ namespace ArdupilotMega.GCSViews
 
             // setup language selection
             CultureInfo ci = null;
-            foreach (string name in new string[] { "en-US", "zh-Hans", "zh-TW", "ru-RU", "Fr", "Pl" })
+            foreach (string name in new string[] { "en-US", "zh-Hans", "zh-TW", "ru-RU", "Fr", "Pl", "it-IT", "es-ES" })
             {
-                ci = MainV2.getcultureinfo(name);
+                ci = CultureInfoEx.GetCultureInfo(name);
                 if (ci != null)
                     languages.Add(ci);
             }
 
             CMB_language.DisplayMember = "DisplayName";
             CMB_language.DataSource = languages;
-            bool match = false;
-            for (int i = 0; i < languages.Count && !match; i++)
+            ci = Thread.CurrentThread.CurrentUICulture;
+            for (int i = 0; i < languages.Count; i++)
             {
-                ci = Thread.CurrentThread.CurrentUICulture;
-                while (!ci.Equals(CultureInfo.InvariantCulture))
+                if (ci.IsChildOf(languages[i]))
                 {
-                    if (ci.Equals(languages[i]))
-                    {
-                        CMB_language.SelectedIndex = i;
-                        match = true;
-                        break;
-                    }
-                    ci = ci.Parent;
+                    CMB_language.SelectedIndex = i;
+                    break;
                 }
             }
             CMB_language.SelectedIndexChanged += CMB_language_SelectedIndexChanged;
@@ -233,7 +237,9 @@ namespace ArdupilotMega.GCSViews
             string data = resources.GetString("MAVParam");
 
             if (data == null)
-                return;
+            {
+                data = global::ArdupilotMega.Properties.Resources.MAVParam;
+            }
 
             string[] tips = data.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -357,7 +363,9 @@ namespace ArdupilotMega.GCSViews
                             thisctl.Minimum = -9000;
                             thisctl.Value = (decimal)(float)param[value];
                             thisctl.Increment = (decimal)0.001;
-                            if (thisctl.Name.EndsWith("_P") || thisctl.Name.EndsWith("_I") || thisctl.Name.EndsWith("_D") || thisctl.Value == 0 || thisctl.Value.ToString("0.###", new System.Globalization.CultureInfo("en-US")).Contains("."))
+                            if (thisctl.Name.EndsWith("_P") || thisctl.Name.EndsWith("_I") || thisctl.Name.EndsWith("_D")
+                                || thisctl.Name.EndsWith("_LOW") || thisctl.Name.EndsWith("_HIGH") || thisctl.Value == 0
+                                || thisctl.Value.ToString("0.###", new System.Globalization.CultureInfo("en-US")).Contains("."))
                             {
                                 thisctl.DecimalPlaces = 3;
                             }
@@ -365,6 +373,12 @@ namespace ArdupilotMega.GCSViews
                             {
                                 thisctl.Increment = (decimal)1;
                                 thisctl.DecimalPlaces = 1;
+                            }
+
+                            if (thisctl.Name.EndsWith("_IMAX"))
+                            {
+                                thisctl.Maximum = 180;
+                                thisctl.Minimum = -180;
                             }
 
                             thisctl.Enabled = true;
@@ -397,7 +411,7 @@ namespace ArdupilotMega.GCSViews
                 }
                 if (text.Length == 0)
                 {
-                    Console.WriteLine(name + " not found");
+                    //Console.WriteLine(name + " not found");
                 }
 
             }
@@ -498,6 +512,19 @@ namespace ArdupilotMega.GCSViews
                         }
                     }
                 }
+                // keep nav_lat and nav_lon paired
+                if (name.Contains("LOITER_LAT_"))
+                {
+                    string newname = name.Replace("LOITER_LAT_", "LOITER_LON_");
+                    foreach (DataGridViewRow row in Params.Rows)
+                    {
+                        if (row.Cells[0].Value.ToString() == newname)
+                        {
+                            row.Cells[1].Value = float.Parse(((Control)sender).Text);
+                            break;
+                        }
+                    }
+                }
             }
             catch { }
 
@@ -551,23 +578,22 @@ namespace ArdupilotMega.GCSViews
                 if (text.Length > 0)
                 {
                     if (text[0].GetType() == typeof(NumericUpDown))
-                        {
-                            decimal option = (decimal)(float.Parse(Params[e.ColumnIndex, e.RowIndex].Value.ToString()));
-                            ((NumericUpDown)text[0]).Value = option;
-                            ((NumericUpDown)text[0]).BackColor = Color.Green;
-                        }
+                    {
+                        decimal option = (decimal)(float.Parse(Params[e.ColumnIndex, e.RowIndex].Value.ToString()));
+                        ((NumericUpDown)text[0]).Value = option;
+                        ((NumericUpDown)text[0]).BackColor = Color.Green;
+                    }
                     else if (text[0].GetType() == typeof(ComboBox))
-                        {
-                            int option = (int)(float.Parse(Params[e.ColumnIndex, e.RowIndex].Value.ToString()));
-                            ((ComboBox)text[0]).SelectedIndex = option;
-                            ((ComboBox)text[0]).BackColor = Color.Green;
-                        }
+                    {
+                        int option = (int)(float.Parse(Params[e.ColumnIndex, e.RowIndex].Value.ToString()));
+                        ((ComboBox)text[0]).SelectedIndex = option;
+                        ((ComboBox)text[0]).BackColor = Color.Green;
+                    }
                 }
             }
             catch { ((Control)text[0]).BackColor = Color.Red; }
-
             Params.Focus();
-        }        
+        }
 
         private void BUT_load_Click(object sender, EventArgs e)
         {
@@ -579,29 +605,11 @@ namespace ArdupilotMega.GCSViews
             DialogResult dr = ofd.ShowDialog();
             if (dr == DialogResult.OK)
             {
-                StreamReader sr = new StreamReader(ofd.OpenFile());
-                while (!sr.EndOfStream)
+                Hashtable param2 = loadParamFile(ofd.FileName);
+
+                foreach (string name in param2.Keys)
                 {
-                    string line = sr.ReadLine();
-
-                    if (line.Contains("NOTE:"))
-                        MessageBox.Show(line, "Saved Note");
-
-                    int index = line.IndexOf(',');
-
-                    int index2 = line.IndexOf(',', index + 1);
-
-                    if (index == -1)
-                        continue;
-
-                    if (index2 != -1)
-                        line = line.Replace(',','.');
-
-                    string name = line.Substring(0, index);
-                    float value = float.Parse(line.Substring(index + 1), new System.Globalization.CultureInfo("en-US"));
-
-                    MAVLink.modifyParamForDisplay(true,name,ref value);
-
+                    string value = param2[name].ToString();
                     // set param table as well
                     foreach (DataGridViewRow row in Params.Rows)
                     {
@@ -633,7 +641,6 @@ namespace ArdupilotMega.GCSViews
                         }
                     }
                 }
-                sr.Close();
             }
         }
 
@@ -706,7 +713,7 @@ namespace ArdupilotMega.GCSViews
                     catch { }
 
                 }
-                catch { MessageBox.Show("Set " + value + " Failed"); }
+                catch { CustomMessageBox.Show("Set " + value + " Failed"); }
             }
         }
 
@@ -717,26 +724,16 @@ namespace ArdupilotMega.GCSViews
         {
             if (ConfigTabs.SelectedTab == TabSetup)
             {
-                if (!MainV2.comPort.BaseStream.IsOpen)
-                {
-                    MessageBox.Show("Please Connect First");
-                    ConfigTabs.SelectedIndex = 0;
-                }
-                else
-                {
 
-                    Setup.Setup temp = new Setup.Setup();
+                    GCSViews.ConfigurationView.Setup temp = new GCSViews.ConfigurationView.Setup();
 
-                    temp.Configuration = this;
-
-                    MainV2.fixtheme(temp);
+                    ThemeManager.ApplyThemeTo(temp);
 
                     temp.ShowDialog();
 
                     startup = true;
                     processToScreen();
                     startup = false;
-                }
             }
         }
 
@@ -755,9 +752,11 @@ namespace ArdupilotMega.GCSViews
 
                 MainV2.cam.Start();
 
+                MainV2.config["video_options"] = CMB_videoresolutions.SelectedIndex;
+
                 BUT_videostart.Enabled = false;
             }
-            catch (Exception ex) { MessageBox.Show("Camera Fail: " + ex.Message); }
+            catch (Exception ex) { CustomMessageBox.Show("Camera Fail: " + ex.Message); }
 
         }
 
@@ -805,7 +804,15 @@ namespace ArdupilotMega.GCSViews
 
             // Add the video device
             hr = m_FilterGraph.AddSourceFilterForMoniker(capDevices[CMB_videosources.SelectedIndex].Mon, null, "Video input", out capFilter);
-            DsError.ThrowExceptionForHR(hr);
+            try
+            {
+                DsError.ThrowExceptionForHR(hr);
+            }
+            catch (Exception ex)
+            {
+                CustomMessageBox.Show("Can not add video source\n" + ex.ToString());
+                return;
+            }
 
             // Find the stream config interface
             hr = capGraph.FindInterface(PinCategory.Capture, MediaType.Video, capFilter, typeof(IAMStreamConfig).GUID, out o);
@@ -833,6 +840,11 @@ namespace ArdupilotMega.GCSViews
             DsUtils.FreeAMMediaType(media);
 
             CMB_videoresolutions.DataSource = modes;
+
+            if (MainV2.getConfig("video_options") != "" && CMB_videosources.Text != "")
+            {
+                CMB_videoresolutions.SelectedIndex = int.Parse(MainV2.getConfig("video_options"));
+            }
         }
 
         private void CHK_hudshow_CheckedChanged(object sender, EventArgs e)
@@ -842,10 +854,10 @@ namespace ArdupilotMega.GCSViews
 
         private void CHK_enablespeech_CheckedChanged(object sender, EventArgs e)
         {
-            MainV2.speechenable = CHK_enablespeech.Checked;
+            MainV2.speechEnable = CHK_enablespeech.Checked;
             MainV2.config["speechenable"] = CHK_enablespeech.Checked;
-            if (MainV2.talk != null)
-                MainV2.talk.SpeakAsyncCancelAll();
+            if (MainV2.speechEngine != null)
+                MainV2.speechEngine.SpeakAsyncCancelAll();
         }
         private void CMB_language_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -924,9 +936,15 @@ namespace ArdupilotMega.GCSViews
             ((MyButton)sender).Enabled = false;
             try
             {
+
                 MainV2.comPort.getParamList();
+
+
+
+
             }
-            catch { MessageBox.Show("Error: getting param list"); }
+            catch { CustomMessageBox.Show("Error: getting param list"); }
+
 
             ((MyButton)sender).Enabled = true;
             startup = true;
@@ -959,7 +977,7 @@ namespace ArdupilotMega.GCSViews
         private void BUT_Joystick_Click(object sender, EventArgs e)
         {
             Form joy = new JoystickSetup();
-            MainV2.fixtheme(joy);
+            ThemeManager.ApplyThemeTo(joy);
             joy.Show();
         }
 
@@ -1090,52 +1108,136 @@ namespace ArdupilotMega.GCSViews
             DialogResult dr = ofd.ShowDialog();
             if (dr == DialogResult.OK)
             {
-                StreamReader sr = new StreamReader(ofd.OpenFile());
-                while (!sr.EndOfStream)
-                {
-                    string line = sr.ReadLine();
+                param2 = loadParamFile(ofd.FileName);
 
-                    if (line.Contains("NOTE:"))
-                        MessageBox.Show(line, "Saved Note");
-
-                    int index = line.IndexOf(',');
-
-                    if (index == -1)
-                        continue;
-
-                    string name = line.Substring(0, index);
-                    float value = float.Parse(line.Substring(index + 1), new System.Globalization.CultureInfo("en-US"));
-
-                    MAVLink.modifyParamForDisplay(true, name, ref value);
-
-                    if (name == "SYSID_SW_MREV")
-                        continue;
-                    if (name == "WP_TOTAL")
-                        continue;
-                    if (name == "CMD_TOTAL")
-                        continue;
-
-                    param2[name] = value;
-                }
-                sr.Close();
-
-                ParamCompare temp = new ParamCompare(this, param, param2);
-                MainV2.fixtheme(temp);
+                ParamCompare temp = new ParamCompare(Params, param, param2);
+                ThemeManager.ApplyThemeTo(temp);
                 temp.ShowDialog();
             }
+        }
+
+        Hashtable loadParamFile(string Filename)
+        {
+            Hashtable param = new Hashtable();
+
+            StreamReader sr = new StreamReader(Filename);
+            while (!sr.EndOfStream)
+            {
+                string line = sr.ReadLine();
+
+                if (line.Contains("NOTE:"))
+                    CustomMessageBox.Show(line, "Saved Note");
+
+                if (line.StartsWith("#"))
+                    continue;
+
+                string[] items = line.Split(new char[] {' ', ',', '\t' },StringSplitOptions.RemoveEmptyEntries);
+
+                if (items.Length != 2)
+                    continue;
+
+                string name = items[0];
+                float value = float.Parse(items[1], new System.Globalization.CultureInfo("en-US"));
+
+                MAVLink.modifyParamForDisplay(true, name, ref value);
+
+                if (name == "SYSID_SW_MREV")
+                    continue;
+                if (name == "WP_TOTAL")
+                    continue;
+                if (name == "CMD_TOTAL")
+                    continue;
+                if (name == "FENCE_TOTAL")
+                    continue;
+                if (name == "SYS_NUM_RESETS")
+                    continue;
+                if (name == "ARSPD_OFFSET")
+                    continue;
+                if (name == "GND_ABS_PRESS")
+                    continue;
+                if (name == "GND_TEMP")
+                    continue;
+                if (name == "CMD_INDEX")
+                    continue;
+                if (name == "LOG_LASTFILE")
+                    continue;
+
+                param[name] = value;
+            }
+            sr.Close();
+
+            return param;
         }
 
         private void CHK_GDIPlus_CheckedChanged(object sender, EventArgs e)
         {
             if (startup)
                 return;
-            MessageBox.Show("You need to restart the planner for this to take effect");
+            CustomMessageBox.Show("You need to restart the planner for this to take effect");
             MainV2.config["CHK_GDIPlus"] = CHK_GDIPlus.Checked.ToString();
         }
 
         private void CHK_lockrollpitch_CheckedChanged(object sender, EventArgs e)
         {
 
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F5)
+            {
+                BUT_rerequestparams_Click(BUT_rerequestparams, null);
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.S))
+            {
+                BUT_writePIDS_Click(BUT_writePIDS, null);
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.O))
+            {
+                BUT_load_Click(BUT_load, null);
+                return true;
+            }
+            if (Params.Focused)
+            {
+                if (keyData >= Keys.A && keyData <= Keys.Z)
+                {
+                    int row = FindRowIndex(0, keyData.ToString());
+                    Params.FirstDisplayedScrollingRowIndex = row;
+                    Params.ClearSelection();
+                    Params[1, row].Selected = true;
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        int FindRowIndex(int col, string startswith)
+        {
+            foreach (DataGridViewRow row in Params.Rows)
+            {
+                if (row.Cells[col].Value.ToString().StartsWith(startswith))
+                {
+                    return row.Index;
+                }
+            }
+            return 0;
+        }
+
+        private void CMB_ratesensors_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            MainV2.config[((ComboBox)sender).Name] = ((ComboBox)sender).Text;
+            MainV2.cs.ratesensors = byte.Parse(((ComboBox)sender).Text);
+        }
+
+        private void Params_KeyDown(object sender, KeyEventArgs e)
+        {
+
+        }
+
+        private void Params_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            
         }
     }
 }

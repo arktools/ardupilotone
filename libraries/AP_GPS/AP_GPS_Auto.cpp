@@ -55,7 +55,7 @@ AP_GPS_Auto::read(void)
 {
     GPS		*gps;
     uint8_t		i;
-    unsigned long then;
+    uint32_t then;
 
     // Loop through possible baudrates trying to detect a GPS at one of them.
     //
@@ -96,10 +96,10 @@ AP_GPS_Auto::read(void)
 GPS *
 AP_GPS_Auto::_detect(void)
 {
-    unsigned long then;
-    int		fingerprint[4];
-    int		tries;
-    int     charcount;
+    uint32_t then;
+    uint8_t	fingerprint[4];
+    uint8_t	tries;
+    uint16_t charcount;
     GPS		*gps;
 
     //

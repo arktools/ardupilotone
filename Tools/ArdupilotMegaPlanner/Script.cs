@@ -10,11 +10,11 @@ namespace ArdupilotMega
     {
         DateTime timeout = DateTime.Now;
         List<string> items = new List<string>();
-        Microsoft.Scripting.Hosting.ScriptEngine engine;
-        Microsoft.Scripting.Hosting.ScriptScope scope;
+        static Microsoft.Scripting.Hosting.ScriptEngine engine;
+        static Microsoft.Scripting.Hosting.ScriptScope scope;
 
         // keeps history
-        MAVLink.__mavlink_rc_channels_override_t rc = new MAVLink.__mavlink_rc_channels_override_t();
+        MAVLink.mavlink_rc_channels_override_t rc = new MAVLink.mavlink_rc_channels_override_t();
 
         public Script()
         {
@@ -24,17 +24,15 @@ namespace ArdupilotMega
             if (engine != null)
                 engine.Runtime.Shutdown();
 
-            engine = Python.CreateEngine(options); 
+            engine = Python.CreateEngine(options);
             scope = engine.CreateScope();
 
             scope.SetVariable("cs", MainV2.cs);
             scope.SetVariable("Script", this);
+            scope.SetVariable("mavutil", this);
 
-            Console.WriteLine(DateTime.Now.Millisecond);
             engine.CreateScriptSourceFromString("print 'hello world from python'").Execute(scope);
-            Console.WriteLine(DateTime.Now.Millisecond);
             engine.CreateScriptSourceFromString("print cs.roll").Execute(scope);
-            Console.WriteLine(DateTime.Now.Millisecond);
 
 
             object thisBoxed = MainV2.cs;
@@ -57,8 +55,22 @@ namespace ArdupilotMega
             }
         }
 
+        public object mavlink_connection(string device, int baud = 115200, int source_system = 255,
+                       bool write = false, bool append = false,
+                       bool robust_parsing = true, bool notimestamps = false, bool input = true)
+        {
 
-        public void Sleep(int ms) {
+            return null;
+        }
+
+        public object recv_match(string condition = null, string type = null, bool blocking = false)
+        {
+
+            return null;
+        }
+
+        public void Sleep(int ms)
+        {
             System.Threading.Thread.Sleep(ms);
         }
 
@@ -70,7 +82,7 @@ namespace ArdupilotMega
             }
             catch (Exception e)
             {
-                System.Windows.Forms.MessageBox.Show("Error running script " + e.Message);
+                System.Windows.Forms.CustomMessageBox.Show("Error running script " + e.Message);
             }
         }
 
@@ -107,7 +119,8 @@ namespace ArdupilotMega
         public bool WaitFor(string message, int timeout)
         {
             int timein = 0;
-            while (!MainV2.cs.message.Contains(message)) {
+            while (!MainV2.cs.message.Contains(message))
+            {
                 System.Threading.Thread.Sleep(5);
                 timein += 5;
                 if (timein > timeout)
@@ -116,8 +129,8 @@ namespace ArdupilotMega
 
             return true;
         }
-        
-        public bool SendRC(int channel, ushort pwm,bool sendnow)
+
+        public bool SendRC(int channel, ushort pwm, bool sendnow)
         {
             switch (channel)
             {

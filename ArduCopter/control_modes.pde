@@ -43,18 +43,20 @@ static void reset_control_switch()
 	read_control_switch();
 }
 
+#define CH_7_PWM_TRIGGER 1800
+
 // read at 10 hz
 // set this to your trainer switch
 static void read_trim_switch()
 {
 	#if CH7_OPTION == CH7_FLIP
-		if (g.rc_7.control_in > 800 && g.rc_3.control_in != 0){
+		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER && g.rc_3.control_in != 0){
 			do_flip = true;
 		}
 
 	#elif CH7_OPTION == CH7_SET_HOVER
 		// switch is engaged
-		if (g.rc_7.control_in > 800){
+		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){
 			trim_flag = true;
 
 		}else{ // switch is disengaged
@@ -70,27 +72,15 @@ static void read_trim_switch()
 			}
 		}
 
-	#elif CH7_OPTION == CH7_ADC_FILTER
-		if (g.rc_7.control_in > 800){
-			adc.filter_result = true;
-		}else{
-			adc.filter_result = false;
-		}
-
-		#elif CH7_OPTION == CH7_AUTO_TRIM
-		if (g.rc_7.control_in > 800){
-			auto_level_counter = 10;
-		}
-
 	#else
 
 	// this is the normal operation set by the mission planner
 
 	if(g.ch7_option == CH7_SIMPLE_MODE){
-		do_simple = (g.rc_7.control_in > 800);
+		do_simple = (g.rc_7.radio_in > CH_7_PWM_TRIGGER);
 
 	}else if (g.ch7_option == CH7_RTL){
-		if (trim_flag == false && g.rc_7.control_in > 800){
+		if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
 			trim_flag = true;
 			set_mode(RTL);
 		}
@@ -103,7 +93,7 @@ static void read_trim_switch()
 		}
 
 	}else if (g.ch7_option == CH7_SAVE_WP){
-		if (g.rc_7.control_in > 800){ // switch is engaged
+		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){ // switch is engaged
 			trim_flag = true;
 
 		}else{ // switch is disengaged
@@ -114,6 +104,7 @@ static void read_trim_switch()
 					// reset the mission
 					CH7_wp_index = 0;
 					g.command_total.set_and_save(1);
+					set_mode(RTL);
 					return;
 				}
 
@@ -154,8 +145,11 @@ static void read_trim_switch()
 				// 1 = takeoff
 				// 2 = WP 2
 				// 3 = command total
-
 			}
+		}
+	}else if (g.ch7_option == CH7_AUTO_TRIM){
+		if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){
+			auto_level_counter = 10;
 		}
 	}
 	#endif
@@ -184,9 +178,6 @@ static void auto_trim()
 
 			//Serial.println("Done");
 			auto_level_counter = 0;
-
-			// set TC
-			init_throttle_cruise();
 		}
 	}
 }
@@ -212,8 +203,7 @@ A_off: 201.95, -24.00, -88.56
 
 static void trim_accel()
 {
-	g.pi_stabilize_roll.reset_I();
-	g.pi_stabilize_pitch.reset_I();
+	reset_stability_I();
 
 	float trim_roll  = (float)g.rc_1.control_in / 30000.0;
 	float trim_pitch = (float)g.rc_2.control_in / 30000.0;
@@ -221,7 +211,7 @@ static void trim_accel()
 	trim_roll 	= constrain(trim_roll, -1.5, 1.5);
 	trim_pitch 	= constrain(trim_pitch, -1.5, 1.5);
 
-	if(g.rc_1.control_in > 200){ // Roll RIght
+	if(g.rc_1.control_in > 200){ // Roll Right
 		imu.ay(imu.ay() - trim_roll);
 	}else if (g.rc_1.control_in < -200){
 		imu.ay(imu.ay() - trim_roll);

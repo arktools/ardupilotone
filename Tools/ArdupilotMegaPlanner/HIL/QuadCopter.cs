@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
+using log4net;
 using YLScsDrawing.Drawing3d;
 using ArdupilotMega.HIL;
 
@@ -101,6 +103,7 @@ namespace ArdupilotMega.HIL
 
     public class QuadCopter : Aircraft
     {
+        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
         QuadCopter self;
 
         int framecount = 0;
@@ -204,7 +207,7 @@ namespace ArdupilotMega.HIL
                 delta_time = new TimeSpan(0, 0, 0, 0, 20);
             }
 
-             // rotational acceleration, in degrees/s/s, in body frame
+            // rotational acceleration, in degrees/s/s, in body frame
             double roll_accel = 0.0;
             double pitch_accel = 0.0;
             double yaw_accel = 0.0;
@@ -225,31 +228,31 @@ namespace ArdupilotMega.HIL
                 thrust += m[i] * self.thrust_scale; // newtons
             }
 
-        // rotational resistance
-        roll_accel  -= (self.pDeg / self.terminal_rotation_rate) * 5000.0;
-        pitch_accel -= (self.qDeg / self.terminal_rotation_rate) * 5000.0;
-        yaw_accel -= (self.rDeg / self.terminal_rotation_rate) * 400.0;
+            // rotational resistance
+            roll_accel -= (self.pDeg / self.terminal_rotation_rate) * 5000.0;
+            pitch_accel -= (self.qDeg / self.terminal_rotation_rate) * 5000.0;
+            yaw_accel -= (self.rDeg / self.terminal_rotation_rate) * 400.0;
 
             //Console.WriteLine("roll {0} {1} {2}", roll_accel, roll_rate, roll);
 
             //# update rotational rates in body frame
-        self.pDeg  += roll_accel * delta_time.TotalSeconds;
-        self.qDeg  += pitch_accel * delta_time.TotalSeconds;
-        self.rDeg += yaw_accel * delta_time.TotalSeconds;
+            self.pDeg += roll_accel * delta_time.TotalSeconds;
+            self.qDeg += pitch_accel * delta_time.TotalSeconds;
+            self.rDeg += yaw_accel * delta_time.TotalSeconds;
 
             // Console.WriteLine("roll {0} {1} {2}", roll_accel, roll_rate, roll);
 
-                    // calculate rates in earth frame
+            // calculate rates in earth frame
 
-             var answer =  BodyRatesToEarthRates(self.roll, self.pitch, self.yaw,
-                                                      self.pDeg, self.qDeg, self.rDeg);
-                    self.roll_rate = answer.Item1;
-         self.pitch_rate = answer.Item2;
-         self.yaw_rate = answer.Item3;
+            var answer = BodyRatesToEarthRates(self.roll, self.pitch, self.yaw,
+                                                     self.pDeg, self.qDeg, self.rDeg);
+            self.roll_rate = answer.Item1;
+            self.pitch_rate = answer.Item2;
+            self.yaw_rate = answer.Item3;
 
-         //self.roll_rate = pDeg;
-         //self.pitch_rate = qDeg;
-         //self.yaw_rate = rDeg;
+            //self.roll_rate = pDeg;
+            //self.pitch_rate = qDeg;
+            //self.yaw_rate = rDeg;
 
             //# update rotation
             roll += roll_rate * delta_time.TotalSeconds;
@@ -327,14 +330,14 @@ namespace ArdupilotMega.HIL
 
             // send to apm
 #if MAVLINK10
-            ArdupilotMega.MAVLink.__mavlink_gps_raw_int_t gps = new ArdupilotMega.MAVLink.__mavlink_gps_raw_int_t();
+            ArdupilotMega.MAVLink.mavlink_gps_raw_int_t gps = new ArdupilotMega.MAVLink.mavlink_gps_raw_int_t();
 #else
-            ArdupilotMega.MAVLink.__mavlink_gps_raw_t gps = new ArdupilotMega.MAVLink.__mavlink_gps_raw_t();
+            ArdupilotMega.MAVLink.mavlink_gps_raw_t gps = new ArdupilotMega.MAVLink.mavlink_gps_raw_t();
 #endif
 
-            ArdupilotMega.MAVLink.__mavlink_attitude_t att = new ArdupilotMega.MAVLink.__mavlink_attitude_t();
+            ArdupilotMega.MAVLink.mavlink_attitude_t att = new ArdupilotMega.MAVLink.mavlink_attitude_t();
 
-            ArdupilotMega.MAVLink.__mavlink_vfr_hud_t asp = new ArdupilotMega.MAVLink.__mavlink_vfr_hud_t();
+            ArdupilotMega.MAVLink.mavlink_vfr_hud_t asp = new ArdupilotMega.MAVLink.mavlink_vfr_hud_t();
 
             att.roll = (float)roll * deg2rad;
             att.pitch = (float)pitch * deg2rad;
@@ -377,7 +380,7 @@ namespace ArdupilotMega.HIL
 
             MainV2.comPort.sendPacket(att);
 
-            MAVLink.__mavlink_raw_pressure_t pres = new MAVLink.__mavlink_raw_pressure_t();
+            MAVLink.mavlink_raw_pressure_t pres = new MAVLink.mavlink_raw_pressure_t();
             double calc = (101325 * Math.Pow(1 - 2.25577 * Math.Pow(10, -5) * gps.alt, 5.25588));
             pres.press_diff1 = (short)(int)(calc); // 0 alt is 0 pa
 
@@ -385,7 +388,7 @@ namespace ArdupilotMega.HIL
 
             MainV2.comPort.sendPacket(asp);
 
-            if (framecount % 12 == 0)
+            if (framecount % 120 == 0)
             {// 50 / 10 = 5 hz
                 MainV2.comPort.sendPacket(gps);
                 //Console.WriteLine(DateTime.Now.Millisecond + " GPS" );
@@ -402,7 +405,7 @@ namespace ArdupilotMega.HIL
             return v;
         }
 
-        static Quaternion new_rotate_euler(double heading, double attitude, double bank)
+        public static Quaternion new_rotate_euler(double heading, double attitude, double bank)
         {
             Quaternion Q = new Quaternion();
             double c1 = Math.Cos(heading / 2);

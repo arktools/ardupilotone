@@ -145,8 +145,11 @@ namespace ArdupilotMega
                 return;
 
             //Console.WriteLine(DateTime.Now.Millisecond + " timer2 serial");
-
-            MainV2.cs.UpdateCurrentSettings(currentStateBindingSource);
+            try
+            {
+                MainV2.cs.UpdateCurrentSettings(currentStateBindingSource);
+            }
+            catch { }
 
             if (sw != null && sw.BaseStream.CanWrite)
             {
@@ -187,47 +190,6 @@ namespace ArdupilotMega
             else { list6.Clear(); }
         }
 
-        public static string CustomMessageBox(string title, string promptText, string buttontext1, string buttontext2)
-        {
-            Form form = new Form();
-            System.Windows.Forms.Label label = new System.Windows.Forms.Label();
-            Button button1 = new Button();
-            Button button2 = new Button();
-
-            form.Text = title;
-            label.Text = promptText;
-
-            button1.Text = buttontext1;
-            button2.Text = buttontext2;
-            button1.DialogResult = DialogResult.OK;
-            button2.DialogResult = DialogResult.Cancel;
-
-            label.SetBounds(9, 10, 372, 13);
-            button1.SetBounds(228, 72, 75, 23);
-            button2.SetBounds(309, 72, 75, 23);
-
-            label.AutoSize = true;
-            button1.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-            button2.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
-
-            form.ClientSize = new Size(396, 107);
-            form.Controls.AddRange(new Control[] { label, button1, button2 });
-            form.ClientSize = new Size(Math.Max(300, label.Right + 10), form.ClientSize.Height);
-            form.FormBorderStyle = FormBorderStyle.FixedDialog;
-            form.StartPosition = FormStartPosition.CenterScreen;
-            form.MinimizeBox = false;
-            form.MaximizeBox = false;
-            form.AcceptButton = button1;
-            form.CancelButton = button2;
-
-            DialogResult dialogResult = form.ShowDialog();
-            if (dialogResult == DialogResult.OK)
-            {
-                return buttontext1;
-            }
-            return buttontext2;
-        }
-
         private void ACM_Setup_Load(object sender, EventArgs e)
         {
 
@@ -255,7 +217,7 @@ namespace ArdupilotMega
 
                     MainV2.cs.ratesensors = 3; // hardcode 3 hz
 
-                    comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_SENSORS, MainV2.cs.ratesensors); // request raw sensor
+                    comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.RAW_SENSORS, MainV2.cs.ratesensors); // request raw sensor
                 }
                 catch { }
             }
@@ -271,7 +233,7 @@ namespace ArdupilotMega
 
                         if (!comPort.BaseStream.IsOpen && !MainV2.comPort.logreadmode)
                         {
-                            MessageBox.Show("Please connect first");
+                            CustomMessageBox.Show("Please connect first");
                             this.Close();
                         }
 
@@ -280,16 +242,16 @@ namespace ArdupilotMega
                         //comPort.stopall(true); // ensure off
 
                         Console.WriteLine("Req streams {0} {1}", comPort.bps, DateTime.Now);
-                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_EXTENDED_STATUS, 0); // mode gps raw
-                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_POSITION, 3); // request location
-                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA1, 3); // request attitude
-                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_EXTRA2, 3); // request vfr
-                        comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_SENSORS, MainV2.cs.ratesensors); // request raw sensor
-                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RC_CHANNELS, 3); // request rc info
+                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.EXTENDED_STATUS, 0); // mode gps raw
+                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.POSITION, 3); // request location
+                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.EXTRA1, 3); // request attitude
+                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.EXTRA2, 3); // request vfr
+                        comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.RAW_SENSORS, MainV2.cs.ratesensors); // request raw sensor
+                        //comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.RC_CHANNELS, 3); // request rc info
                     }
                     catch
                     {
-                        MessageBox.Show("Comport open failed");
+                        CustomMessageBox.Show("Comport open failed");
                         return;
                     }
                 timer1.Start();
@@ -298,7 +260,7 @@ namespace ArdupilotMega
         private void CMB_rawupdaterate_SelectedIndexChanged(object sender, EventArgs e)
         {
             MainV2.cs.ratesensors = (byte)int.Parse(CMB_rawupdaterate.Text);
-            comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.MAV_DATA_STREAM_RAW_SENSORS, (byte)int.Parse(CMB_rawupdaterate.Text)); // request raw sensor
+            comPort.requestDatastream((byte)ArdupilotMega.MAVLink.MAV_DATA_STREAM.RAW_SENSORS, (byte)int.Parse(CMB_rawupdaterate.Text)); // request raw sensor
         }
 
         System.IO.StreamWriter sw = null;

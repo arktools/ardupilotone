@@ -1,5 +1,5 @@
-import euclid, math, util
-
+import math, util, rotmat
+from rotmat import Vector3, Matrix3
 
 class Aircraft(object):
     '''a basic aircraft class'''
@@ -14,67 +14,44 @@ class Aircraft(object):
         self.longitude = self.home_longitude
         self.altitude  = self.home_altitude
 
-        self.pitch = 0.0        # degrees
-        self.roll = 0.0         # degrees
-        self.yaw = 0.0          # degrees
+        self.dcm = Matrix3()
 
-        # rates in earth frame
-        self.pitch_rate = 0.0   # degrees/s
-        self.roll_rate = 0.0    # degrees/s
-        self.yaw_rate = 0.0     # degrees/s
+        # rotation rate in body frame
+        self.gyro = Vector3(0,0,0) # rad/s
 
-        # rates in body frame
-        self.pDeg = 0.0   # degrees/s
-        self.qDeg = 0.0   # degrees/s
-        self.rDeg = 0.0   # degrees/s
-
-        self.velocity = euclid.Vector3(0, 0, 0) # m/s, North, East, Up
-        self.position = euclid.Vector3(0, 0, 0) # m North, East, Up
-        self.accel    = euclid.Vector3(0, 0, 0) # m/s/s North, East, Up
+        self.velocity = Vector3(0, 0, 0) # m/s, North, East, Down
+        self.position = Vector3(0, 0, 0) # m North, East, Down
         self.mass = 0.0
         self.update_frequency = 50 # in Hz
         self.gravity = 9.8 # m/s/s
-        self.accelerometer = euclid.Vector3(0, 0, -self.gravity)
+        self.accelerometer = Vector3(0, 0, -self.gravity)
 
         self.wind = util.Wind('0,0,0')
 
-    def normalise(self):
-        '''normalise roll, pitch and yaw
+    def on_ground(self, position=None):
+        '''return true if we are on the ground'''
+        if position is None:
+            position = self.position
+        return (-position.z) + self.home_altitude <= self.ground_level + self.frame_height
 
-        roll between -180 and 180
-        pitch between -180 and 180
-        yaw between 0 and 360
 
-        '''
-        def norm(angle, min, max):
-            while angle > max:
-                angle -= 360
-            while angle < min:
-                angle += 360
-            return angle
-        self.roll  = norm(self.roll, -180, 180)
-        self.pitch = norm(self.pitch, -180, 180)
-        self.yaw   = norm(self.yaw, 0, 360)
-
-    def update_position(self):
+    def update_position(self, delta_time):
         '''update lat/lon/alt from position'''
 
         radius_of_earth = 6378100.0 # in meters
         dlat = math.degrees(math.atan(self.position.x/radius_of_earth))
-        dlon = math.degrees(math.atan(self.position.y/radius_of_earth))
-
-        self.altitude  = self.home_altitude + self.position.z
         self.latitude  = self.home_latitude + dlat
+        lon_scale = math.cos(math.radians(self.latitude));
+        dlon = math.degrees(math.atan(self.position.y/radius_of_earth))/lon_scale
         self.longitude = self.home_longitude + dlon
 
-        from math import sin, cos, sqrt, radians
-        
-        # work out what the accelerometer would see
-        xAccel = sin(radians(self.pitch)) * cos(radians(self.roll))
-        yAccel = -sin(radians(self.roll)) * cos(radians(self.pitch))
-        zAccel = -cos(radians(self.roll)) * cos(radians(self.pitch))
-        scale = 9.81 / sqrt((xAccel*xAccel)+(yAccel*yAccel)+(zAccel*zAccel))
-        xAccel *= scale;
-        yAccel *= scale;
-        zAccel *= scale;
-        self.accelerometer = euclid.Vector3(xAccel, yAccel, zAccel)
+        self.altitude  = self.home_altitude - self.position.z
+
+        velocity_body = self.dcm.transposed() * self.velocity
+
+        # force the acceleration to mostly be from gravity. We should be using 100% accel_body,
+        # but right now that flies very badly as the AHRS system can't do centripetal correction
+        # for multicopters. This is a compromise until we get that sorted out
+        accel_true = self.accel_body
+        accel_fake = self.dcm.transposed() * Vector3(0, 0, -self.gravity)
+        self.accelerometer = (accel_true * 0.5) + (accel_fake * 0.5)

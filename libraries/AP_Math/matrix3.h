@@ -90,27 +90,14 @@ public:
 	{	return *this = *this / num;	}
 
 	// multiplication by a vector
-	Vector3<T> operator *(const Vector3<T> &v) const
-	{
-		return Vector3<T>(a.x * v.x + a.y * v.y + a.z * v.z,
-						  b.x * v.x + b.y * v.y + b.z * v.z,
-						  c.x * v.x + c.y * v.y + c.z * v.z);
-	}
+	Vector3<T> operator *(const Vector3<T> &v) const;
+
+	// multiplication of transpose by a vector
+	Vector3<T> mul_transpose(const Vector3<T> &v) const;
 
 	// multiplication by another Matrix3<T>
-	Matrix3<T> operator *(const Matrix3<T> &m) const
-	{
-		Matrix3<T> temp (Vector3<T>(a.x * m.a.x + a.y * m.b.x + a.z * m.c.x,
-									a.x * m.a.y + a.y * m.b.y + a.z * m.c.y,
-									a.x * m.a.z + a.y * m.b.z + a.z * m.c.z),
-						 Vector3<T>(b.x * m.a.x + b.y * m.b.x + b.z * m.c.x,
-									b.x * m.a.y + b.y * m.b.y + b.z * m.c.y,
-									b.x * m.a.z + b.y * m.b.z + b.z * m.c.z),
-						 Vector3<T>(c.x * m.a.x + c.y * m.b.x + c.z * m.c.x,
-									c.x * m.a.y + c.y * m.b.y + c.z * m.c.y,
-									c.x * m.a.z + c.y * m.b.z + c.z * m.c.z));
-		return temp;
-	}
+	Matrix3<T> operator *(const Matrix3<T> &m) const;
+
 	Matrix3<T> &operator *=(const Matrix3<T> &m)
 	{	return *this = *this * m;	}
 
@@ -124,6 +111,37 @@ public:
 	Matrix3<T> transpose(void)
 	{	return *this = transposed();	}
 
+	// zero the matrix
+	void zero(void) {
+		a.x = a.y = a.z = 0;
+		b.x = b.y = b.z = 0;
+		c.x = c.y = c.z = 0;
+	}
+
+	// setup the identity matrix
+	void identity(void) {
+		a.x = b.y = c.z = 1;
+		a.y = a.z = 0;
+		b.x = b.z = 0;
+		c.x = c.y = 0;
+	}
+
+	// check if any elements are NAN
+	bool is_nan(void)
+		{   return a.is_nan() || b.is_nan() || c.is_nan(); }
+
+	// fill in the matrix with a standard rotation
+	void rotation(enum Rotation rotation);
+
+    // create a rotation matrix from Euler angles
+	void from_euler(float roll, float pitch, float yaw);
+
+    // create eulers from a rotation matrix
+	void to_euler(float *roll, float *pitch, float *yaw);
+
+    // apply an additional rotation from a body frame gyro vector
+    // to a rotation matrix.
+	void rotate(const Vector3<T> &g);
 };
 
 typedef Matrix3<int16_t>		Matrix3i;

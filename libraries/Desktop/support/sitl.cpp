@@ -25,6 +25,8 @@
 #include <wiring.h>
 #include <AP_PeriodicProcess.h>
 #include <AP_TimerProcess.h>
+#include <GCS_MAVLink.h>
+#include <avr/interrupt.h>
 #include "sitl_adc.h"
 #include "sitl_rc.h"
 #include "desktop.h"
@@ -53,7 +55,9 @@ struct sitl_fdm {
 
 static int sitl_fd;
 struct sockaddr_in rcout_addr;
+#ifndef __CYGWIN__
 static pid_t parent_pid;
+#endif
 struct ADC_UDR2 UDR2;
 struct RC_ICR4 ICR4;
 extern AP_TimerProcess timer_scheduler;
@@ -157,8 +161,12 @@ static void sitl_fdm_input(void)
 
 }
 
+// used for noise generation in the ADC code
+// motor speed in revolutions per second
+float sitl_motor_speed[4] = {0,0,0,0};
+
 /*
-  send RC outputs to simulator for a quadcopter
+  send RC outputs to simulator
  */
 static void sitl_simulator_output(void)
 {
@@ -189,9 +197,23 @@ static void sitl_simulator_output(void)
 	last_update = millis();
 
 	for (i=0; i<11; i++) {
-		// the registers are 2x the PWM value
-		pwm[i] = (*reg[i])/2;
+		if (*reg[i] == 0xFFFF) {
+			pwm[i] = 0;
+		} else {
+			pwm[i] = (*reg[i])/2;
+		}
 	}
+
+	if (!desktop_state.quadcopter) {
+		// 400kV motor, 16V
+		sitl_motor_speed[0] = ((pwm[2]-1000)/1000.0) * 400 * 16 / 60.0;
+	} else {
+		// 850kV motor, 16V
+		for (i=0; i<4; i++) {
+			sitl_motor_speed[i] = ((pwm[i]-1000)/1000.0) * 850 * 12 / 60.0;
+		}
+	}
+
 	sendto(sitl_fd, (void*)pwm, sizeof(pwm), MSG_DONTWAIT, (const sockaddr *)&rcout_addr, sizeof(rcout_addr));
 }
 
@@ -201,11 +223,31 @@ static void sitl_simulator_output(void)
 static void timer_handler(int signum)
 {
 	static uint32_t last_update_count;
+	static bool running;
 
+	if (running) {
+		return;
+	}
+	running = true;
+	cli();
+
+#ifndef __CYGWIN__
 	/* make sure we die if our parent dies */
 	if (kill(parent_pid, 0) != 0) {
 		exit(1);
 	}
+#else
+    
+    static uint16_t count = 0;
+    static uint32_t last_report;
+        
+    	count++;
+		if (millis() - last_report > 1000) {
+			printf("TH %u cps\n", count);
+			count = 0;
+			last_report = millis();
+		}
+#endif
 
 	/* check for packet from flight sim */
 	sitl_fdm_input();
@@ -223,10 +265,14 @@ static void timer_handler(int signum)
 
 	if (update_count == 0) {
 		sitl_update_gps(0, 0, 0, 0, 0, false);
+		sei();
+		running = false;
 		return;
 	}
 
 	if (update_count == last_update_count) {
+		sei();
+		running = false;
 		return;
 	}
 	last_update_count = update_count;
@@ -239,7 +285,9 @@ static void timer_handler(int signum)
 			sim_state.xAccel, sim_state.yAccel, sim_state.zAccel,
 			sim_state.airspeed);
 	sitl_update_barometer(sim_state.altitude);
-	sitl_update_compass(sim_state.heading, sim_state.rollDeg, sim_state.pitchDeg, sim_state.heading);
+	sitl_update_compass(sim_state.rollDeg, sim_state.pitchDeg, sim_state.heading);
+	sei();
+	running = false;
 }
 
 
@@ -270,7 +318,9 @@ static void setup_timer(void)
  */
 void sitl_setup(void)
 {
+#ifndef __CYGWIN__
 	parent_pid = getppid();
+#endif
 
 	rcout_addr.sin_family = AF_INET;
 	rcout_addr.sin_port = htons(RCOUT_PORT);
@@ -284,6 +334,35 @@ void sitl_setup(void)
 	// setup some initial values
 	sitl_update_barometer(desktop_state.initial_height);
 	sitl_update_adc(0, 0, 0, 0, 0, 0, 0, 0, -9.8, 0);
-	sitl_update_compass(0, 0, 0, 0);
+	sitl_update_compass(0, 0, 0);
 	sitl_update_gps(0, 0, 0, 0, 0, false);
+}
+
+
+/* report SITL state via MAVLink */
+void sitl_simstate_send(uint8_t chan)
+{
+	double p, q, r;
+	float yaw;
+
+	// we want the gyro values to be directly comparable to the
+	// raw_imu message, which is in body frame
+	convert_body_frame(sim_state.rollDeg, sim_state.pitchDeg,
+			   sim_state.rollRate, sim_state.pitchRate, sim_state.yawRate,
+			   &p, &q, &r);
+
+	// convert to same conventions as DCM
+	yaw = sim_state.yawDeg;
+	if (yaw > 180) {
+		yaw -= 360;
+	}
+
+	mavlink_msg_simstate_send((mavlink_channel_t)chan,
+				  ToRad(sim_state.rollDeg),
+				  ToRad(sim_state.pitchDeg),
+				  ToRad(yaw),
+				  sim_state.xAccel,
+				  sim_state.yAccel,
+				  sim_state.zAccel,
+				  p, q, r);
 }

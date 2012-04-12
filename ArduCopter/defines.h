@@ -7,6 +7,9 @@
 #define ENABLED			1
 #define DISABLED		0
 
+// this avoids a very common config error
+#define ENABLE ENABLED
+#define DISABLE DISABLED
 
 // Flight modes
 // ------------
@@ -60,11 +63,15 @@
 #define NORMAL_LEDS 0
 #define AUTO_TRIM_LEDS 1
 
-// motor LEDs
-#define FR_LED AN12  // Mega PE4 pin, OUT7
-#define RE_LED AN14  // Mega PE5 pin, OUT6
-#define RI_LED AN10  // Mega PH4 pin, OUT5
-#define LE_LED AN8   // Mega PH5 pin, OUT4
+// COPTER LEDs
+#define COPTER_LED_1 AN8  	// Motor LED
+#define COPTER_LED_2 AN9  	// Motor LED
+#define COPTER_LED_3 AN10 	// Motor LED
+#define COPTER_LED_4 AN11 	// Motor LED
+#define COPTER_LED_5 AN12	// Motor or Aux LED
+#define COPTER_LED_6 AN13 	// Motor or Aux LED
+#define COPTER_LED_7 AN14 	// Motor or GPS LED
+#define COPTER_LED_8 AN15 	// Motor or GPS LED
 
 // Internal defines, don't edit and expect things to work
 // -------------------------------------------------------
@@ -122,9 +129,8 @@
 #define CIRCLE 7			// AUTO control
 #define POSITION 8			// AUTO control
 #define LAND 9				// AUTO control
-#define NUM_MODES 10
-
-#define INITIALISING 9     // in startup routines
+#define OF_LOITER 10			// Hold a single location using optical flow sensor
+#define NUM_MODES 11
 
 #define SIMPLE_1 1
 #define SIMPLE_2 2
@@ -139,20 +145,28 @@
 // Attitude
 #define CH6_STABILIZE_KP 1
 #define CH6_STABILIZE_KI 2
-#define	CH6_YAW_KP 3
+#define CH6_STABILIZE_KD 29
+#define CH6_YAW_KP 3
+#define CH6_YAW_KI 24
 // Rate
+#define CH6_ACRO_KP 25
 #define CH6_RATE_KP 4
 #define CH6_RATE_KI 5
-#define	CH6_YAW_RATE_KP 6
+#define CH6_RATE_KD 21
+#define CH6_YAW_RATE_KP 6
+#define CH6_YAW_RATE_KD 26
 // Altitude rate controller
 #define CH6_THROTTLE_KP 7
 // Extras
 #define CH6_TOP_BOTTOM_RATIO 8
 #define CH6_RELAY 9
-#define CH6_TRAVERSE_SPEED 10
+// Navigation
+#define CH6_TRAVERSE_SPEED 10	// maximum speed to next way point
+#define CH6_NAV_KP 11
+#define CH6_LOITER_KP 12
+#define CH6_LOITER_KI 27
 
-#define CH6_NAV_P 11
-#define CH6_LOITER_P 12
+// Trad Heli specific
 #define CH6_HELI_EXTERNAL_GYRO 13
 
 // altitude controller
@@ -163,6 +177,12 @@
 // optical flow controller
 #define CH6_OPTFLOW_KP 17
 #define CH6_OPTFLOW_KI 18
+#define CH6_OPTFLOW_KD 19
+
+#define CH6_NAV_I 20
+#define CH6_LOITER_RATE_KP 22
+#define CH6_LOITER_RATE_KI 28
+#define CH6_LOITER_RATE_KD 23
 
 
 // nav byte mask
@@ -228,6 +248,9 @@ enum ap_message {
     MSG_NEXT_WAYPOINT,
     MSG_NEXT_PARAM,
     MSG_STATUSTEXT,
+    MSG_AHRS,
+    MSG_SIMSTATE,
+    MSG_HWSTATUS,
     MSG_RETRY_DEFERRED // this must be last
 };
 
@@ -254,6 +277,7 @@ enum gcs_severity {
 #define LOG_MOTORS_MSG 			0x0B
 #define LOG_OPTFLOW_MSG 		0x0C
 #define LOG_DATA_MSG 			0x0D
+#define LOG_PID_MSG 			0x0E
 #define LOG_INDEX_MSG			0xF0
 #define MAX_NUM_LOGS			50
 
@@ -269,6 +293,7 @@ enum gcs_severity {
 #define MASK_LOG_CUR			(1<<9)
 #define MASK_LOG_MOTORS			(1<<10)
 #define MASK_LOG_OPTFLOW		(1<<11)
+#define MASK_LOG_PID			(1<<12)
 
 // Waypoint Modes
 // ----------------
@@ -291,9 +316,9 @@ enum gcs_severity {
 // Climb rate calculations
 #define	ALTITUDE_HISTORY_LENGTH 8	//Number of (time,altitude) points to regress a climb rate from
 
+#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1024.0))*g.volt_div_ratio
+#define CURRENT_AMPS(x) ((x*(g.input_voltage/1024.0))-CURR_AMPS_OFFSET)*g.curr_amp_per_volt
 
-#define BATTERY_VOLTAGE(x) (x*(g.input_voltage/1023.0))*VOLT_DIV_RATIO
-#define CURRENT_AMPS(x) ((x*(g.input_voltage/1023.0))-CURR_AMPS_OFFSET)*CURR_AMP_PER_VOLT
 //#define BARO_FILTER_SIZE 8
 
 /* ************************************************************** */
@@ -341,8 +366,8 @@ enum gcs_severity {
 
 // EEPROM addresses
 #define EEPROM_MAX_ADDR		4096
-// parameters get the first 1KiB of EEPROM, remainder is for waypoints
-#define WP_START_BYTE 0x400 // where in memory home WP is stored + all other WP
+// parameters get the first 1280 bytes of EEPROM, remainder is for waypoints
+#define WP_START_BYTE 0x500 // where in memory home WP is stored + all other WP
 #define WP_SIZE 15
 
 #define ONBOARD_PARAM_NAME_LENGTH 15
@@ -364,5 +389,10 @@ enum gcs_severity {
 
 #define LOGGING_SIMPLE    1
 #define LOGGING_VERBOSE   2
+
+// Channel Config selection
+
+#define CHANNEL_CONFIG_DEFAULT 1
+#define CHANNEL_CONFIG_CUSTOM  2
 
 #endif // _DEFINES_H

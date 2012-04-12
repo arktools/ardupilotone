@@ -79,22 +79,11 @@ static void init_ardupilot()
 	// Console serial port
 	//
 	// The console port buffers are defined to be sufficiently large to support
-	// the console's use as a logging device, optionally as the GPS port when
-	// GPS_PROTOCOL_IMU is selected, and as the telemetry port.
+	// the MAVLink protocol efficiently
 	//
-	// XXX This could be optimised to reduce the buffer sizes in the cases
-	// where they are not otherwise required.
-	//
-	Serial.begin(SERIAL0_BAUD, 128, 128);
+	Serial.begin(SERIAL0_BAUD, 128, 256);
 
 	// GPS serial port.
-	//
-	// XXX currently the EM406 (SiRF receiver) is nominally configured
-	// at 57600, however it's not been supported to date.  We should
-	// probably standardise on 38400.
-	//
-	// XXX the 128 byte receive buffer may be too small for NMEA, depending
-	// on the message set configured.
 	//
     // standard gps running
     Serial1.begin(38400, 128, 16);
@@ -102,6 +91,10 @@ static void init_ardupilot()
 	Serial.printf_P(PSTR("\n\nInit " THISFIRMWARE
 						 "\n\nFree RAM: %u\n"),
                     memcheck_available_memory());
+
+#if QUATERNION_ENABLE == ENABLED
+    Serial.printf_P(PSTR("Quaternion test\n"));
+#endif
 
 	//
 	// Initialize Wire and SPI libraries
@@ -118,28 +111,7 @@ static void init_ardupilot()
 	//
 	// Check the EEPROM format version before loading any parameters from EEPROM.
 	//
-	
-	if (!g.format_version.load() ||
-	     g.format_version != Parameters::k_format_version) {
-
-		// erase all parameters
-		Serial.printf_P(PSTR("Firmware change: erasing EEPROM...\n"));
-		delay(100); // wait for serial send
-		AP_Var::erase_all();
-		
-		// save the current format version
-		g.format_version.set_and_save(Parameters::k_format_version);
-		Serial.println_P(PSTR("done."));
-
-    } else {
-	    unsigned long before = micros();
-	    // Load all auto-loaded EEPROM variables
-	    AP_Var::load_all();
-
-	    Serial.printf_P(PSTR("load_all took %luus\n"), micros() - before);
-	    Serial.printf_P(PSTR("using %u bytes of memory (%u resets)\n"), 
-                        AP_Var::get_memory_use(), (unsigned)g.num_resets);
-	}
+    load_parameters();
 
     // keep a record of how many resets have happened. This can be
     // used to detect in-flight resets
@@ -152,11 +124,11 @@ static void init_ardupilot()
     if (!usb_connected) {
         // we are not connected via USB, re-init UART0 with right
         // baud rate
-        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD));
     }
 #else
     // we have a 2nd serial port for telemetry
-    Serial3.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+    Serial3.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 256);
 	gcs3.init(&Serial3);
 #endif
 
@@ -182,12 +154,11 @@ static void init_ardupilot()
 
 	if (g.compass_enabled==true) {
         compass.set_orientation(MAG_ORIENTATION);							// set compass's orientation on aircraft
-		if (!compass.init()) {
+		if (!compass.init() || !compass.read()) {
             Serial.println_P(PSTR("Compass initialisation failed!"));
             g.compass_enabled = false;
         } else {
-            dcm.set_compass(&compass);
-            compass.get_offsets();						// load offsets to account for airframe magnetic interference
+            ahrs.set_compass(&compass);
             compass.null_offsets_enable();
         }
 	}
@@ -266,8 +237,8 @@ static void init_ardupilot()
 		//----------------
 		//read_EEPROM_airstart_critical();
 #if HIL_MODE != HIL_MODE_ATTITUDE
-        imu.warmStart();
-		dcm.set_centripetal(1);
+		imu.init(IMU::WARM_START, mavlink_delay, flash_leds, &timer_scheduler);
+		ahrs.set_centripetal(1);
 #endif
 
 		// This delay is important for the APM_RC library to work.
@@ -322,7 +293,7 @@ static void startup_ground(void)
 	//IMU ground start
 	//------------------------
     //
-	startup_IMU_ground();
+	startup_IMU_ground(false);
 
 	// read the radio to set trims
 	// ---------------------------
@@ -354,6 +325,14 @@ static void startup_ground(void)
 	// Makes the servos wiggle - 3 times signals ready to fly
 	// -----------------------
 	demo_servos(3);
+
+    // we don't want writes to the serial port to cause us to pause
+    // mid-flight, so set the serial ports non-blocking once we are
+    // ready to fly
+    Serial.set_blocking_writes(false);
+    if (gcs3.initialised) {
+        Serial3.set_blocking_writes(false);
+    }
 
 	gcs_send_text_P(SEVERITY_LOW,PSTR("\n\n Ready to FLY."));
 }
@@ -445,7 +424,7 @@ static void check_short_failsafe()
 }
 
 
-static void startup_IMU_ground(void)
+static void startup_IMU_ground(bool force_accel_level)
 {
 #if HIL_MODE != HIL_MODE_ATTITUDE
     gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Warming up ADC..."));
@@ -457,10 +436,15 @@ static void startup_IMU_ground(void)
     gcs_send_text_P(SEVERITY_MEDIUM, PSTR("Beginning IMU calibration; do not move plane"));
 	mavlink_delay(1000);
 
-    imu.coldStart();
-	imu.init_accel();
-	dcm.set_centripetal(1);
-    dcm.matrix_reset();
+	imu.init(IMU::COLD_START, mavlink_delay, flash_leds, &timer_scheduler);
+    if (force_accel_level || g.manual_level == 0) {
+        // when MANUAL_LEVEL is set to 1 we don't do accelerometer
+        // levelling on each boot, and instead rely on the user to do
+        // it once via the ground station
+        imu.init_accel(mavlink_delay, flash_leds);
+    }
+	ahrs.set_centripetal(1);
+    ahrs.reset();
 
 	// read Baro pressure at ground
 	//-----------------------------
@@ -514,10 +498,9 @@ static void update_GPS_light(void)
 static void resetPerfData(void) {
 	mainLoop_count 			= 0;
 	G_Dt_max 				= 0;
-	dcm.gyro_sat_count 		= 0;
 	imu.adc_constraints 	= 0;
-	dcm.renorm_sqrt_count 	= 0;
-	dcm.renorm_blowup_count = 0;
+	ahrs.renorm_range_count 	= 0;
+	ahrs.renorm_blowup_count = 0;
 	gps_fix_count 			= 0;
 	pmTest1					= 0;
 	perf_mon_timer 			= millis();
@@ -530,6 +513,9 @@ static void resetPerfData(void) {
 static uint32_t map_baudrate(int8_t rate, uint32_t default_baud)
 {
     switch (rate) {
+    case 1:    return 1200;
+    case 2:    return 2400;
+    case 4:    return 4800;
     case 9:    return 9600;
     case 19:   return 19200;
     case 38:   return 38400;
@@ -553,9 +539,9 @@ static void check_usb_mux(void)
     // the user has switched to/from the telemetry port
     usb_connected = usb_check;
     if (usb_connected) {
-        Serial.begin(SERIAL0_BAUD, 128, 128);
+        Serial.begin(SERIAL0_BAUD);
     } else {
-        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD), 128, 128);
+        Serial.begin(map_baudrate(g.serial3_baud, SERIAL3_BAUD));
     }
 }
 #endif
@@ -570,3 +556,38 @@ void flash_leds(bool on)
     digitalWrite(A_LED_PIN, on?LED_OFF:LED_ON);
     digitalWrite(C_LED_PIN, on?LED_ON:LED_OFF);
 }
+
+#ifndef DESKTOP_BUILD
+/*
+ * Read Vcc vs 1.1v internal reference
+ *
+ * This call takes about 150us total. ADC conversion is 13 cycles of
+ * 125khz default changes the mux if it isn't set, and return last
+ * reading (allows necessary settle time) otherwise trigger the
+ * conversion
+ */
+uint16_t board_voltage(void)
+{
+	const uint8_t mux = (_BV(REFS0)|_BV(MUX4)|_BV(MUX3)|_BV(MUX2)|_BV(MUX1));
+
+	if (ADMUX == mux) {
+		ADCSRA |= _BV(ADSC);                // Convert
+		uint16_t counter=4000; // normally takes about 1700 loops
+		while (bit_is_set(ADCSRA, ADSC) && counter)  // Wait
+			counter--;
+		if (counter == 0) {
+			// we don't actually expect this timeout to happen,
+			// but we don't want any more code that could hang. We
+			// report 0V so it is clear in the logs that we don't know
+			// the value
+			return 0;
+		}
+		uint32_t result = ADCL | ADCH<<8;
+		return 1126400UL / result;       // Read and back-calculate Vcc in mV
+    }
+    // switch mux, settle time is needed. We don't want to delay
+    // waiting for the settle, so report 0 as a "don't know" value
+    ADMUX = mux;
+	return 0; // we don't know the current voltage
+}
+#endif

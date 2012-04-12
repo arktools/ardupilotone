@@ -1,7 +1,7 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
 // 10 = 1 second
-#define ARM_DELAY 30
+#define ARM_DELAY 20
 #define DISARM_DELAY 20
 #define LEVEL_DELAY 100
 
@@ -26,7 +26,7 @@ static void arm_motors()
 			arming_counter = 0;
 
 		}else if (arming_counter == ARM_DELAY){
-			if(motor_armed == false){
+			if(motors.armed() == false){
 				// arm the motors and configure for flight
 				init_arm_motors();
 			}
@@ -46,7 +46,7 @@ static void arm_motors()
 			arming_counter = 0;
 
 		}else if (arming_counter == DISARM_DELAY){
-			if(motor_armed == true){
+			if(motors.armed()){
 				// arm the motors and configure for flight
 				init_disarm_motors();
 			}
@@ -75,7 +75,14 @@ static void init_arm_motors()
 	gcs_send_text_P(SEVERITY_HIGH, PSTR("ARMING MOTORS"));
 	#endif
 
-	motor_armed 	= true;
+    // we don't want writes to the serial port to cause us to pause
+    // mid-flight, so set the serial ports non-blocking once we arm
+    // the motors
+    Serial.set_blocking_writes(false);
+    if (gcs3.initialised) {
+        Serial3.set_blocking_writes(false);
+    }
+	motors.armed(true);
 
 	#if PIEZO_ARMING == 1
 	piezo_beep();
@@ -92,6 +99,10 @@ static void init_arm_motors()
 	// -------------------
 	if(home_is_set)
 		init_home();
+
+	// all I terms are invalid
+	// -----------------------
+    reset_I_all();
 
 	if(did_ground_start == false){
 		did_ground_start = true;
@@ -118,7 +129,7 @@ static void init_disarm_motors()
 	gcs_send_text_P(SEVERITY_HIGH, PSTR("DISARMING MOTORS"));
 	#endif
 
-	motor_armed 	= false;
+	motors.armed(false);
 	compass.save_offsets();
 
 	g.throttle_cruise.save();
@@ -137,25 +148,6 @@ static void init_disarm_motors()
 static void
 set_servos_4()
 {
-	if (motor_armed == true && motor_auto_armed == true) {
-		// creates the radio_out and pwm_out values
-		output_motors_armed();
-	} else{
-		output_motors_disarmed();
-	}
-}
-
-int ch_of_mot( int mot ) {
-  switch (mot) {
-    case 1: return MOT_1;
-    case 2: return MOT_2;
-    case 3: return MOT_3;
-    case 4: return MOT_4;
-    case 5: return MOT_5;
-    case 6: return MOT_6;
-    case 7: return MOT_7;
-    case 8: return MOT_8;
-  }
-  return (-1);
+	motors.output();
 }
 

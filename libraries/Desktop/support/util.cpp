@@ -13,7 +13,9 @@
 #include <math.h>
 #include <stdint.h>
 #include <fcntl.h>
+#include <AP_Math.h>
 #include "desktop.h"
+#include "util.h"
 
 
 void set_nonblocking(int fd)
@@ -36,4 +38,36 @@ double normalise(double v, double min, double max)
 double normalise180(double v)
 {
 	return normalise(v, -180, 180);
+}
+
+/* convert the angular velocities from earth frame to
+   body frame. Thanks to James Goppert for the formula
+*/
+void convert_body_frame(double rollDeg, double pitchDeg,
+			double rollRate, double pitchRate, double yawRate,
+			double *p, double *q, double *r)
+{
+	double phi, theta, phiDot, thetaDot, psiDot;
+
+	phi = ToRad(rollDeg);
+	theta = ToRad(pitchDeg);
+	phiDot = ToRad(rollRate);
+	thetaDot = ToRad(pitchRate);
+	psiDot = ToRad(yawRate);
+
+	*p = phiDot - psiDot*sin(theta);
+	*q = cos(phi)*thetaDot + sin(phi)*psiDot*cos(theta);
+	*r = cos(phi)*psiDot*cos(theta) - sin(phi)*thetaDot;
+}
+
+// generate a random Vector3f of size 1
+Vector3f rand_vec3f(void)
+{
+	Vector3f v = Vector3f(rand_float(),
+			      rand_float(),
+			      rand_float());
+	if (v.length() != 0.0) {
+		v.normalize();
+	}
+	return v;
 }

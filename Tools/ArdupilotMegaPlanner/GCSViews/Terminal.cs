@@ -146,9 +146,13 @@ namespace ArdupilotMega.GCSViews
                             }
                         }
                         // do not change this  \r is correct - no \n
+                        if (cmd == "+++")
+                            comPort.Write(Encoding.ASCII.GetBytes(cmd), 0, cmd.Length);
+                        else {
                         comPort.Write(Encoding.ASCII.GetBytes(cmd + "\r"), 0, cmd.Length + 1);
+                        }
                     }
-                    catch { MessageBox.Show("Error writing to com port"); }
+                    catch { CustomMessageBox.Show("Error writing to com port"); }
                 }
             }
             /*
@@ -167,14 +171,14 @@ namespace ArdupilotMega.GCSViews
         {
             try
             {
-                MainV2.givecomport = true;
+                MainV2.giveComport = true;
 
                 if (comPort.IsOpen)
                     comPort.Close();
 
                 comPort.ReadBufferSize = 1024 * 1024;
 
-                comPort.PortName = MainV2.comportname;
+                comPort.PortName = MainV2.comPortName;
 
                 comPort.Open();
 
@@ -197,9 +201,11 @@ namespace ArdupilotMega.GCSViews
                         }
                         catch { return; }
                     }
-
+                    try
+                    {
                         comPort.Write("\n\n\n");
-
+                    }
+                    catch { return; }
                     while (threadrun)
                     {
                         try
@@ -228,7 +234,6 @@ namespace ArdupilotMega.GCSViews
                 t11.IsBackground = true;
                 t11.Name = "Terminal serial thread";
                 t11.Start();
-                MainV2.threads.Add(t11);
 
                 // doesnt seem to work on mac
                 //comPort.DataReceived += new SerialDataReceivedEventHandler(comPort_DataReceived);
@@ -289,7 +294,7 @@ namespace ArdupilotMega.GCSViews
         private void Logs_Click(object sender, EventArgs e)
         {
             Form Log = new Log();
-            MainV2.fixtheme(Log);
+            ThemeManager.ApplyThemeTo(Log);
             inlogview = true;
             Log.ShowDialog();
             inlogview = false;
@@ -298,7 +303,7 @@ namespace ArdupilotMega.GCSViews
         private void BUT_logbrowse_Click(object sender, EventArgs e)
         {
             Form logbrowse = new LogBrowse();
-            MainV2.fixtheme(logbrowse);
+            ThemeManager.ApplyThemeTo(logbrowse);
             logbrowse.ShowDialog();
         }
     }

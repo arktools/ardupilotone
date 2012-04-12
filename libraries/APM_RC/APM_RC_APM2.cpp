@@ -20,7 +20,12 @@
 */
 #include "APM_RC_APM2.h"
 
-#include "WProgram.h"
+#include <avr/interrupt.h>
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include "WProgram.h"
+#endif
 
 #if !defined(__AVR_ATmega1280__) && !defined(__AVR_ATmega2560__)
 # error Please check the Tools/Board menu to ensure you have selected Arduino Mega as your target.
@@ -80,9 +85,8 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   pinMode(11,OUTPUT); // OUT2 (PB5/OC1A)
 
   // WGM: 1 1 1 0. Clear Timer on Compare, TOP is ICR1.
-  // COM1A and COM1B enabled, set to low level on match.
   // CS11: prescale by 8 => 0.5us tick
-  TCCR1A =((1<<WGM11)|(1<<COM1A1)|(1<<COM1B1));
+  TCCR1A =((1<<WGM11));
   TCCR1B = (1<<WGM13)|(1<<WGM12)|(1<<CS11);
   ICR1 = 40000; // 0.5us tick => 50hz freq
   OCR1A = 0xFFFF; // Init OCR registers to nil output signal
@@ -94,9 +98,8 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   pinMode(6,OUTPUT); // OUT5 (PH3/OC4A)
 
   // WGM: 1 1 1 0. Clear Timer on Compare, TOP is ICR4.
-  // COM4A, 4B, 4C enabled, set to low level on match.
   // CS41: prescale by 8 => 0.5us tick
-  TCCR4A =((1<<WGM41)|(1<<COM4A1)|(1<<COM4B1)|(1<<COM4C1));
+  TCCR4A =((1<<WGM41));
   TCCR4B = (1<<WGM43)|(1<<WGM42)|(1<<CS41);
   OCR4A = 0xFFFF; // Init OCR registers to nil output signal
   OCR4B = 0xFFFF;
@@ -109,9 +112,8 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   pinMode(5,OUTPUT); // OUT8 (PE3/OC3A)
 
   // WGM: 1 1 1 0. Clear timer on Compare, TOP is ICR3
-  // COM3A, 3B, 3C enabled, set to low level on match
   // CS31: prescale by 8 => 0.5us tick
-  TCCR3A =((1<<WGM31)|(1<<COM3A1)|(1<<COM3B1)|(1<<COM3C1));
+  TCCR3A =((1<<WGM31));
   TCCR3B = (1<<WGM33)|(1<<WGM32)|(1<<CS31);
   OCR3A = 0xFFFF; // Init OCR registers to nil output signal
   OCR3B = 0xFFFF;
@@ -121,6 +123,8 @@ void APM_RC_APM2::Init( Arduino_Mega_ISR_Registry * isr_reg )
   //--------------- TIMER5: PPM INPUT ---------------------------------
   // Init PPM input on Timer 5
   pinMode(48, INPUT);  // PPM Input (PL1/ICP5)
+  pinMode(45, OUTPUT); // OUT10 (PL4/OC5B)
+  pinMode(44, OUTPUT); // OUT11 (PL5/OC5C)
 
   // WGM: 1 1 1 1. Fast PWM, TOP is OCR5A
   // COM all disabled.
@@ -152,29 +156,63 @@ void APM_RC_APM2::OutputCh(unsigned char ch, uint16_t pwm)
     case 5:  OCR3C=pwm; break;  // out6
     case 6:  OCR3B=pwm; break;  // out7
     case 7:  OCR3A=pwm; break;  // out8
+    case 9:  OCR5B=pwm; break;  // out10
+    case 10: OCR5C=pwm; break;  // out11
+  }
+}
+
+void APM_RC_APM2::enable_out(uint8_t ch)
+{
+  switch(ch) {
+    case 0: TCCR1A |= (1<<COM1B1); break; // CH_1 : OC1B
+    case 1: TCCR1A |= (1<<COM1A1); break; // CH_2 : OC1A
+    case 2: TCCR4A |= (1<<COM4C1); break; // CH_3 : OC4C
+    case 3: TCCR4A |= (1<<COM4B1); break; // CH_4 : OC4B
+    case 4: TCCR4A |= (1<<COM4A1); break; // CH_5 : OC4A
+    case 5: TCCR3A |= (1<<COM3C1); break; // CH_6 : OC3C
+    case 6: TCCR3A |= (1<<COM3B1); break; // CH_7 : OC3B
+    case 7: TCCR3A |= (1<<COM3A1); break; // CH_8 : OC3A
+    case 9: TCCR5A |= (1<<COM5B1); break; // CH_10 : OC5B
+    case 10: TCCR5A |= (1<<COM5C1); break; // CH_11 : OC5C
+  }
+}
+
+void APM_RC_APM2::disable_out(uint8_t ch)
+{
+  switch(ch) {
+    case 0: TCCR1A &= ~(1<<COM1B1); break; // CH_1 : OC1B
+    case 1: TCCR1A &= ~(1<<COM1A1); break; // CH_2 : OC1A
+    case 2: TCCR4A &= ~(1<<COM4C1); break; // CH_3 : OC4C
+    case 3: TCCR4A &= ~(1<<COM4B1); break; // CH_4 : OC4B
+    case 4: TCCR4A &= ~(1<<COM4A1); break; // CH_5 : OC4A
+    case 5: TCCR3A &= ~(1<<COM3C1); break; // CH_6 : OC3C
+    case 6: TCCR3A &= ~(1<<COM3B1); break; // CH_7 : OC3B
+    case 7: TCCR3A &= ~(1<<COM3A1); break; // CH_8 : OC3A
+    case 9: TCCR5A &= ~(1<<COM5B1); break; // CH_10 : OC5B
+    case 10: TCCR5A &= ~(1<<COM5C1); break; // CH_11 : OC5C
   }
 }
 
 uint16_t APM_RC_APM2::InputCh(unsigned char ch)
 {
-  uint16_t result;
-  uint16_t result2;
+	uint16_t result;
 
 	if (_HIL_override[ch] != 0) {
 		return _HIL_override[ch];
 	}
 
-  // Because servo pulse variables are 16 bits and the interrupts are running values could be corrupted.
-  // We dont want to stop interrupts to read radio channels so we have to do two readings to be sure that the value is correct...
-  result =  _PWM_RAW[ch]>>1;  // Because timer runs at 0.5us we need to do value/2
-  result2 = _PWM_RAW[ch]>>1;
-  if (result != result2)
-    result =  _PWM_RAW[ch]>>1;   // if the results are different we make a third reading (this should be fine)
+	// we need to block interrupts during the read of a 16 bit
+	// value
+	cli();
+	result = _PWM_RAW[ch];
+	sei();
+	// Because timer runs at 0.5us we need to do value/2
+	result >>= 1;
 
-  // Limit values to a valid range
-  result = constrain(result,MIN_PULSEWIDTH,MAX_PULSEWIDTH);
-  _radio_status=0; // Radio channel read
-  return(result);
+	// Limit values to a valid range
+	result = constrain(result,MIN_PULSEWIDTH,MAX_PULSEWIDTH);
+	_radio_status = 0; // Radio channel read
+	return result;
 }
 
 unsigned char APM_RC_APM2::GetState(void)
@@ -190,71 +228,22 @@ void APM_RC_APM2::Force_Out2_Out3(void) { }
 void APM_RC_APM2::Force_Out6_Out7(void) { }
 
 /* ---------------- OUTPUT SPEED CONTROL ------------------ */
-// Output rate options:
-#define OUTPUT_SPEED_50HZ 0
-#define OUTPUT_SPEED_200HZ 1
-#define OUTPUT_SPEED_400HZ 2
 
-void APM_RC_APM2::SetFastOutputChannels(uint32_t chmask)
+void APM_RC_APM2::SetFastOutputChannels(uint32_t chmask, uint16_t speed_hz)
 {
-    if ((chmask & ( _BV(CH_1) | _BV(CH_2))) != 0)
-        _set_speed_ch1_ch2(OUTPUT_SPEED_400HZ);
+	uint16_t icr = _map_speed(speed_hz);
 
-    if ((chmask & ( _BV(CH_3) | _BV(CH_4) | _BV(CH_5))) != 0)
-        _set_speed_ch3_ch4_ch5(OUTPUT_SPEED_400HZ);
+	if ((chmask & ( _BV(CH_1) | _BV(CH_2))) != 0) {
+		ICR1 = icr;
+	}
 
-    if ((chmask & ( _BV(CH_6) | _BV(CH_7) | _BV(CH_8))) != 0)
-        _set_speed_ch6_ch7_ch8(OUTPUT_SPEED_400HZ);
-}
+	if ((chmask & ( _BV(CH_3) | _BV(CH_4) | _BV(CH_5))) != 0) {
+		ICR4 = icr;
+	}
 
-void APM_RC_APM2::_set_speed_ch1_ch2(uint8_t speed)
-{
-  switch(speed) {
-  case OUTPUT_SPEED_400HZ:
-    ICR1 = 5000;
-    break;
-  case OUTPUT_SPEED_200HZ:
-    ICR1 = 10000;
-    break;
-  case OUTPUT_SPEED_50HZ:
-  default:
-    ICR1 = 40000;
-    break;
-  }
-}
-
-void APM_RC_APM2::_set_speed_ch3_ch4_ch5(uint8_t speed)
-{
-  switch(speed) {
-  case OUTPUT_SPEED_400HZ:
-    ICR4 = 5000;
-    break;
-  case OUTPUT_SPEED_200HZ:
-    ICR4 = 10000;
-    break;
-  case OUTPUT_SPEED_50HZ:
-  default:
-    ICR4 = 40000;
-    break;
-  }
-
-}
-
-void APM_RC_APM2::_set_speed_ch6_ch7_ch8(uint8_t speed)
-{
-  switch(speed) {
-  case OUTPUT_SPEED_400HZ:
-    ICR3 = 5000;
-    break;
-  case OUTPUT_SPEED_200HZ:
-    ICR3 = 10000;
-    break;
-  case OUTPUT_SPEED_50HZ:
-  default:
-    ICR3 = 40000;
-    break;
-  }
-
+	if ((chmask & ( _BV(CH_6) | _BV(CH_7) | _BV(CH_8))) != 0) {
+		ICR3 = icr;
+	}
 }
 
 // allow HIL override of RC values

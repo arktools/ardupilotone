@@ -38,7 +38,7 @@ static void stabilize()
         // handle this is to ensure both go in the same direction from
         // zero
         nav_roll += 18000;
-        if (dcm.roll_sensor < 0) nav_roll -= 36000;
+        if (ahrs.roll_sensor < 0) nav_roll -= 36000;
     }
 
 	// For Testing Only
@@ -48,11 +48,11 @@ static void stabilize()
 
 	// Calculate dersired servo output for the roll
 	// ---------------------------------------------
-	g.channel_roll.servo_out = g.pidServoRoll.get_pid((nav_roll - dcm.roll_sensor), delta_ms_fast_loop, speed_scaler);
+	g.channel_roll.servo_out = g.pidServoRoll.get_pid((nav_roll - ahrs.roll_sensor), delta_ms_fast_loop, speed_scaler);
 	long tempcalc = nav_pitch +
-	        fabs(dcm.roll_sensor * g.kff_pitch_compensation) +
+	        fabs(ahrs.roll_sensor * g.kff_pitch_compensation) +
 	        (g.channel_throttle.servo_out * g.kff_throttle_to_pitch) -
-	        (dcm.pitch_sensor - g.pitch_trim);
+	        (ahrs.pitch_sensor - g.pitch_trim);
     if (inverted_flight) {
         // when flying upside down the elevator control is inverted
         tempcalc = -tempcalc;
@@ -120,7 +120,7 @@ static void stabilize()
 
 static void crash_checker()
 {
-	if(dcm.pitch_sensor < -4500){
+	if(ahrs.pitch_sensor < -4500){
 		crash_timer = 255;
 	}
 	if(crash_timer > 0)
@@ -215,7 +215,7 @@ static void calc_nav_roll()
 	nav_roll = constrain(nav_roll, -g.roll_limit.get(), g.roll_limit.get());
 
 	Vector3f omega;
-	omega = dcm.get_gyro();
+	omega = ahrs.get_gyro();
 
 	// rate limiter
 	long rate		= degrees(omega.z) * 100; 										// 3rad = 17188 , 6rad = 34377
@@ -314,7 +314,6 @@ static void set_servos(void)
 		if (g.mix_mode == 0) {
 			g.channel_roll.calc_pwm();
 			g.channel_pitch.calc_pwm();
-			g.channel_rudder.calc_pwm();
 			if (g_rc_function[RC_Channel_aux::k_aileron]) {
 				g_rc_function[RC_Channel_aux::k_aileron]->servo_out = g.channel_roll.servo_out;
 				g_rc_function[RC_Channel_aux::k_aileron]->calc_pwm();
@@ -329,6 +328,7 @@ static void set_servos(void)
 			g.channel_roll.radio_out =	elevon1_trim + (BOOL_TO_SIGN(g.reverse_ch1_elevon) * (ch1 * 500.0/ SERVO_MAX));
 			g.channel_pitch.radio_out =	elevon2_trim + (BOOL_TO_SIGN(g.reverse_ch2_elevon) * (ch2 * 500.0/ SERVO_MAX));
 		}
+		g.channel_rudder.calc_pwm();
 
 		#if THROTTLE_OUT == 0
 			g.channel_throttle.servo_out = 0;

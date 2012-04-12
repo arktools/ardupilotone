@@ -27,6 +27,7 @@ extern "C" {
 typedef char PROGMEM prog_char;
 extern int strcasecmp_P(const char *, PGM_P) __ATTR_PURE__;
 extern int strcmp_P(const char *, PGM_P) __ATTR_PURE__;
+extern int strncmp_P(const char *, PGM_P, size_t n) __ATTR_PURE__;
 extern size_t strlcat_P (char *, PGM_P, size_t );
 extern size_t strnlen_P (PGM_P, size_t );
 extern size_t strlen_P (PGM_P);
@@ -35,6 +36,7 @@ extern char *strncpy_P(char *dest, PGM_P src, size_t n);
 extern void *memcpy_P(void *dest, PGM_P src, size_t n);
 
 static inline uint8_t pgm_read_byte(PGM_P s) { return (uint8_t)*s; }
+	static inline uint8_t pgm_read_byte_far(const void *s) { return *(const uint8_t *)s; }
 static inline uint16_t pgm_read_word(const void *s) { return *(const uint16_t *)s; }
 
 #define GETBYTE(flag, mask, pnt)        ({      \

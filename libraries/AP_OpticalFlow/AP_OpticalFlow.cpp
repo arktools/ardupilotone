@@ -18,16 +18,16 @@ AP_OpticalFlow* AP_OpticalFlow::_sensor = NULL;  // pointer to the last instanti
 bool
 AP_OpticalFlow::init(bool initCommAPI)
 {
-	_orientation_matrix = Matrix3f(1, 0, 0, 0, 1, 0, 0, 0, 1);
-    update_conversion_factors();
-    return true;  // just return true by default
+	_orientation = ROTATION_NONE;
+	update_conversion_factors();
+	return true;  // just return true by default
 }
 
 // set_orientation - Rotation vector to transform sensor readings to the body frame.
 void
-AP_OpticalFlow::set_orientation(const Matrix3f &rotation_matrix)
+AP_OpticalFlow::set_orientation(enum Rotation rotation)
 {
-    _orientation_matrix = rotation_matrix;
+    _orientation = rotation;
 }
 
 // read value from the sensor.  Should be overridden by derived class
@@ -54,10 +54,12 @@ AP_OpticalFlow::write_register(byte address, byte value)
 void
 AP_OpticalFlow::apply_orientation_matrix()
 {
-    Vector3f rot_vector;
+	Vector3f rot_vector;
+	rot_vector(raw_dx, raw_dy, 0);
 
 	// next rotate dx and dy
-	rot_vector = _orientation_matrix * Vector3f(raw_dx, raw_dy, 0);
+	rot_vector.rotate(_orientation);
+
 	dx = rot_vector.x;
 	dy = rot_vector.y;
 
@@ -109,30 +111,3 @@ AP_OpticalFlow::update_position(float roll, float pitch, float cos_yaw_x, float 
 	_last_roll = roll;
 	_last_pitch = pitch;
 }
-
-
-/*
-{
-	// only update position if surface quality is good and angle is not over 45 degrees
-	if( surface_quality >= 10 && fabs(_dcm->roll) <= FORTYFIVE_DEGREES && fabs(_dcm->pitch) <= FORTYFIVE_DEGREES ) {
-		altitude = max(altitude, 0);
-		Vector3f omega = _dcm->get_gyro();
-
-		// calculate expected x,y diff due to roll and pitch change
-		float exp_change_x =  omega.x * radians_to_pixels;
-		float exp_change_y = -omega.y * radians_to_pixels;
-
-		// real estimated raw change from mouse
-		float change_x = dx - exp_change_x;
-		float change_y = dy - exp_change_y;
-
-		// convert raw change to horizontal movement in cm
-		float x_cm = -change_x * altitude * conv_factor;	// perhaps this altitude should actually be the distance to the ground?	i.e. if we are very rolled over it should be longer?
-		float y_cm = -change_y * altitude * conv_factor;	// for example if you are leaned over at 45 deg the ground will appear farther away and motion from opt flow sensor will be less
-
-		vlon =  (float)x_cm * sin_yaw_y - (float)y_cm * cos_yaw_x;
-		vlat =  (float)y_cm * sin_yaw_y - (float)x_cm * cos_yaw_x;
-	}
-}
-
-*/

@@ -116,7 +116,11 @@ public:
 	virtual int read(void);
 	virtual int peek(void);
 	virtual void flush(void);
+#if defined(ARDUINO) && ARDUINO >= 100
+	virtual size_t write(uint8_t c);
+#else
 	virtual void write(uint8_t c);
+#endif
 	using BetterStream::write;
 	//@}
 
@@ -156,6 +160,11 @@ public:
 		return (1<<port) & _serialInitialized;
 	}
 
+	// ask for writes to be blocking or non-blocking
+	void set_blocking_writes(bool blocking) {
+		_nonblocking_writes = !blocking;
+	}
+
 private:
 
 	/// Bit mask for initialized ports
@@ -182,6 +191,10 @@ private:
 	Buffer			* const _rxBuffer;
 	Buffer			* const _txBuffer;
 	bool 			_open;
+
+	// whether writes to the port should block waiting
+	// for enough space to appear
+	bool			_nonblocking_writes;
 
 	/// Allocates a buffer of the given size
 	///

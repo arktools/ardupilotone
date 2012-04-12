@@ -21,6 +21,9 @@ heli:
 apm2:
 	make -f Makefile EXTRAFLAGS="-DCONFIG_APM_HARDWARE=APM_HARDWARE_APM2"
 
+apm2hexa:
+	make -f Makefile EXTRAFLAGS="-DCONFIG_APM_HARDWARE=APM_HARDWARE_APM2 -DFRAME_CONFIG=HEXA_FRAME"
+
 apm2beta:
 	make -f Makefile EXTRAFLAGS="-DCONFIG_APM_HARDWARE=APM_HARDWARE_APM2 -DAPM2_BETA_HARDWARE"
 
@@ -38,6 +41,9 @@ sitl-hexa:
 
 sitl-y6:
 	make -f ../libraries/Desktop/Makefile.desktop y6
+
+sitl-quaternion:
+	make -f ../libraries/Desktop/Makefile.desktop EXTRAFLAGS="-DQUATERNION_ENABLE=ENABLED"
 
 etags:
 	cd .. && etags -f ArduCopter/TAGS --langmap=C++:.pde.cpp.h $$(git ls-files ArduCopter libraries)

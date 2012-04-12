@@ -3,8 +3,12 @@
 
 #include "AP_InertialSensor_MPU6000.h"
 
-#include <wiring.h>
 #include <SPI.h>
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include <wiring.h>
+#endif
 
 // MPU 6000 registers
 #define MPUREG_WHOAMI 0x75 //
@@ -150,6 +154,11 @@ bool AP_InertialSensor_MPU6000::update( void )
 	_temp    = _temp_to_celsius(sum[_temp_data_index] * count_scale);
 
 	return true;
+}
+
+bool AP_InertialSensor_MPU6000::new_data_available( void )
+{
+    return _count != 0;
 }
 
 float AP_InertialSensor_MPU6000::gx() { return _gyro.x; }
@@ -313,4 +322,12 @@ float AP_InertialSensor_MPU6000::_temp_to_celsius ( uint16_t regval )
 {
     /* TODO */
     return 20.0;
+}
+
+// return the MPU6k gyro drift rate in radian/s/s
+// note that this is much better than the oilpan gyros
+float AP_InertialSensor_MPU6000::get_gyro_drift_rate(void)
+{
+    // 0.5 degrees/second/minute
+    return ToRad(0.5/60);
 }

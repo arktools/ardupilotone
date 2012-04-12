@@ -16,7 +16,11 @@
 #define _AP_COMMON_H
 
 // Get the common arduino functions
-#include "wiring.h"
+#if defined(ARDUINO) && ARDUINO >= 100
+	#include "Arduino.h"
+#else
+	#include "wiring.h"
+#endif
 // ... and remove some of their stupid macros
 #undef round
 #undef abs
@@ -34,9 +38,13 @@ typedef struct {
 #include "c++.h" // c++ additions
 //#include "AP_Vector.h"
 //#include "AP_Loop.h"
+
+// default to AP_Param system, unless USE_AP_VAR is defined
+#ifdef USE_AP_VAR
 #include "AP_Var.h"
-
-
+#else
+#include "AP_Param.h"
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @name	Warning control
@@ -219,5 +227,11 @@ struct Location {
 
 //@}
 
+#ifdef DESKTOP_BUILD
+// used to report serious errors in autotest
+# define SITL_debug(fmt, args...)  fprintf(stdout, "%s:%u " fmt, __FUNCTION__, __LINE__, ##args)
+#else
+# define SITL_debug(fmt, args...)
+#endif
 
 #endif // _AP_COMMON_H

@@ -16,6 +16,7 @@ static void process_nav_command()
 			break;
 
 		case MAV_CMD_NAV_LAND:	// 21 LAND to Waypoint
+			yaw_mode 		= YAW_HOLD;
 			do_land();
 			break;
 
@@ -121,8 +122,6 @@ static void process_now_command()
 
 static bool verify_must()
 {
-	//Serial.printf("vmust: %d\n", command_nav_ID);
-
 	switch(command_nav_queue.id) {
 
 		case MAV_CMD_NAV_TAKEOFF:
@@ -130,7 +129,11 @@ static bool verify_must()
 			break;
 
 		case MAV_CMD_NAV_LAND:
-			return verify_land();
+			if(g.sonar_enabled == true){
+				return verify_land_sonar();
+			}else{
+				return verify_land_baro();
+			}
 			break;
 
 		case MAV_CMD_NAV_WAYPOINT:
@@ -205,6 +208,10 @@ static void do_RTL(void)
 	// --------------------
 	set_next_WP(&temp);
 
+
+	// We want to come home and stop on a dime
+	slow_wp = true;
+
 	// output control mode to the ground station
 	// -----------------------------------------
 	gcs_send_message(MSG_HEARTBEAT);
@@ -229,6 +236,9 @@ static void do_takeoff()
 		temp.alt = command_nav_queue.alt;
 		//Serial.printf("abs alt: %ld",temp.alt);
 	}
+
+	// prevent flips
+	reset_I_all();
 
 	// Set our waypoint
 	set_next_WP(&temp);
@@ -265,13 +275,21 @@ static void do_land()
 {
 	wp_control = LOITER_MODE;
 
+	// just to make sure
 	land_complete		= false;
+
+	// landing boost lowers the main throttle to mimmick
+	// the effect of a user's hand
+	landing_boost 		= 0;
+
+	// A counter that goes up if our climb rate stalls out.
+	ground_detector 	= 0;
 
 	// hold at our current location
 	set_next_WP(&current_loc);
 
-	// Set a new target altitude
-	set_new_altitude(-200);
+	// Set a new target altitude very low, incase we are landing on a hill!
+	set_new_altitude(-1000);
 }
 
 static void do_loiter_unlimited()
@@ -331,7 +349,6 @@ static void do_loiter_time()
 
 static bool verify_takeoff()
 {
-
 	// wait until we are ready!
 	if(g.rc_3.control_in == 0){
 		return false;
@@ -341,46 +358,79 @@ static bool verify_takeoff()
 	return (current_loc.alt > target_altitude);
 }
 
-static bool verify_land()
+// called at 10hz
+static bool verify_land_sonar()
 {
+	static float icount = 1;
 
-	static int32_t 	old_alt = 0;
-	static int16_t	velocity_land = -1;
-
-	// landing detector
-	if ((current_loc.alt - home.alt) > 300){
-		old_alt = current_loc.alt;
-		velocity_land = 2000;
+	if(current_loc.alt > 300){
+		wp_control = LOITER_MODE;
+		icount = 1;
+		ground_detector = 0;
 	}else{
-		// a LP filter used to tell if we have landed
-		// will drive to 0 if we are on the ground - maybe, the baro is noisy
-		int16_t delta = (old_alt - current_loc.alt) << 3;
-		velocity_land = ((velocity_land * 7) + delta ) / 8;
-	}
-
-	//Serial.printf("velocity_land %d \n", velocity_land);
-
-	// remenber altitude for climb_rate
-	old_alt = current_loc.alt;
-
-	if ((current_loc.alt - home.alt) < 200){
-		// don't bank to hold position
-		wp_control = NO_NAV_MODE;
-		// try and come down faster
+		// begin to pull down on the throttle
 		landing_boost++;
-		landing_boost 	= min(landing_boost, 30);
-	}else{
-		landing_boost 	= 0;
-		wp_control 		= LOITER_MODE;
+		landing_boost = min(landing_boost, 40);
 	}
 
-	if((current_loc.alt - home.alt)  < 100 && velocity_land <= 50){
-		land_complete = true;
-		landing_boost = 0;
+	if(current_loc.alt < 200 ){
+		wp_control 	= NO_NAV_MODE;
+	}
 
-		// reset old_alt
-		old_alt = 0;
-		return true;
+	if(current_loc.alt < 150 ){
+		//rapid throttle reduction
+		//int16_t lb  = (1.75 * icount * icount) - (7.2 * icount);
+		//icount++;
+		//lb =  constrain(lb, 0, 180);
+		//landing_boost += lb;
+		//Serial.printf("%0.0f, %d, %d, %d\n", icount, current_loc.alt, landing_boost, lb);
+
+		// if we are low or don't seem to be decending much, increment ground detector
+		if(current_loc.alt < 40 || abs(climb_rate) < 20) {
+			landing_boost++;  // reduce the throttle at twice the normal rate
+			if(ground_detector++ >= 30) {
+				land_complete = true;
+				ground_detector = 30;
+				icount = 1;
+				if(g.rc_3.control_in == 0){
+					// init disarm motors
+					init_disarm_motors();
+				}
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+static bool verify_land_baro()
+{
+	if(current_loc.alt > 300){
+		wp_control = LOITER_MODE;
+		ground_detector = 0;
+	}else{
+		// begin to pull down on the throttle
+		landing_boost++;
+		landing_boost = min(landing_boost, 40);
+	}
+
+	if(current_loc.alt < 200 ){
+		wp_control 	= NO_NAV_MODE;
+	}
+
+	if(current_loc.alt < 150 ){
+		if(abs(climb_rate) < 20) {
+			landing_boost++;
+			if(ground_detector++ >= 30) {
+				land_complete = true;
+				ground_detector = 30;
+				if(g.rc_3.control_in == 0){
+					// init disarm motors
+					init_disarm_motors();
+				}
+				return true;
+			}
+		}
 	}
 	return false;
 }
@@ -512,7 +562,7 @@ static void do_change_alt()
 
 static void do_within_distance()
 {
-	condition_value	 = command_cond_queue.lat;
+	condition_value	 = command_cond_queue.lat * 100;
 }
 
 static void do_yaw()
@@ -621,7 +671,7 @@ static bool verify_yaw()
 	if((millis() - command_yaw_start_time) > command_yaw_time){
 		// time out
 		// make sure we hold at the final desired yaw angle
-		nav_yaw = command_yaw_end;
+		nav_yaw 	= command_yaw_end;
 		auto_yaw 	= nav_yaw;
 
 		//Serial.println("Y");
